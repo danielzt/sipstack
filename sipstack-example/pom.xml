@@ -16,11 +16,22 @@
   <description />
 
   <dependencies>
+
      <dependency>
        <groupId>io.sipstack</groupId>
        <artifactId>sipstack-netty-codec-sip</artifactId>
-       <version>${project.version}</version> 
      </dependency>
+
+     <dependency>
+       <groupId>io.sipstack</groupId>
+       <artifactId>sipstack-core</artifactId>
+     </dependency>
+
+   <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+   </dependency>
+
   </dependencies>
 
 </project>

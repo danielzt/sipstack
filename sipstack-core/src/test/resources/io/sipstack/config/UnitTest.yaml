@@ -1,0 +1,8 @@
+# Test yaml file used by unit test.
+
+name: hello
+
+sip:
+    listen: 
+        - 127.0.0.1:5060 as 192.168.0.100
+

@@ -5,6 +5,8 @@
 
 .idea
 
+*.iml
+
 # Where maven compiles by default
 target
 
@@ -18,3 +20,5 @@ target
 
 # Backup files
 *.bak
+
+.cache

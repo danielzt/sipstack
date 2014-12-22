@@ -5,6 +5,7 @@ import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipParseException;
 import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.PreConditions;
+import io.pkts.packet.sip.impl.SipParser;
 
 import java.io.IOException;
 
@@ -47,6 +48,31 @@ public class ListeningPointConfiguration {
             return transport;
         }
         return Buffers.EMPTY_BUFFER;
+    }
+
+    @JsonIgnore
+    public boolean isUDP() {
+        return SipParser.isUDPLower(getTransport());
+    }
+
+    @JsonIgnore
+    public boolean isTCP() {
+        return SipParser.isTCPLower(getTransport());
+    }
+
+    @JsonIgnore
+    public boolean isTLS() {
+        return SipParser.isTLSLower(getTransport());
+    }
+
+    @JsonIgnore
+    public boolean isWS() {
+        return SipParser.isWSLower(getTransport());
+    }
+
+    @JsonIgnore
+    public boolean isSCTP() {
+        return SipParser.isSCTPLower(getTransport());
     }
 
     @JsonIgnore

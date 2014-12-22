@@ -1,0 +1,26 @@
+# Test yaml file used by unit test.
+
+name: wow
+
+sip:
+    interface:
+         - name: public
+           listen: 62.10.20.40:5090
+           transport: [tls]
+           vipAddress: 64.92.13.45:5060
+
+         - name: private
+           listen: 10.36.10.100
+           transport: [udp ]
+
+         - name: local
+           listen: 127.0.0.1
+           transport:
+               - tcp
+               - udp
+
+         - name: wlan0
+           listen: 192.168.0.100
+           transport: ws
+
+

@@ -3,6 +3,7 @@
  */
 package io.sipstack.config;
 
+import java.util.Collections;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -15,11 +16,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class SipConfiguration {
 
-    @JsonProperty
-    private List<ListeningPointConfiguration> listen;
+    // @JsonProperty
+    // private List<ListeningPointConfiguration> listen;
+
+    @JsonProperty("interface")
+    private List<NetworkInterfaceConfiguration> networkInterfaces;
 
     @JsonIgnore
-    public List<ListeningPointConfiguration> getListeningPoints() {
-        return this.listen;
+    public List<NetworkInterfaceConfiguration> getNetworkInterfaces() {
+        if (this.networkInterfaces == null) {
+            return Collections.emptyList();
+        }
+        return this.networkInterfaces;
     }
 }

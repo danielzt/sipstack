@@ -14,8 +14,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * @author jonas
- *
+ * @author jonas@jonasborjesson.com
  */
 public final class MySipApplication extends Application<MyConfiguration> {
 

@@ -1,0 +1,7 @@
+
+sip:
+    listen: 
+        - 327.0.0.1:5060;transport=tcp as 64.92.13.45:5090
+        - 127.0.0.1:5060;transport=udp as 64.92.13.45:5090
+        - 192.168.0.100:5060;transport=udp 
+

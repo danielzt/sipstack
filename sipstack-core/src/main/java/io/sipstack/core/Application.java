@@ -6,6 +6,10 @@ package io.sipstack.core;
 import static io.pkts.packet.sip.impl.PreConditions.checkIfEmpty;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
+import io.sipstack.config.NetworkInterfaceConfiguration;
+import io.sipstack.config.NetworkInterfaceDeserializer;
+import io.sipstack.server.NetworkLayer;
+import io.sipstack.server.SipBridgeHandler;
 import io.sipstack.utils.Generics;
 
 import java.io.FileInputStream;
@@ -19,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 /**
@@ -102,8 +107,14 @@ public abstract class Application<T extends Configuration> {
             run(config, environment);
 
             // Create and initialize the actual Sip server
+            final NetworkLayer.Builder<T> networkBuilder = NetworkLayer.with(config, environment);
+            final SipBridgeHandler handler = new SipBridgeHandler();
+            networkBuilder.serverHandler(handler);
+            final NetworkLayer server = networkBuilder.build();
+            server.start();
 
-
+            // will wait until server shuts down again.
+            server.sync();
 
         } catch (JsonParseException | JsonMappingException e) {
             logger.error("Unable to parse the configuration file", e);
@@ -162,6 +173,9 @@ public abstract class Application<T extends Configuration> {
     @SuppressWarnings("unchecked")
     public <T> T loadConfiguration(final InputStream stream) throws JsonParseException, JsonMappingException, IOException {
         final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        final SimpleModule module = new SimpleModule();
+        module.addDeserializer(NetworkInterfaceConfiguration.class, new NetworkInterfaceDeserializer());
+        mapper.registerModule(module);
         return mapper.readValue(stream, (Class<T>)Generics.getTypeParameter(getClass()));
     }
 

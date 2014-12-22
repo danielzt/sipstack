@@ -17,6 +17,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class Configuration {
 
+    /**
+     * The name of the application.
+     */
+    @Valid
+    @NotNull
+    @JsonProperty
+    private String name;
+
+
     @Valid
     @NotNull
     @JsonProperty
@@ -39,6 +48,20 @@ public class Configuration {
      */
     public SipConfiguration getSipConfiguration() {
         return this.sip;
+    }
+
+    /**
+     * @return the name
+     */
+    public String getName() {
+        return this.name;
+    }
+
+    /**
+     * @param name the name to set
+     */
+    public void setName(final String name) {
+        this.name = name;
     }
 
 }

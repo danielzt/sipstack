@@ -20,7 +20,11 @@
     <dependency>
 	<groupId>args4j</groupId>
 	<artifactId>args4j</artifactId>
-        <version>${args4j.version}</version>
+    </dependency>
+
+    <dependency>
+        <groupId>com.typesafe.akka</groupId>
+        <artifactId>akka-actor_${scala-tools.version}</artifactId>
     </dependency>
 
      <dependency>
@@ -50,8 +54,18 @@
     </dependency>
 
     <dependency>
+      <groupId>io.sipstack</groupId>
+      <artifactId>sipstack-configuration</artifactId>
+    </dependency>
+
+    <dependency>
        <groupId>io.sipstack</groupId>
-       <artifactId>sipstack-netty-codec-sip</artifactId>
+       <artifactId>sipstack-network-layer</artifactId>
+     </dependency>
+
+    <dependency>
+       <groupId>io.sipstack</groupId>
+       <artifactId>sipstack-transaction</artifactId>
      </dependency>
 
     <dependency>

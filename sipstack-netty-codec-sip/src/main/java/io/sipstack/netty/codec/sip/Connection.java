@@ -17,6 +17,8 @@ import java.net.InetSocketAddress;
  */
 public interface Connection {
 
+    ConnectionId id();
+
     /**
      * Get the local port to which this {@link Connection} is listening to.
      * 
@@ -69,6 +71,8 @@ public interface Connection {
      * @return
      */
     String getRemoteIpAddress();
+
+    Transport getTransport();
 
     /**
      * Check whether or not this {@link Connection} is using UDP as its

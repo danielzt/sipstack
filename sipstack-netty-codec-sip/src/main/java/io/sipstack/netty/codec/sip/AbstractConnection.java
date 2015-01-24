@@ -20,7 +20,7 @@ import java.net.SocketAddress;
  */
 public abstract class AbstractConnection implements Connection {
 
-    // private final ChannelHandlerContext ctx;
+    private final ConnectionId id;
     private final Channel channel;
     private final InetSocketAddress remote;
 
@@ -29,14 +29,24 @@ public abstract class AbstractConnection implements Connection {
      * { this.ctx = ctx; this.channel = null; this.remote = remote; }
      */
 
-    protected AbstractConnection(final Channel channel, final InetSocketAddress remote) {
-        // this.ctx = null;
+    protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote) {
+        this.id = ConnectionId.create(transport, (InetSocketAddress)channel.localAddress(), remote);
         this.channel = channel;
         this.remote = remote;
     }
 
     protected Channel channel() {
         return this.channel;
+    }
+
+    @Override
+    public Transport getTransport() {
+        return this.id.getProtocol();
+    }
+
+    @Override
+    public ConnectionId id() {
+        return this.id;
     }
 
     @Override

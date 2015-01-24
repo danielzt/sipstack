@@ -7,6 +7,7 @@ import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
+import akka.actor.ActorRef;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -14,16 +15,20 @@ import io.sipstack.netty.codec.sip.SipMessageEvent;
 @Sharable
 public class SipBridgeHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
 
+    private final ActorRef akka;
+
+
     /**
      * 
      */
-    public SipBridgeHandler() {
-        // TODO Auto-generated constructor stub
+    public SipBridgeHandler(final ActorRef akka) {
+        this.akka = akka;
     }
+
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent msg) throws Exception {
-        System.err.println("got message: " + msg.getMessage());
+        this.akka.tell(msg, ActorRef.noSender());
     }
 
 }

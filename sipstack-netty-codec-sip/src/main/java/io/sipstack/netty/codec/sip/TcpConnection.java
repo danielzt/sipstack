@@ -9,13 +9,14 @@ import io.pkts.packet.sip.SipMessage;
 import java.net.InetSocketAddress;
 
 /**
+ *
  * @author jonas@jonasborjesson.com
  */
 public final class TcpConnection extends AbstractConnection {
 
 
     public TcpConnection(final Channel channel, final InetSocketAddress remote) {
-        super(channel, remote);
+        super(Transport.tcp, channel, remote);
     }
 
     /**

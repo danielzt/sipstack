@@ -33,9 +33,10 @@ final class ApplicationActor extends Actor {
   }
   
   def receive = {
-    
     case msg:IncomingRequest if msg.msg.isInvite() => doInvite(msg)
-    case _ => println("got something but not sure what: " + this)
+    case msg:IncomingRequest if msg.msg.isAck() => doAck(msg)
+    case msg:IncomingRequest if msg.msg.isBye() => doBye(msg)
+    case unknown => println("[ApplicationActor] got something but not sure what: " + unknown)
   }
   
   def doInvite(event:IncomingRequest) {
@@ -43,16 +44,18 @@ final class ApplicationActor extends Actor {
     val now = System.currentTimeMillis()
     val ringing = invite createResponse 180
     sender ! new OutgoingResponse(now, event.connectionId, event.transactionId, event.callId, ringing)
-    // sender ! request.createResponse(180)
-    // sender ! request.createResponse(200)
+    val ok = invite createResponse 200
+    sender ! new OutgoingResponse(now, event.connectionId, event.transactionId, event.callId, ok)
   }
   
-  def doAck(request:SipRequest) {
+  def doAck(event:IncomingRequest) {
     // ignore
   }
   
-  def doBye(request:SipRequest) {
-    sender ! request.createResponse(200)
+  def doBye(event:IncomingRequest) {
+    val now = System.currentTimeMillis()
+    val ok = event.msg.createResponse(200)
+    sender ! new OutgoingResponse(now, event.connectionId, event.transactionId, event.callId, ok)
     self ! PoisonPill
   }
   

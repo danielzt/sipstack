@@ -2,17 +2,18 @@ package io.sipstack.transaction
 
 import akka.actor.ActorRef
 import akka.actor.Props
-import io.sipstack.transport.FlowActor.IncomingRequest
 import io.sipstack.config.TransactionLayerConfiguration
+import io.sipstack.transport.FlowActor.IncomingRequest
 
 final object ServerTransaction {
   
-  def props(next:ActorRef, config:TransactionLayerConfiguration, req:IncomingRequest): Props = {
-    
+
+  
+  def props(previous:ActorRef, next:ActorRef, config:TransactionLayerConfiguration, req:IncomingRequest): Props = {
     if (req.msg.isInvite()) {
-      Props(new InviteServerTransaction(next, config, req))
+      Props(new InviteServerTransaction(previous, next, config, req))
     } else {
-        Props()
+      Props(new NonInviteServerTransaction(previous, next, config, req))
     }
   }
   

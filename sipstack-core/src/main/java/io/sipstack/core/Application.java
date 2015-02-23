@@ -4,17 +4,13 @@
 package io.sipstack.core;
 
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.application.ApplicationSupervisor;
+import io.sipstack.actor.ActorSystem;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.NetworkInterfaceDeserializer;
-import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.net.NetworkLayer;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
 import io.sipstack.server.SipBridgeHandler;
-import io.sipstack.transaction.TransactionSupervisor;
-import io.sipstack.transport.TransportSupervisor;
 import io.sipstack.utils.Generics;
 
 import java.io.FileInputStream;
@@ -25,11 +21,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import akka.actor.ActorRef;
-import akka.actor.ActorSystem;
-import akka.routing.ConsistentHashingPool;
-import akka.routing.ConsistentHashingRouter.ConsistentHashMapper;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
@@ -121,50 +112,9 @@ public abstract class Application<T extends Configuration> {
             // Create and initialize the actual Sip server
             final List<NetworkInterfaceConfiguration> ifs = config.getSipConfiguration().getNetworkInterfaces();
             final NetworkLayer.Builder networkBuilder = NetworkLayer.with(ifs);
-            final ActorSystem system = ActorSystem.create("sipstack");
-            final ConsistentHashMapper mapper = new ConsistentHashMapper() {
 
-                @Override
-                public Object hashKey(final Object message) {
-                    if (message instanceof io.sipstack.transport.FlowActor.IncomingMessage) {
-                        return ((io.sipstack.transport.FlowActor.IncomingMessage)message).callId();
-                    }
-
-                    // if (message instanceof io.sipstack.transport.FlowActor.IncomingRequest) {
-                    // return ((io.sipstack.transport.FlowActor.IncomingRequest)message).callId();
-                    // } else if (message instanceof io.sipstack.transport.FlowActor.IncomingResponse) {
-                    // return ((io.sipstack.transport.FlowActor.IncomingResponse)message).callId();
-                    // }
-                    return null;
-                }
-
-            };
-
-            final ConsistentHashMapper sipMessageEventMapper = new ConsistentHashMapper() {
-
-                @Override
-                public Object hashKey(final Object message) {
-                    try {
-                        return ((SipMessageEvent)message).getMessage().getCallIDHeader().getCallId().getArray();
-                    } catch (final Exception e) {
-                        e.printStackTrace();
-                    }
-                    return null;
-                }
-            };
-
-
-            final ConsistentHashingPool applicationPool = new ConsistentHashingPool(10).withHashMapper(mapper);
-            final ActorRef applicationRouter = system.actorOf(ApplicationSupervisor.props().withRouter(applicationPool));
-
-            final TransactionLayerConfiguration transactionConfig = config.getSipConfiguration().getTransaction();
-            final ConsistentHashingPool transactionPool = new ConsistentHashingPool(10).withHashMapper(mapper);
-            final ActorRef transactionRouter = system.actorOf(TransactionSupervisor.props(applicationRouter, transactionConfig).withRouter(transactionPool));
-
-            final ConsistentHashingPool transportPool = new ConsistentHashingPool(10).withHashMapper(sipMessageEventMapper);
-            final ActorRef transportRouter = system.actorOf(TransportSupervisor.props(transactionRouter).withRouter(transportPool));
-
-            final SipBridgeHandler handler = new SipBridgeHandler(transportRouter);
+            final ActorSystem system = new ActorSystem("sipstack.io");
+            final SipBridgeHandler handler = new SipBridgeHandler(system);
             networkBuilder.serverHandler(handler);
             final NetworkLayer server = networkBuilder.build();
             server.start();

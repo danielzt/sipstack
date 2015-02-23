@@ -22,10 +22,12 @@
 	<artifactId>args4j</artifactId>
     </dependency>
 
+<!--
     <dependency>
         <groupId>com.typesafe.akka</groupId>
         <artifactId>akka-actor_${scala-tools.version}</artifactId>
     </dependency>
+-->
 
      <dependency>
        <groupId>io.netty</groupId>
@@ -61,11 +63,6 @@
     <dependency>
        <groupId>io.sipstack</groupId>
        <artifactId>sipstack-network-layer</artifactId>
-     </dependency>
-
-    <dependency>
-       <groupId>io.sipstack</groupId>
-       <artifactId>sipstack-transaction</artifactId>
      </dependency>
 
     <dependency>

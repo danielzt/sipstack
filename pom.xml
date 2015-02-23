@@ -47,7 +47,7 @@
 
     <args4j.version>2.0.29</args4j.version> 
     <netty.version>4.1.0.Beta3</netty.version> 
-    <pkts.version>1.0.5-SNAPSHOT</pkts.version> 
+    <pkts.version>1.0.6-SNAPSHOT</pkts.version> 
     <sl4j.version>1.7.7</sl4j.version> 
     <logback.version>1.1.2</logback.version> 
     <log4j.version>1.2.14</log4j.version> 
@@ -68,7 +68,9 @@
     <module>sipstack-netty-codec-sip</module>
     <module>sipstack-network-layer</module>
     <module>sipstack-core</module>
+<!--
     <module>sipstack-transaction</module>
+-->
     <module>sipstack-example</module>
   </modules>
 
@@ -99,6 +101,7 @@
       <scope>compile</scope>
     </dependency>
 
+<!--
     <dependency>
       <groupId>io.sipstack</groupId>
       <artifactId>sipstack-transaction</artifactId>
@@ -106,6 +109,7 @@
       <type>jar</type>
       <scope>compile</scope>
     </dependency>
+-->
 
     <dependency>
       <groupId>io.sipstack</groupId>
@@ -139,6 +143,7 @@
       <scope>compile</scope>
     </dependency>
 
+<!--
     <dependency>
         <groupId>org.scala-lang</groupId>
         <artifactId>scala-library</artifactId>
@@ -161,6 +166,7 @@
        <type>jar</type>
        <scope>compile</scope>
     </dependency>
+-->
 
     <dependency>
         <groupId>org.yaml</groupId>
@@ -275,6 +281,7 @@
   <build>
       <pluginManagement>
             <plugins>
+<!--
                 <plugin>
                     <groupId>net.alchim31.maven</groupId>
                     <artifactId>scala-maven-plugin</artifactId>
@@ -285,6 +292,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>2.0.2</version>
                 </plugin>
+-->
             </plugins>
         </pluginManagement>
 

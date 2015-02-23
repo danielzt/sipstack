@@ -1,0 +1,28 @@
+* FlowActor always independently of any other pinned Actor threads. The reason is
+  that a flow can be shared by multiple transactions and as such it cannot be
+  tied to the execution flow of a single call-id key.
+* The stack has the ability to open up multiple Flows to the same destination in
+  case there are too many writes over a single Flow. This is important for situations
+  where there may be internal communcation between two very super busy servers using
+  TCP and therefore you setup multiple TCP connections between those servers.
+* If app ties up the same pool, it could kill everything! Perhaps a bad idea but it would
+  give us a complete lock free environemnt.
+  
+  Yeah, don't think its a good idea. Hence, app on its own thread and probably on its own
+  ThreadPool. We must protect the stack from bad applications.
+
+* When an Actor does ctx.fireUpstreamEvent(event) that event will NOT be processed
+  until the actor returns from its onEvent.
+* An Actor can do ctx.fireUpstreamEvent(event) as many times as it wish during a single
+  invocation of Actor.onEvent and it is guaranteed that those events will be processed
+  in the order at which they were fired.
+* An Actor can do both ctx.fireUpstream and ctx.fireDownstream during a single invocation
+  of Actor.onEvent.
+* If an Actor fires both upstream and downstream events, downstream events will ALWAYS
+  be processed first. The reason behind this is that downstrem events will go through
+  the sip stack and out on the network where other sip elements will process those events
+  and shut up etc. E.g., if the actor is a InviteServerTransaction and it process its
+  initial INVITE request it may issue a ctx.fireDownstreamEvent(100 trying) as well as
+  propagating the INVITE to the next upstream element in the pipeline but we really
+  want the 100 Trying to go out on the network asap in order to quence any retransmission
+  etc.

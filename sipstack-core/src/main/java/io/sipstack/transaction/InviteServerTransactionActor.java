@@ -111,7 +111,7 @@ public class InviteServerTransactionActor implements TransactionActor {
      * {@inheritDoc}
      */
     @Override
-    public void onEvent(final ActorContext ctx, final Event event) {
+    public void onUpstreamEvent(final ActorContext ctx, final Event event) {
         this.receive.accept(ctx, event);
     }
 

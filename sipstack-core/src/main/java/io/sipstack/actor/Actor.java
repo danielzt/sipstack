@@ -4,12 +4,11 @@
 package io.sipstack.actor;
 
 /**
- * @author jonas
- *
+ * @author jonas@jonasborjesson.com
  */
 public interface Actor {
 
-    void onEvent(ActorContext ctx, Event event);
+    void onUpstreamEvent(ActorContext ctx, Event event);
 
     void onDownstreamEvent(ActorContext ctx, Event event);
 

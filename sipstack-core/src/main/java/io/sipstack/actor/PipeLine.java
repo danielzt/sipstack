@@ -4,6 +4,7 @@
 package io.sipstack.actor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +27,12 @@ public interface PipeLine {
      * since a {@link PipeLine} is immutable, a new {@link PipeLine} is returned, which is one step
      * ahead of this one.
      * 
+     * Note that is is possible to walk off of the pipe, i.e., if you are at the last element in the
+     * pipe and call {@link #progress()} you will "walk off" and therefore {@link #next()} will
+     * return nothing. This is by design and allows you to detect when there are no more elements in
+     * the pipe and you can still at this point {@link #reverse()} the pipe and walk back the same
+     * way you came.
+     * 
      * @return a new {@link PipeLine} that is one step ahead of this one.
      */
     PipeLine progress();
@@ -36,6 +43,51 @@ public interface PipeLine {
      * Turn the pipe around based on the current location. The current location will be preserved
      * but is acting like it is going in the reverse direction compared to the original one.
      * 
+     * Example, if you have the following chain:
+     * 
+     * <pre>
+     *   A -> B -> C -> D
+     *   ^
+     *   |
+     * next
+     * </pre>
+     * 
+     * So you are currently pointing to the first element, which is your next, and if you reverse
+     * this around you will get:
+     * 
+     * <pre>
+     *   D -> C -> B -> A
+     *                  ^
+     *                  |
+     *                 next
+     * </pre>
+     * 
+     * Which would mean that next is still A but if you do {@link #progress()} you will in fact walk
+     * off the queue.
+     * 
+     * More commonly, you would have a situation where you have walked a portion, or all, of the
+     * chain and at that point you reverse like so:
+     * 
+     * <pre>
+     *   A -> B -> C -> D
+     *             ^
+     *             |
+     *            next
+     * </pre>
+     * 
+     * after {@link #reverse()}
+     * 
+     * <pre>
+     *   0    1    2    3
+     *   D -> C -> B -> A
+     *        ^
+     *        |
+     *       next
+     * </pre>
+     * 
+     * {@link #next()} will once again return C but now when you {@link #progress()} you will walk
+     * back the pipe compared to the previous direction.
+     * 
      * @return a new {@link PipeLine} that is in the reverse order compared to this one.
      */
     PipeLine reverse();
@@ -43,6 +95,10 @@ public interface PipeLine {
 
     static PipeLine withChain(final List<Actor> chain) {
         return new DefaultPipeLine(chain);
+    }
+
+    static PipeLine withChain(final Actor... actors) {
+        return new DefaultPipeLine(Arrays.asList(actors));
     }
 
     static class DefaultPipeLine implements PipeLine {
@@ -62,7 +118,7 @@ public interface PipeLine {
 
         @Override
         public Optional<Actor> next() {
-            if (next < chain.size()) {
+            if (next >= 0 && next < chain.size()) {
                 return Optional.of(chain.get(next));
             }
             return Optional.empty();
@@ -82,17 +138,18 @@ public interface PipeLine {
 
         @Override
         public PipeLine progress() {
-            return new DefaultPipeLine(next + 1, this.chain);
+            return new DefaultPipeLine(Math.min(next + 1, chain.size()), this.chain);
         }
 
         @Override
         public PipeLine reverse() {
             try {
-                final List<Actor> reverse = new ArrayList<>(next + 1);
-                for (int i = Math.min(next, chain.size() - 1); i >= 0; --i) {
+                final List<Actor> reverse = new ArrayList<>(chain.size());
+                for (int i = chain.size() - 1; i >= 0; --i) {
                     reverse.add(chain.get(i));
                 }
-                return new DefaultPipeLine(0, reverse);
+
+                return new DefaultPipeLine(chain.size() - next - 1, reverse);
             } catch (final IndexOutOfBoundsException e) {
                 throw e;
             }

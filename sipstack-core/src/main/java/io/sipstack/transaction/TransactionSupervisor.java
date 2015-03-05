@@ -38,7 +38,7 @@ public class TransactionSupervisor implements Actor {
     }
 
     @Override
-    public void onEvent(final ActorContext ctx, final Event event) {
+    public void onUpstreamEvent(final ActorContext ctx, final Event event) {
         final SipMessageEvent msg = (SipMessageEvent) event;
         final TransactionId id = TransactionId.create(msg.getMessage());
         final TransactionActor t = ensureTransaction(id, msg);

@@ -73,7 +73,7 @@ public class ActorContextTest {
         final CountDownLatch inboundLatch = new CountDownLatch(3);
         final CountDownLatch outboundLatch = new CountDownLatch(2);
         // note index 2 is of course our 3rd actor
-        final ActorContext ctx = prepare(3, inboundLatch, outboundLatch, 2);
+        final ActorContext ctx = prepare(3, inboundLatch, outboundLatch, 2, true);
         ctx.fireUpstreamEvent(new DummyEvent());
 
         assertThat("One of more Actors did not get inbound event", inboundLatch.await(1000, TimeUnit.MILLISECONDS),
@@ -90,16 +90,28 @@ public class ActorContextTest {
     @Test
     public void testBasicEventDownstreamPropagation() throws Exception {
         final CountDownLatch latch = new CountDownLatch(3);
-        final ActorContext ctx = prepare(latch);
+        final ActorContext ctx = prepareOutbound(latch);
         final Event event = new DummyEvent();
         ctx.fireDownstreamEvent(event);
 
         assertThat("One of more Actors did not get event", latch.await(1000, TimeUnit.MILLISECONDS), is(true));
     }
 
-    private ActorContext prepare(final CountDownLatch inboundLatch) {
+    /**
+     * Prepare an {@link ActorContext} for an outbound default pipeline.
+     * 
+     * @param outboundLatch
+     * @return
+     */
+    private ActorContext prepareOutbound(final CountDownLatch outboundLatch) {
+        return prepare((int) outboundLatch.getCount(), new CountDownLatch((int) outboundLatch.getCount()),
+                outboundLatch, -1, false);
+
+    }
+
+    private ActorContext prepareInbound(final CountDownLatch inboundLatch) {
         return prepare((int) inboundLatch.getCount(), inboundLatch, new CountDownLatch((int) inboundLatch.getCount()),
-                -1);
+                -1, true);
     }
 
     /**
@@ -112,8 +124,7 @@ public class ActorContextTest {
      * @return
      */
     private ActorContext prepare(final int noOfActors, final CountDownLatch inboundLatch,
-            final CountDownLatch outboundLatch,
-            final int reverseAtIndex) {
+            final CountDownLatch outboundLatch, final int reverseAtIndex, final boolean isInbound) {
 
         final List<Actor> actors = new ArrayList<Actor>();
         for (int i = 0; i < noOfActors; ++i) {
@@ -123,7 +134,11 @@ public class ActorContextTest {
         initWorker(pipeLineFactory);
 
         final PipeLine pipe = pipeLineFactory.newPipeLine();
-        return ActorContext.withPipeLine(pipe);
+        if (isInbound) {
+            return ActorContext.withInboundPipeLine(pipe);
+        } else {
+            return ActorContext.withOutboundPipeLine(pipe);
+        }
     }
 
     /**
@@ -133,8 +148,8 @@ public class ActorContextTest {
      */
     @Test
     public void testBasicEventUpstreamPropagation() throws Exception {
-        final CountDownLatch latch = new CountDownLatch(2);
-        prepare(latch);
+        final CountDownLatch latch = new CountDownLatch(3);
+        prepareInbound(latch);
         final Event event = new DummyEvent();
         this.jobQueue.offer(event);
         assertThat("One of more Actors did not get event", latch.await(1000, TimeUnit.MILLISECONDS), is(true));
@@ -185,10 +200,9 @@ public class ActorContextTest {
         }
 
         @Override
-        public void onEvent(final ActorContext ctx, final Event event) {
+        public void onUpstreamEvent(final ActorContext ctx, final Event event) {
             this.latch.countDown();
             if (this.reverseEvent) {
-                System.err.println("Reversing the direction");
                 ctx.fireDownstreamEvent(event);
             } else {
                 ctx.fireUpstreamEvent(event);

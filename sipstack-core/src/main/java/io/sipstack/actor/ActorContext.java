@@ -70,7 +70,7 @@ public interface ActorContext {
          * @param pipeLine
          * @return
          */
-        private PipeLine getInboundPipe(final PipeLine pipeLine) {
+        private PipeLine getInboundPipe() {
             return isInbound ? this.pipeLine : this.pipeLine.reverse();
         }
 
@@ -80,41 +80,76 @@ public interface ActorContext {
          * @param pipeLine
          * @return
          */
-        private PipeLine getOutboundPipe(final PipeLine pipeLine) {
+        private PipeLine getOutboundPipe() {
             return isInbound ? this.pipeLine.reverse() : this.pipeLine;
         }
 
         private void dispatchEvent(final boolean inbound, final Event event) {
-            final PipeLine inboundPipe = getInboundPipe(this.pipeLine);
-            final PipeLine outboundPipe = getOutboundPipe(this.pipeLine);
+            final PipeLine pipeLine = inbound ? getInboundPipe() : getOutboundPipe();
+            final Optional<Actor> optional = pipeLine.next();
 
-            final Optional<Actor> next = inbound ? inboundPipe.next() : outboundPipe.next();
-
-            if (!next.isPresent()) {
+            if (!optional.isPresent()) {
                 return;
             }
 
-            final BufferedActorContext bufferedCtx = new BufferedActorContext(pipeLine);
-            next.get().onEvent(bufferedCtx, event);
+            final Actor next = optional.get();
+            final BufferedActorContext bufferedCtx = invokeActor(inbound, next, pipeLine, event);
 
-            final PipeLine nextOutboundPipe = outboundPipe.progress();
-            for (final Event downstream : bufferedCtx.getDownstreamEvents()) {
-                final ActorContext nextCtx = ActorContext.withPipeLine(nextOutboundPipe);
-                nextCtx.fireDownstreamEvent(downstream);
+            final List<Event> downstreamEvents = bufferedCtx.getDownstreamEvents();
+            if (!downstreamEvents.isEmpty()) {
+                // if this is an inbound event then we have to get the outbound
+                // pipe first and progress on it. If this already was an outbound
+                // event than the 'pipeLine' is our outbound pipe so no reason
+                // to call getOutboundPipe() again. Waste of time and resources...
+                final PipeLine nextOutboundPipe = inbound ? getOutboundPipe().progress() : pipeLine.progress();
+                for (final Event downstream : downstreamEvents) {
+                    final ActorContext nextCtx = ActorContext.withOutboundPipeLine(nextOutboundPipe);
+                    nextCtx.fireDownstreamEvent(downstream);
+                }
             }
 
-            final PipeLine nextInboundPipe = inboundPipe.progress();
-            for (final Event upstream : bufferedCtx.getUpstreamEvents()) {
-                final ActorContext nextCtx = ActorContext.withPipeLine(nextInboundPipe);
-                nextCtx.fireUpstreamEvent(upstream);
+            final List<Event> upstreamEvents = bufferedCtx.getUpstreamEvents();
+            if (!upstreamEvents.isEmpty()) {
+                final PipeLine nextInboundPipe = inbound ? pipeLine.progress() : getInboundPipe().progress();
+                for (final Event upstream : bufferedCtx.getUpstreamEvents()) {
+                    final ActorContext nextCtx = ActorContext.withInboundPipeLine(nextInboundPipe);
+                    nextCtx.fireUpstreamEvent(upstream);
+                }
             }
         }
+
+        /**
+         * Whenever we invoke an {@link Actor} that actor can of course blow up but we should under
+         * no circumstances allow that exception to escape but rather catch it and push that as an
+         * event through the {@link PipeLine}. If it did escape, it could eventually kill out
+         * thread, which wouldn't be all that fun...
+         * 
+         * @param next
+         * @param pipeLine
+         * @return
+         */
+        private BufferedActorContext invokeActor(final boolean inbound, final Actor next, final PipeLine pipeLine,
+                final Event event) {
+            final BufferedActorContext bufferedCtx = new BufferedActorContext(pipeLine);
+            try {
+                if (inbound) {
+                    next.onUpstreamEvent(bufferedCtx, event);
+                } else {
+                    next.onDownstreamEvent(bufferedCtx, event);
+                }
+            } catch (final Throwable t) {
+                System.err.println("Do something about it...");
+                t.printStackTrace();
+            }
+            return bufferedCtx;
+        }
+
     }
 
     /**
      * Acts as a place holder when we invoke the next {@link Actor}. The reason is that whenever an
      * {@link Actor} is invoked it can produce new events but our contract guarantees that no event
-     * is actually never ever processed until the {@link Actor#onEvent(ActorContext, Event)} has
+     * is actually never ever processed until the {@link Actor#onUpstreamEvent(ActorContext, Event)} has
      * returned. This makes it much easier to reason about what happens in the system and also makes
      * it way easier to test!
      * 

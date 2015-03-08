@@ -25,7 +25,7 @@ import org.junit.Test;
  */
 public class ActorContextTest {
 
-    private BlockingQueue<Event> jobQueue;
+    private BlockingQueue<Runnable> jobQueue;
     private Worker worker;
     private Thread t;
 
@@ -51,11 +51,10 @@ public class ActorContextTest {
     public void tearDown() throws Exception {}
 
     private void initWorker(final PipeLineFactory factory) {
-        this.jobQueue = new LinkedBlockingQueue<Event>(10);
-        this.worker = new Worker(0, factory, this.jobQueue);
+        this.jobQueue = new LinkedBlockingQueue<Runnable>(10);
+        this.worker = new Worker(0, this.jobQueue);
         this.t = new Thread(this.worker);
         this.t.start();
-
     }
 
     /**
@@ -149,9 +148,14 @@ public class ActorContextTest {
     @Test
     public void testBasicEventUpstreamPropagation() throws Exception {
         final CountDownLatch latch = new CountDownLatch(3);
-        prepareInbound(latch);
+        final ActorContext ctx = prepareInbound(latch);
         final Event event = new DummyEvent();
-        this.jobQueue.offer(event);
+        this.jobQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                ctx.fireUpstreamEvent(event);
+            }
+        });
         assertThat("One of more Actors did not get event", latch.await(1000, TimeUnit.MILLISECONDS), is(true));
     }
 
@@ -174,6 +178,12 @@ public class ActorContextTest {
         @Override
         public Key key() {
             return Key.withBuffer(Buffers.wrap(1));
+        }
+
+        @Override
+        public long getArrivalTime() {
+            // TODO Auto-generated method stub
+            return 0;
         }
 
     }

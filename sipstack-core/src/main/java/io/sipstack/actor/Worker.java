@@ -15,16 +15,15 @@ public class Worker implements Runnable {
      */
     private final int id;
 
-    private final BlockingQueue<Event> queue;
+    private final BlockingQueue<Runnable> queue;
 
-    private final PipeLineFactory pipeFactory;
+    // private final PipeLineFactory pipeFactory;
 
     /**
      * 
      */
-    public Worker(final int id, final PipeLineFactory pipe, final BlockingQueue<Event> queue) {
+    public Worker(final int id, final BlockingQueue<Runnable> queue) {
         this.id = id;
-        this.pipeFactory = pipe;
         this.queue = queue;
     }
 
@@ -32,10 +31,8 @@ public class Worker implements Runnable {
     public void run() {
         while (true) {
             try {
-                final Event event = this.queue.take();
-                final PipeLine pipe = this.pipeFactory.newPipeLine();
-                final ActorContext ctx = ActorContext.withPipeLine(pipe);
-                ctx.fireUpstreamEvent(event);
+                final Runnable event = this.queue.take();
+                event.run();
             } catch (final Throwable t) {
                 // do something cool
                 t.printStackTrace();

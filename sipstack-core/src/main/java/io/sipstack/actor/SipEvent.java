@@ -4,6 +4,9 @@
 package io.sipstack.actor;
 
 import io.pkts.buffer.Buffer;
+import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 /**
@@ -12,21 +15,46 @@ import io.sipstack.netty.codec.sip.SipMessageEvent;
  */
 public class SipEvent implements Event {
 
-    private final SipMessageEvent event;
+    private final SipMessage msg;
+    private final long arrivalTime;
     private final Key key;
+
+    public static SipEvent create(final SipMessageEvent event) {
+        final SipMessage msg = event.getMessage();
+        final Key key = createKey(msg);
+        return new SipEvent(key, event.getArrivalTime(), msg);
+    }
+
+    public static SipEvent create(final Key key, final SipResponse response) {
+        // TODO: don't use System.currentTimeMillis
+        return new SipEvent(key, System.currentTimeMillis(), response);
+    }
+
+    public static SipEvent create(final SipRequest request) {
+        // TODO: don't use System.currentTimeMillis
+        final Key key = createKey(request);
+        return new SipEvent(key, System.currentTimeMillis(), request);
+    }
+
+    private static Key createKey(final SipMessage msg) {
+        final Buffer callId = msg.getCallIDHeader().getValue();
+        return Key.withBuffer(callId);
+    }
 
     /**
      * 
      */
-    public SipEvent(final SipMessageEvent event) {
-        final Buffer callId = event.getMessage().getCallIDHeader().getValue();
-        this.key = Key.withBuffer(callId);
-        this.event = event;
+    public SipEvent(final Key key, final long arrivalTime, final SipMessage msg) {
+        this.key = key;
+        this.arrivalTime = arrivalTime;
+        this.msg = msg;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
+    public final SipMessage getSipMessage() {
+        return this.msg;
+    }
+
     @Override
     public final boolean isSipMessage() {
         return true;
@@ -35,6 +63,11 @@ public class SipEvent implements Event {
     @Override
     public Key key() {
         return this.key;
+    }
+
+    @Override
+    public long getArrivalTime() {
+        return this.arrivalTime;
     }
 
 }

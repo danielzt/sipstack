@@ -14,4 +14,9 @@ public interface ServerTransaction extends Transaction {
         return true;
     }
 
+    @Override
+    default ServerTransaction toServerTransaction() throws ClassCastException {
+        return this;
+    }
+
 }

@@ -1,12 +1,15 @@
 /**
  * 
  */
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.actor.ActorContext;
 import io.sipstack.actor.Event;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.actor.SipEvent;
+import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.TransactionId;
+import io.sipstack.transaction.TransactionState;
 
 import java.util.function.BiConsumer;
 
@@ -62,19 +65,19 @@ import java.util.function.BiConsumer;
 public class InviteServerTransactionActor implements TransactionActor {
 
     private final TransactionId id;
-    private final SipMessageEvent invite;
+    private final SipEvent invite;
+    private TransactionState state;
 
     private BiConsumer<ActorContext, Event> receive;
 
     /**
      * 
      */
-    protected InviteServerTransactionActor(final TransactionId id, final SipMessageEvent inviteEvent) {
+    protected InviteServerTransactionActor(final TransactionId id, final SipEvent inviteEvent) {
         this.id = id;
         this.invite = inviteEvent;
         become(this.init);
     }
-
 
     private void become(final BiConsumer<ActorContext, Event> nextState) {
         this.receive = nextState;
@@ -87,25 +90,25 @@ public class InviteServerTransactionActor implements TransactionActor {
         System.err.println("Ok, so I swapped states...");
     };
 
-    private void processInitialInvite() {
-        final SipResponse response = this.invite.getMessage().createResponse(100);
-        this.invite.getConnection().send(response);
+    private void processInitialInvite(final ActorContext ctx) {
+        final SipResponse response = this.invite.getSipMessage().createResponse(100);
+        ctx.fireDownstreamEvent(SipEvent.create(this.invite.key(), response));
     }
 
     /**
      * My init state
      */
     private final BiConsumer<ActorContext, Event> init = (ctx, event) -> {
+        System.err.println("in init and processing an event");
         if (event == this.invite) {
-            processInitialInvite();
+            processInitialInvite(ctx);
             ctx.fireUpstreamEvent(event); // this must not be processed until we are done
         } else {
             System.err.println("Queue??? shouldn't be able to happen");
         }
+        this.state = TransactionState.PROOCEEDING;
         become(this.proceeding);
     };
-
-
 
     /**
      * {@inheritDoc}
@@ -115,11 +118,13 @@ public class InviteServerTransactionActor implements TransactionActor {
         this.receive.accept(ctx, event);
     }
 
-
     @Override
     public void onDownstreamEvent(final ActorContext ctx, final Event event) {
         // TODO Auto-generated method stub
-
     }
 
+    @Override
+    public Transaction getTransaction() {
+        return new ServerTransactionImpl(this.id, this.state);
+    }
 }

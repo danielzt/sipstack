@@ -3,6 +3,8 @@
  */
 package io.sipstack.actor;
 
+import io.sipstack.event.Event;
+
 /**
  * @author jonas@jonasborjesson.com
  */
@@ -12,4 +14,7 @@ public interface Actor {
 
     void onDownstreamEvent(ActorContext ctx, Event event);
 
+    default Supervisor getSupervisor() {
+        return null;
+    }
 }

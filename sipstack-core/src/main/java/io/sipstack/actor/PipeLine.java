@@ -3,6 +3,8 @@
  */
 package io.sipstack.actor;
 
+import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -18,9 +20,44 @@ import java.util.Optional;
  */
 public interface PipeLine {
 
-    Optional<PipeLine> replace(Actor toBeReplaced, Actor replacement);
+    /**
+     * Replace the {@link Actor} at the current position. The new {@link PipeLine} that is returned
+     * will have the exact same chain as this {@link PipeLine} with the difference of the actor at
+     * the current index, hence, once the current is replaced, a call to {@link #next()} will
+     * naturally return the actor we just passed in.
+     * 
+     * Of course, since {@link PipeLine}s are immutable, the current pipe line will still containt
+     * the original chain.
+     * 
+     * @param actor
+     * @return
+     * @throws IllegalArgumentException in case the actor is null.
+     */
+    PipeLine replaceCurrent(Actor actor) throws IllegalArgumentException;
 
-    Optional<PipeLine> remove(Actor toRemove);
+    /**
+     * Remove the actor at the current position and return a new {@link PipeLine} reflecting that
+     * change.
+     * 
+     * If the {@link PipeLine} only had a single element, an empty PipeLine will be returned. throws
+     * IllegalArgumentException; If the current position is the last position in the pipeline, then
+     * new pipeline will be at the end since we just removed the last one.
+     * 
+     * @return
+     */
+    PipeLine removeCurrent();
+
+    /**
+     * Insert a new Actor into the pipe. The new actor will be inserted after the current location,
+     * which means that calling {@link #next()} on the newly returned {@link PipeLine} will still
+     * yield the same as this one. However, calling {@link #progress()} and then {@link #next()}
+     * will return the newly inserted actor.
+     * 
+     * @param actor
+     * @return
+     * @throws IllegalArgumentException in case the actor is null.
+     */
+    PipeLine insert(Actor actor) throws IllegalArgumentException;
 
     /**
      * Calling {@link #progress()} will force this {@link PipeLine} to progress forward. However,
@@ -36,6 +73,15 @@ public interface PipeLine {
      * @return a new {@link PipeLine} that is one step ahead of this one.
      */
     PipeLine progress();
+
+    /**
+     * Calling {@link #regress()} will force this {@link PipeLine} to move backwards. However, since
+     * a {@link PipeLine} is immutable, a new {@link PipeLine} is returned, which is one step behind
+     * this one.
+     * 
+     * @return
+     */
+    PipeLine regress();
 
     Optional<Actor> next();
 
@@ -93,6 +139,10 @@ public interface PipeLine {
     PipeLine reverse();
 
 
+    static PipeLine empty() {
+        return DefaultPipeLine.EMPTY;
+    }
+
     static PipeLine withChain(final List<Actor> chain) {
         return new DefaultPipeLine(chain);
     }
@@ -103,6 +153,8 @@ public interface PipeLine {
 
     static class DefaultPipeLine implements PipeLine {
 
+        private static final PipeLine EMPTY = new EmptyPipeLine();
+
         private final List<Actor> chain;
         private final int next;
 
@@ -111,7 +163,7 @@ public interface PipeLine {
         }
 
         private DefaultPipeLine(final int next, final List<Actor> chain) {
-            this.next = next;
+            this.next = next < -1 ? -1 : next;
             this.chain = chain;
         }
 
@@ -125,15 +177,33 @@ public interface PipeLine {
         }
 
         @Override
-        public Optional<PipeLine> replace(final Actor toBeReplaced, final Actor replacement) {
-            // TODO Auto-generated method stub
-            return null;
+        public PipeLine replaceCurrent(final Actor actor) throws IllegalArgumentException {
+            ensureNotNull(actor);
+            final List<Actor> newChain = new ArrayList<>(chain.size());
+            for (int i = 0; i < chain.size(); ++i) {
+                if (i == next) {
+                    newChain.add(actor);
+                } else {
+                    newChain.add(chain.get(i));
+                }
+            }
+            return new DefaultPipeLine(next, newChain);
         }
 
         @Override
-        public Optional<PipeLine> remove(final Actor toRemove) {
-            // TODO Auto-generated method stub
-            return null;
+        public PipeLine removeCurrent() {
+            final int size = chain.size() - 1;
+            if (size <= 0) {
+                return EMPTY;
+            }
+
+            final List<Actor> newChain = new ArrayList<>(size);
+            for (int i = 0; i < chain.size(); ++i) {
+                if (i != next) {
+                    newChain.add(chain.get(i));
+                }
+            }
+            return new DefaultPipeLine(next, newChain);
         }
 
         @Override
@@ -153,6 +223,70 @@ public interface PipeLine {
             } catch (final IndexOutOfBoundsException e) {
                 throw e;
             }
+        }
+
+        @Override
+        public PipeLine insert(final Actor actor) throws IllegalArgumentException {
+            ensureNotNull(actor);
+            final List<Actor> newChain = new ArrayList<>(chain.size() + 1);
+            for (int i = 0; i < chain.size(); ++i) {
+                newChain.add(chain.get(i));
+                if (i == next) {
+                    newChain.add(actor);
+                }
+            }
+            return new DefaultPipeLine(next, newChain);
+        }
+
+        @Override
+        public PipeLine regress() {
+            return new DefaultPipeLine(next - 1, this.chain);
+        }
+    }
+
+    static class EmptyPipeLine implements PipeLine {
+
+        @Override
+        public PipeLine replaceCurrent(final Actor actor) throws IllegalArgumentException {
+            ensureNotNull(actor);
+            return PipeLine.withChain(actor);
+        }
+
+        @Override
+        public PipeLine removeCurrent() {
+            return this;
+        }
+
+        /**
+         * Remember that the javadoc says that insert will insert one ahead of the current location
+         * so that means that {@link #next()} should still return empty.
+         * 
+         * {@inheritDoc}
+         */
+        @Override
+        public PipeLine insert(final Actor actor) throws IllegalArgumentException {
+            ensureNotNull(actor);
+            return new DefaultPipeLine(-1, Arrays.asList(actor));
+        }
+
+        @Override
+        public PipeLine progress() {
+            return this;
+        }
+
+        @Override
+        public Optional<Actor> next() {
+            return Optional.empty();
+        }
+
+        @Override
+        public PipeLine reverse() {
+            return this;
+        }
+
+        @Override
+        public PipeLine regress() {
+            return this;
         }
 
     }

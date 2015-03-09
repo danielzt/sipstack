@@ -4,6 +4,7 @@
 package io.sipstack.actor;
 
 import io.pkts.buffer.Buffer;
+import io.sipstack.netty.codec.sip.ConnectionId;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -12,6 +13,10 @@ public interface Key {
 
     static Key withBuffer(final Buffer buffer) {
         return new DefaultKey(buffer.hashCode());
+    }
+
+    static Key withConnectionId(final ConnectionId id) {
+        return new ConnectionIdKey(id);
     }
 
     /**
@@ -50,7 +55,42 @@ public interface Key {
                 return false;
             }
         }
-
     }
+
+    static class ConnectionIdKey implements Key {
+        private final ConnectionId id;
+
+        private ConnectionIdKey(final ConnectionId id) {
+            this.id = id;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public int hashCode() {
+            return this.id.hashCode();
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean equals(final Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            try {
+                final ConnectionIdKey other = (ConnectionIdKey) obj;
+                return this.id.equals(other.id);
+            } catch (final ClassCastException e) {
+                return false;
+            }
+        }
+    }
+
 
 }

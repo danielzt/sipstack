@@ -5,7 +5,9 @@ package io.sipstack.actor;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.mockito.Mockito.mock;
 import io.pkts.buffer.Buffers;
+import io.sipstack.event.Event;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +30,7 @@ public class ActorContextTest {
     private BlockingQueue<Runnable> jobQueue;
     private Worker worker;
     private Thread t;
+    private ActorSystem actorSystem;
 
     /**
      * @throws java.lang.Exception
@@ -42,6 +45,7 @@ public class ActorContextTest {
      */
     @Before
     public void setUp() throws Exception {
+        this.actorSystem = mock(ActorSystem.class);
     }
 
     /**
@@ -134,9 +138,9 @@ public class ActorContextTest {
 
         final PipeLine pipe = pipeLineFactory.newPipeLine();
         if (isInbound) {
-            return ActorContext.withInboundPipeLine(pipe);
+            return ActorContext.withInboundPipeLine(this.actorSystem, pipe);
         } else {
-            return ActorContext.withOutboundPipeLine(pipe);
+            return ActorContext.withOutboundPipeLine(this.actorSystem, pipe);
         }
     }
 
@@ -223,6 +227,12 @@ public class ActorContextTest {
         public void onDownstreamEvent(final ActorContext ctx, final Event event) {
             this.outboundLatch.countDown();
             ctx.fireDownstreamEvent(event);
+        }
+
+        @Override
+        public Supervisor getSupervisor() {
+            // TODO Auto-generated method stub
+            return null;
         }
     }
 

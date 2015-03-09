@@ -5,8 +5,13 @@ package io.sipstack.actor;
 
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
+import io.sipstack.event.Event;
+import io.sipstack.event.SipEvent;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import org.junit.After;
@@ -18,10 +23,12 @@ import org.junit.Before;
 public class SipTestBase {
 
     protected SipRequest invite;
+    protected SipResponse ringing;
+    protected SipResponse twoHundredToInvite;
 
     private final String inviteStr;
     private final String ringingStr;
-    private final String twohundredStr;
+    private final String twoHundredToInviteStr;
     private final String ackStr;
     private final String byeStr;
     private final String twoHundredByeStr;
@@ -67,7 +74,7 @@ public class SipTestBase {
         sb.append("CSeq: 1 INVITE\r\n");
         sb.append("Via: SIP/2.0/UDP 127.0.1.1:5061;branch=z9hG4bK-25980-1-0\r\n");
         sb.append("Max-Forwards: 70\r\n");
-        this.twohundredStr = sb.toString();
+        this.twoHundredToInviteStr = sb.toString();
 
 
         sb = new StringBuilder();
@@ -113,6 +120,8 @@ public class SipTestBase {
     @Before
     public void setUp() throws Exception {
         this.invite = SipMessage.frame(this.inviteStr).toRequest();
+        this.ringing = SipMessage.frame(this.ringingStr).toResponse();
+        this.twoHundredToInvite = SipMessage.frame(this.twoHundredToInviteStr).toResponse();
     }
 
     /**
@@ -134,9 +143,27 @@ public class SipTestBase {
         public final List<Event> upstreamEvents = new ArrayList<Event>();
         public final List<Event> downstreamEvents = new ArrayList<Event>();
 
+        List<Integer> responses;
+
+        public EventProxy(final Integer... responses) {
+            if (responses != null && responses.length > 0) {
+                this.responses = Arrays.asList(responses);
+            } else {
+                this.responses = Collections.emptyList();
+            }
+        }
+
         @Override
         public void onUpstreamEvent(final ActorContext ctx, final Event event) {
             this.upstreamEvents.add(event);
+            if (event instanceof SipEvent) {
+                final SipRequest request = ((SipEvent) event).getSipMessage().toRequest();
+                for (final Integer responseStatus : this.responses) {
+                    final SipResponse response = request.createResponse(responseStatus);
+                    final SipEvent responseEvent = SipEvent.create(event.key(), response);
+                    ctx.fireDownstreamEvent(responseEvent);
+                }
+            }
             ctx.fireUpstreamEvent(event);
         }
 
@@ -144,6 +171,17 @@ public class SipTestBase {
         public void onDownstreamEvent(final ActorContext ctx, final Event event) {
             this.downstreamEvents.add(event);
             ctx.fireDownstreamEvent(event);
+        }
+
+        public void reset() {
+            this.upstreamEvents.clear();
+            this.downstreamEvents.clear();
+        }
+
+        @Override
+        public Supervisor getSupervisor() {
+            // TODO Auto-generated method stub
+            return null;
         }
 
     }

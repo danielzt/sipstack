@@ -1,12 +1,13 @@
 /**
  * 
  */
-package io.sipstack.actor;
+package io.sipstack.event;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.sipstack.actor.Key;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 /**
@@ -36,6 +37,12 @@ public class SipEvent implements Event {
         return new SipEvent(key, System.currentTimeMillis(), request);
     }
 
+    public static SipEvent create(final SipResponse response) {
+        // TODO: don't use System.currentTimeMillis
+        final Key key = createKey(response);
+        return new SipEvent(key, System.currentTimeMillis(), response);
+    }
+
     private static Key createKey(final SipMessage msg) {
         final Buffer callId = msg.getCallIDHeader().getValue();
         return Key.withBuffer(callId);
@@ -51,16 +58,6 @@ public class SipEvent implements Event {
     }
 
     @Override
-    public final SipMessage getSipMessage() {
-        return this.msg;
-    }
-
-    @Override
-    public final boolean isSipMessage() {
-        return true;
-    }
-
-    @Override
     public Key key() {
         return this.key;
     }
@@ -68,6 +65,10 @@ public class SipEvent implements Event {
     @Override
     public long getArrivalTime() {
         return this.arrivalTime;
+    }
+
+    public SipMessage getSipMessage() {
+        return this.msg;
     }
 
 }

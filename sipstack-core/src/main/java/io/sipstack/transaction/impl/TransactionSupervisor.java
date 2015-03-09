@@ -6,8 +6,9 @@ package io.sipstack.transaction.impl;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.Actor;
 import io.sipstack.actor.ActorContext;
-import io.sipstack.actor.Event;
-import io.sipstack.actor.SipEvent;
+import io.sipstack.actor.Supervisor;
+import io.sipstack.event.Event;
+import io.sipstack.event.SipEvent;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 
@@ -18,7 +19,7 @@ import java.util.Map;
  * @author jonas@jonasborjesson.com
  * 
  */
-public class TransactionSupervisor implements Actor {
+public class TransactionSupervisor implements Actor, Supervisor {
 
     private final Map<TransactionId, TransactionActor> transactions = new HashMap<>(100, 0.75f);
 
@@ -54,19 +55,19 @@ public class TransactionSupervisor implements Actor {
             return t;
         }
 
-        final TransactionActor newTransaction = TransactionActor.create(id, event);
+        final TransactionActor newTransaction = TransactionActor.create(this, id, event);
         this.transactions.put(id, newTransaction);
         return newTransaction;
     }
 
     @Override
     public void onUpstreamEvent(final ActorContext ctx, final Event event) {
-        if (event.isSipMessage()) {
+        if (event instanceof SipEvent) {
             final SipEvent sipEvent = (SipEvent) event;
             final SipMessage msg = sipEvent.getSipMessage();
             final TransactionId id = TransactionId.create(msg);
             final TransactionActor t = ensureTransaction(id, sipEvent);
-            ctx.replace(this, t);
+            ctx.replace(t);
             ctx.fireUpstreamEvent(event);
         }
     }
@@ -75,7 +76,27 @@ public class TransactionSupervisor implements Actor {
     public void onDownstreamEvent(final ActorContext ctx, final Event event) {
         // TODO Auto-generated method stub
         System.err.println("[TransactionSupervisor] Got a downstream event, now what????");
-        ctx.fireDownstreamEvent(event);
+    }
+
+    @Override
+    public Supervisor getSupervisor() {
+        // we are a supervisor so we don't have one ourselves.
+        return null;
+    }
+
+    @Override
+    public void killChild(final Actor actor) {
+        // can only be a TransactionActor
+        try {
+            final TransactionId id = ((TransactionActor) actor).getTransactionId();
+            final TransactionActor transaction = this.transactions.remove(id);
+            if (transaction != null) {
+                System.err.println("Killed off the transaction...");
+            }
+        } catch (final ClassCastException e) {
+            // strange...
+            throw e;
+        }
     }
 
 }

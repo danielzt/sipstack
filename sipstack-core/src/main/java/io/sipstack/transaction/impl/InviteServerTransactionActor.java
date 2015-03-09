@@ -3,10 +3,12 @@
  */
 package io.sipstack.transaction.impl;
 
+import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.actor.ActorContext;
-import io.sipstack.actor.Event;
-import io.sipstack.actor.SipEvent;
+import io.sipstack.actor.Supervisor;
+import io.sipstack.event.Event;
+import io.sipstack.event.SipEvent;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
@@ -68,27 +70,97 @@ public class InviteServerTransactionActor implements TransactionActor {
     private final SipEvent invite;
     private TransactionState state;
 
+    private final TransactionSupervisor parent;
+
+    /**
+     * If we receive any re-transmissions, we will send out the last response again if there is
+     * one..
+     */
+    private SipEvent lastResponseEvent;
+
+    /**
+     * Our behavior. This will change as we transition from one state to another.
+     */
     private BiConsumer<ActorContext, Event> receive;
+
+    /**
+     * Contains all the states and their corresponding function pointers. Makes it for easy
+     * transition to new behavior as the state changes.
+     */
+    private final BiConsumer<ActorContext, Event>[] states = new BiConsumer[6];
 
     /**
      * 
      */
-    protected InviteServerTransactionActor(final TransactionId id, final SipEvent inviteEvent) {
+    protected InviteServerTransactionActor(final TransactionSupervisor parent, final TransactionId id,
+            final SipEvent inviteEvent) {
+        this.parent = parent;
         this.id = id;
         this.invite = inviteEvent;
-        become(this.init);
+
+        this.states[TransactionState.INIT.ordinal()] = this.init;
+        this.states[TransactionState.PROCEEDING.ordinal()] = this.proceeding;
+        this.states[TransactionState.COMPLETED.ordinal()] = this.completed;
+        this.states[TransactionState.CONFIRMED.ordinal()] = this.confirmed;
+        this.states[TransactionState.TERMINATED.ordinal()] = this.terminated;
+        become(TransactionState.INIT);
     }
 
-    private void become(final BiConsumer<ActorContext, Event> nextState) {
-        this.receive = nextState;
+    private void become(final TransactionState state) {
+        this.state = state;
+        this.receive = this.states[state.ordinal()];
     }
+
+    private final BiConsumer<ActorContext, Event> terminated = (ctx, event) -> {
+        System.out.println("in terminated state");
+    };
+
+    private final BiConsumer<ActorContext, Event> completed = (ctx, event) -> {
+        System.out.println("in completed state");
+    };
+
+    private final BiConsumer<ActorContext, Event> confirmed = (ctx, event) -> {
+        System.out.println("in confirmed state");
+    };
 
     /**
-     * The proceeding state
+     * The proceeding state.
      */
     private final BiConsumer<ActorContext, Event> proceeding = (ctx, event) -> {
-        System.err.println("Ok, so I swapped states...");
+        if (event instanceof SipEvent) {
+            final SipEvent sipEvent = (SipEvent) event;
+            final SipMessage msg = sipEvent.getSipMessage();
+            if (msg.isRequest()) {
+                // better be a re-transmission of the invite.
+                // TODO: check
+                return;
+            }
+
+            final SipResponse response = msg.toResponse();
+            relayResponse(ctx, sipEvent);
+            if (response.isSuccess()) {
+                terminate(ctx);
+            } else if (response.isFinal()) {
+                become(TransactionState.COMPLETED);
+            }
+        } else {
+
+        }
     };
+
+    private void terminate(final ActorContext ctx) {
+        become(TransactionState.TERMINATED);
+        ctx.killMe();
+    }
+
+    private void relayResponse(final ActorContext ctx, final SipEvent event) {
+        if (this.lastResponseEvent == null
+                || this.lastResponseEvent.getSipMessage().toResponse().getStatus() < event.getSipMessage().toResponse()
+                .getStatus()) {
+            this.lastResponseEvent = event;
+        }
+        ctx.fireDownstreamEvent(event);
+    }
 
     private void processInitialInvite(final ActorContext ctx) {
         final SipResponse response = this.invite.getSipMessage().createResponse(100);
@@ -96,18 +168,18 @@ public class InviteServerTransactionActor implements TransactionActor {
     }
 
     /**
-     * My init state
+     * The init state. Just make sure that the first event we receive is the same INVITE as created
+     * the transaction (yes, we compare references in this case, that's what we want) and then
+     * transition over to the proceeding state.
      */
     private final BiConsumer<ActorContext, Event> init = (ctx, event) -> {
-        System.err.println("in init and processing an event");
         if (event == this.invite) {
             processInitialInvite(ctx);
             ctx.fireUpstreamEvent(event); // this must not be processed until we are done
         } else {
             System.err.println("Queue??? shouldn't be able to happen");
         }
-        this.state = TransactionState.PROOCEEDING;
-        become(this.proceeding);
+        become(TransactionState.PROCEEDING);
     };
 
     /**
@@ -120,11 +192,21 @@ public class InviteServerTransactionActor implements TransactionActor {
 
     @Override
     public void onDownstreamEvent(final ActorContext ctx, final Event event) {
-        // TODO Auto-generated method stub
+        this.receive.accept(ctx, event);
     }
 
     @Override
     public Transaction getTransaction() {
         return new ServerTransactionImpl(this.id, this.state);
+    }
+
+    @Override
+    public Supervisor getSupervisor() {
+        return this.parent;
+    }
+
+    @Override
+    public TransactionId getTransactionId() {
+        return this.id;
     }
 }

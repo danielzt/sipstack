@@ -39,6 +39,105 @@ public class PipeLineTest {
     @After
     public void tearDown() throws Exception {}
 
+    @Test
+    public void testInsert() {
+        PipeLine pipe = PipeLine.withChain(this.one, this.two, this.three);
+        assertThat(pipe.next().get(), is(this.one));
+        pipe = pipe.insert(this.four);
+
+        // still at the same index so next will still yield one.
+        assertThat(pipe.next().get(), is(this.one));
+        pipe = pipe.progress();
+        assertThat(pipe.next().get(), is(this.four));
+
+        // progress all the way down to the last element, then reverse
+        // it which means that we should be able to walk back
+        // three, two, four, one
+        pipe = pipe.progress().progress().reverse();
+        assertWalkAbout(pipe, this.three, this.two, this.four, this.one);
+    }
+
+    /**
+     * Remember that if we insert an element into an empty pipe, the javadoc for PipeLine says that
+     * the inserted element will be +1 from the current location and since the current location is
+     * empty, next will still return empty.
+     */
+    @Test
+    public void testInsertFromEmptyPipe() {
+        PipeLine pipe = PipeLine.empty();
+        assertThat(pipe.next().isPresent(), is(false));
+        pipe = pipe.insert(this.one);
+        assertThat(pipe.next().isPresent(), is(false));
+        assertThat(pipe.progress().next().get(), is(this.one));
+        assertThat(pipe.progress().progress().next().isPresent(), is(false));
+    }
+
+    @Test
+    public void testInsertRemove() {
+        PipeLine pipe = PipeLine.withChain(this.one, this.two, this.three).progress().insert(this.four);
+        assertThat(pipe.next().get(), is(this.two));
+        pipe = pipe.removeCurrent();
+        assertThat(pipe.next().get(), is(this.four));
+
+        pipe = pipe.reverse();
+        assertThat(pipe.next().get(), is(this.four));
+        assertThat(pipe.progress().next().get(), is(this.one));
+    }
+
+    /**
+     * See if we can build up a new {@link PipeLine} by just inserting a bunch. Note, inserting is a
+     * little sneaky because you keep pushing up the ones after it all the time so even though we
+     * are inserting two, three, four, they will end up in the reverse order...
+     */
+    @Test
+    public void testInsertMany() {
+        final PipeLine pipe = PipeLine.withChain(this.one).insert(this.two).insert(this.three).insert(this.four);
+        assertWalkAbout(pipe, this.one, this.four, this.three, this.two);
+    }
+
+    /**
+     * Make sure that we can replace the current Actor in the pipe. Once it has been replaced, a new
+     * {@link PipeLine} with the exact same index should be returned, hence, calling next should
+     * give us the Actor we just replaced.
+     */
+    @Test
+    public void testReplaceCurrent() {
+        PipeLine pipe = PipeLine.withChain(this.one, this.two, this.three).progress();
+        assertThat(pipe.next().get(), is(this.two));
+        pipe = pipe.replaceCurrent(this.four);
+        assertThat(pipe.next().get(), is(this.four));
+        assertThat(pipe.progress().next().get(), is(this.three));
+        assertThat(pipe.progress().progress().next().isPresent(), is(false));
+    }
+
+    @Test
+    public void testRemoveCurrent() {
+        PipeLine pipe = PipeLine.withChain(this.one, this.two, this.three).progress();
+        assertThat(pipe.next().get(), is(this.two));
+        pipe = pipe.removeCurrent();
+        assertThat(pipe.next().get(), is(this.three));
+        assertThat(pipe.progress().next().isPresent(), is(false));
+    }
+
+    @Test
+    public void testRemoveCurrentOneActor() {
+        PipeLine pipe = PipeLine.withChain(this.one);
+        assertThat(pipe.next().get(), is(this.one));
+        pipe = pipe.removeCurrent();
+        assertThat(pipe.next().isPresent(), is(false));
+        assertThat(pipe.reverse().next().isPresent(), is(false));
+    }
+
+    @Test
+    public void testRemoveCurrentEmptyPipe() {
+        PipeLine pipe = PipeLine.withChain();
+        assertThat(pipe.next().isPresent(), is(false));
+        pipe = pipe.removeCurrent();
+        assertThat(pipe.next().isPresent(), is(false));
+        assertThat(pipe.progress().next().isPresent(), is(false));
+        assertThat(pipe.reverse().next().isPresent(), is(false));
+    }
+
     /**
      * Test basic operation of just simply moving forward in the pipe.
      */
@@ -67,6 +166,24 @@ public class PipeLineTest {
 
         final PipeLine emptyPipe = theEnd.progress();
         assertThat(emptyPipe.next().isPresent(), is(false));
+    }
+
+    @Test
+    public void testRegress() {
+        PipeLine pipe = PipeLine.withChain(this.one, this.two, this.three).progress();
+        assertThat(pipe.next().get(), is(this.two));
+        pipe = pipe.regress();
+        assertWalkAbout(pipe, this.one, this.two, this.three);
+    }
+
+    @Test
+    public void testRegressOffEdge() {
+        PipeLine pipe = PipeLine.withChain(this.one);
+        pipe = pipe.regress();
+        assertThat(pipe.next().isPresent(), is(false));
+
+        // walk forward again and we are back to one
+        assertThat(pipe.progress().next().get(), is(this.one));
     }
 
     /**

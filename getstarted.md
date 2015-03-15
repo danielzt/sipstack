@@ -7,7 +7,7 @@ active_element: getstarted
 
 <h1 id="getting-started">Getting Started</h1>
 
-This guide will take you through the process of creating a simple UAS application and will guide you through some of the more important concepts of sipstack.io. We will also look at some of the underlying libraries that sipstack.io is using and touch upon some of the reasons why sipstack.io exists to begin with. Test
+This guide will take you through the process of creating a simple UAS application and will guide you through some of the more important concepts of sipstack.io. We will also look at some of the underlying libraries that sipstack.io is using and touch upon some of the reasons why sipstack.io exists to begin with.
 
 <h2 id="getting-started-overview">Overview</h2>
 

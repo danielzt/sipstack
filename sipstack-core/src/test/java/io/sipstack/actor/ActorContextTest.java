@@ -77,7 +77,7 @@ public class ActorContextTest {
         final CountDownLatch outboundLatch = new CountDownLatch(2);
         // note index 2 is of course our 3rd actor
         final ActorContext ctx = prepare(3, inboundLatch, outboundLatch, 2, true);
-        ctx.fireUpstreamEvent(new DummyEvent());
+        ctx.forwardUpstreamEvent(new DummyEvent());
 
         assertThat("One of more Actors did not get inbound event", inboundLatch.await(1000, TimeUnit.MILLISECONDS),
                 is(true));
@@ -95,7 +95,7 @@ public class ActorContextTest {
         final CountDownLatch latch = new CountDownLatch(3);
         final ActorContext ctx = prepareOutbound(latch);
         final Event event = new DummyEvent();
-        ctx.fireDownstreamEvent(event);
+        ctx.forwardDownstreamEvent(event);
 
         assertThat("One of more Actors did not get event", latch.await(1000, TimeUnit.MILLISECONDS), is(true));
     }
@@ -157,7 +157,7 @@ public class ActorContextTest {
         this.jobQueue.offer(new Runnable() {
             @Override
             public void run() {
-                ctx.fireUpstreamEvent(event);
+                ctx.forwardUpstreamEvent(event);
             }
         });
         assertThat("One of more Actors did not get event", latch.await(1000, TimeUnit.MILLISECONDS), is(true));
@@ -217,16 +217,16 @@ public class ActorContextTest {
         public void onUpstreamEvent(final ActorContext ctx, final Event event) {
             this.latch.countDown();
             if (this.reverseEvent) {
-                ctx.fireDownstreamEvent(event);
+                ctx.forwardDownstreamEvent(event);
             } else {
-                ctx.fireUpstreamEvent(event);
+                ctx.forwardUpstreamEvent(event);
             }
         }
 
         @Override
         public void onDownstreamEvent(final ActorContext ctx, final Event event) {
             this.outboundLatch.countDown();
-            ctx.fireDownstreamEvent(event);
+            ctx.forwardDownstreamEvent(event);
         }
 
         @Override

@@ -117,7 +117,7 @@ public class InviteServerTransactionTest extends SipTestBase {
      */
     @Test
     public void testInitialInvite() {
-        this.defaultCtx.fireUpstreamEvent(this.defaultInviteEvent);
+        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
         assertInitialInvite(this.defaultInviteEvent);
     }
 
@@ -127,7 +127,7 @@ public class InviteServerTransactionTest extends SipTestBase {
     @Test
     public void testInviteRinging() {
         init(180);
-        this.defaultCtx.fireUpstreamEvent(this.defaultInviteEvent);
+        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
 
         // should still be in proceeding
         assertServerTransactionState(this.defaultInviteEvent, TransactionState.PROCEEDING);
@@ -141,7 +141,7 @@ public class InviteServerTransactionTest extends SipTestBase {
     @Test
     public void testInviteRinging200Ok() {
         init(180, 200);
-        this.defaultCtx.fireUpstreamEvent(this.defaultInviteEvent);
+        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
 
         // should be in terminated state because of the 200 response
         assertServerTransactionState(this.defaultInviteEvent, TransactionState.TERMINATED);

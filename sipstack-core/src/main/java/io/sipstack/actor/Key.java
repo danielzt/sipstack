@@ -4,6 +4,7 @@
 package io.sipstack.actor;
 
 import io.pkts.buffer.Buffer;
+import io.pkts.packet.sip.SipMessage;
 import io.sipstack.netty.codec.sip.ConnectionId;
 
 /**
@@ -17,6 +18,18 @@ public interface Key {
 
     static Key withConnectionId(final ConnectionId id) {
         return new ConnectionIdKey(id);
+    }
+
+
+    /**
+     * Convenience method for creating a new {@link Key} based on a {@link SipMessage}.
+     * 
+     * @param msg
+     * @return
+     */
+    static Key withSipMessage(final SipMessage msg) {
+        final Buffer callId = msg.getCallIDHeader().getValue();
+        return Key.withBuffer(callId);
     }
 
     /**

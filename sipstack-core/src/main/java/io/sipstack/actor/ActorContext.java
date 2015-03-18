@@ -16,7 +16,7 @@ import java.util.Optional;
 public interface ActorContext {
 
     /**
-     * Replace the current {@link Actor} with this one. The next {@link #fireUpstreamEvent(Event)}
+     * Replace the current {@link Actor} with this one. The next {@link #forwardUpstreamEvent(Event)}
      * will go through the newly inserted actor.
      * 
      * @param actor
@@ -36,25 +36,25 @@ public interface ActorContext {
     /**
      * When your {@link Actor} is done processing its {@link Event} it can decide to forward the
      * same (or a new) event upstream. There are two methods for forwarding an event upstream, the
-     * {@link #fireUpstreamEvent(Event)} and the {@link #continueUpstreamEvent(Event)} and the
+     * {@link #forwardUpstreamEvent(Event)} and the {@link #fireUpstreamEvent(Event)} and the
      * difference is that the former will use the same thread as this {@link Actor} is currently
      * using while the latter may select another thread to run on as decided by the
      * {@link Event#key()}
      * 
      * Usually, if you are sure that the same thread should handle the next execution in the
      * pipeline (because e.g. the very same key is used, which is true for all the actors handling a
-     * sip message) then use {@link #fireUpstreamEvent(Event)} but if you are not sure, or if a
-     * different key indeed is used, then use the {@link #continueUpstreamEvent(Event)} instead.
+     * sip message) then use {@link #forwardUpstreamEvent(Event)} but if you are not sure, or if a
+     * different key indeed is used, then use the {@link #fireUpstreamEvent(Event)} instead.
      * 
      * @param event
      */
+    void forwardUpstreamEvent(Event event);
+
+    void forwardDownstreamEvent(Event event);
+
     void fireUpstreamEvent(Event event);
 
     void fireDownstreamEvent(Event event);
-
-    void continueUpstreamEvent(Event event);
-
-    void continueDownstreamEvent(Event event);
 
     static ActorContext withInboundPipeLine(final ActorSystem system, final PipeLine pipeLine) {
         return new DefaultActorContext(system, true, pipeLine);
@@ -96,12 +96,12 @@ public interface ActorContext {
 
 
         @Override
-        public void fireUpstreamEvent(final Event event) {
+        public void forwardUpstreamEvent(final Event event) {
             dispatchEvent(true, event);
         }
 
         @Override
-        public void fireDownstreamEvent(final Event event) {
+        public void forwardDownstreamEvent(final Event event) {
             dispatchEvent(false, event);
         }
 
@@ -147,7 +147,7 @@ public interface ActorContext {
                 final PipeLine nextOutboundPipe = inbound ? getOutboundPipe().progress() : pipeLine.progress();
                 for (final Event downstream : downstreamEvents) {
                     final ActorContext nextCtx = ActorContext.withOutboundPipeLine(this.system, nextOutboundPipe);
-                    nextCtx.fireDownstreamEvent(downstream);
+                    nextCtx.forwardDownstreamEvent(downstream);
                 }
             }
 
@@ -164,7 +164,7 @@ public interface ActorContext {
 
                 for (final Event upstream : upstreamEvents) {
                     final ActorContext nextCtx = ActorContext.withInboundPipeLine(this.system, nextInboundPipe);
-                    nextCtx.fireUpstreamEvent(upstream);
+                    nextCtx.forwardUpstreamEvent(upstream);
                 }
 
                 for (final Event upstream : continueUpstreamEvents) {
@@ -202,7 +202,6 @@ public interface ActorContext {
                     next.onDownstreamEvent(bufferedCtx, event);
                 }
             } catch (final Throwable t) {
-                System.err.println("Do something about it...");
                 t.printStackTrace();
             }
             return bufferedCtx;
@@ -214,12 +213,12 @@ public interface ActorContext {
         }
 
         @Override
-        public void continueUpstreamEvent(final Event event) {
+        public void fireUpstreamEvent(final Event event) {
             throw new RuntimeException("You shouldn't call this method outside of an Actor invocation");
         }
 
         @Override
-        public void continueDownstreamEvent(final Event event) {
+        public void fireDownstreamEvent(final Event event) {
             throw new RuntimeException("You shouldn't call this method outside of an Actor invocation");
         }
 
@@ -298,7 +297,7 @@ public interface ActorContext {
         }
 
         @Override
-        public void fireUpstreamEvent(final Event event) {
+        public void forwardUpstreamEvent(final Event event) {
             if (upstreamEvents == null) {
                 this.upstreamEvents = new ArrayList<>();
             }
@@ -307,7 +306,7 @@ public interface ActorContext {
 
 
         @Override
-        public void fireDownstreamEvent(final Event event) {
+        public void forwardDownstreamEvent(final Event event) {
             if (downstreamEvents == null) {
                 this.downstreamEvents = new ArrayList<>();
             }
@@ -320,7 +319,7 @@ public interface ActorContext {
         }
 
         @Override
-        public void continueUpstreamEvent(final Event event) {
+        public void fireUpstreamEvent(final Event event) {
             if (continueUpstreamEvents == null) {
                 this.continueUpstreamEvents = new ArrayList<>();
             }
@@ -328,7 +327,7 @@ public interface ActorContext {
         }
 
         @Override
-        public void continueDownstreamEvent(final Event event) {
+        public void fireDownstreamEvent(final Event event) {
             if (continueDownstreamEvents == null) {
                 this.continueDownstreamEvents = new ArrayList<>();
             }

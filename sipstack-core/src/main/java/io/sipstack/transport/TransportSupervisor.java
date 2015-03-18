@@ -39,13 +39,11 @@ public class TransportSupervisor implements Actor, Supervisor {
     public void onUpstreamEvent(final ActorContext ctx, final Event event) {
         try {
             final IOEvent ioEvent = (IOEvent) event;
-            System.err.println("[TransportSupervisor " + this + "] processing new IOEvent");
             final FlowActor flow = ensureFlow(ioEvent.getConnection());
             ctx.replace(flow);
-            ctx.fireUpstreamEvent(event);
+            ctx.forwardUpstreamEvent(event);
         } catch (final ClassCastException e) {
             // no???
-            System.err.println("[TransportSupervisor " + this + "] That is strange. We only deal with IOEvents...");
             e.printStackTrace();
             throw e;
         }

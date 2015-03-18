@@ -20,6 +20,11 @@ public interface IOEvent extends Event {
      */
     Connection getConnection();
 
+    @Override
+    default boolean isIOEvent() {
+        return true;
+    }
+
     default boolean isReadEvent() {
         return false;
     }

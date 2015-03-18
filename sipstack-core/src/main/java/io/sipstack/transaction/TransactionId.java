@@ -44,6 +44,11 @@ public interface TransactionId {
             this.id = id;
         }
 
+        @Override
+        public String toString() {
+            return new String(id);
+        }
+
         /**
          * {@inheritDoc}
          */

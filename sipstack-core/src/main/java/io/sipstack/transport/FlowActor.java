@@ -3,10 +3,14 @@ package io.sipstack.transport;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.Actor;
 import io.sipstack.actor.ActorContext;
+import io.sipstack.actor.Key;
 import io.sipstack.actor.Supervisor;
 import io.sipstack.event.Event;
+import io.sipstack.event.IOEvent;
+import io.sipstack.event.IOReadEvent;
 import io.sipstack.event.SipEvent;
 import io.sipstack.netty.codec.sip.Connection;
+import io.sipstack.netty.codec.sip.ConnectionId;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,12 +31,22 @@ public class FlowActor implements Actor {
         this.connection = connection;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void onUpstreamEvent(final ActorContext ctx, final Event event) {
-        logger.debug("Processing new event {} ", event.getClass());
+        // logger.debug("Processing new event {} ", event.getClass());
 
-        // swap to a different thread (potentially anyway)
-        ctx.continueUpstreamEvent(event);
+        if (event.isIOEvent()) {
+            final IOEvent ioEvent = (IOEvent) event;
+            if (ioEvent.isSipReadEvent()) {
+                final long arrivalTime = event.getArrivalTime();
+                final SipMessage msg = ((IOReadEvent<SipMessage>) event).getObject();
+                final Key key = Key.withSipMessage(msg);
+                final SipEvent sipEvent = SipEvent.create(key, arrivalTime, msg);
+                ctx.fireUpstreamEvent(sipEvent);
+            }
+        }
+
     }
 
     @Override
@@ -46,6 +60,16 @@ public class FlowActor implements Actor {
     @Override
     public Supervisor getSupervisor() {
         return this.supervisor;
+    }
+
+    private static final class DefaultFlow implements Flow {
+
+        @Override
+        public ConnectionId getConnectionId() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
     }
 
 }

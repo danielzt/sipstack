@@ -161,16 +161,16 @@ public class SipTestBase {
                 for (final Integer responseStatus : this.responses) {
                     final SipResponse response = request.createResponse(responseStatus);
                     final SipEvent responseEvent = SipEvent.create(event.key(), response);
-                    ctx.fireDownstreamEvent(responseEvent);
+                    ctx.forwardDownstreamEvent(responseEvent);
                 }
             }
-            ctx.fireUpstreamEvent(event);
+            ctx.forwardUpstreamEvent(event);
         }
 
         @Override
         public void onDownstreamEvent(final ActorContext ctx, final Event event) {
             this.downstreamEvents.add(event);
-            ctx.fireDownstreamEvent(event);
+            ctx.forwardDownstreamEvent(event);
         }
 
         public void reset() {

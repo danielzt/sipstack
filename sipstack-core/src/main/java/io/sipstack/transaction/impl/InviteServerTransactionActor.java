@@ -63,6 +63,56 @@ import java.util.function.BiConsumer;
  *               +-----------+
  * 
  * </pre>
+ * 
+ * Actually, need to implement the updated state machine as specified by rfc6026
+ * 
+ * <pre>
+ * 
+ *                                    |INVITE
+ *                                    |pass INV to TU
+ *                 INVITE             V send 100 if TU won't in 200 ms
+ *                 send response+------------+
+ *                     +--------|            |--------+ 101-199 from TU
+ *                     |        |            |        | send response
+ *                     +------->|            |<-------+
+ *                              | Proceeding |
+ *                              |            |--------+ Transport Err.
+ *                              |            |        | Inform TU
+ *                              |            |<-------+
+ *                              +------------+
+ *                 300-699 from TU |    |2xx from TU
+ *                 send response   |    |send response
+ *                  +--------------+    +------------+
+ *                  |                                |
+ * INVITE           V          Timer G fires         |
+ * send response +-----------+ send response         |
+ *      +--------|           |--------+              |
+ *      |        |           |        |              |
+ *      +------->| Completed |<-------+      INVITE  |  Transport Err.
+ *               |           |               -       |  Inform TU
+ *      +--------|           |----+          +-----+ |  +---+
+ *      |        +-----------+    | ACK      |     | v  |   v
+ *      |          ^   |          | -        |  +------------+
+ *      |          |   |          |          |  |            |---+ ACK
+ *      +----------+   |          |          +->|  Accepted  |   | to TU
+ *      Transport Err. |          |             |            |<--+
+ *      Inform TU      |          V             +------------+
+ *                     |      +-----------+        |  ^     |
+ *                     |      |           |        |  |     |
+ *                     |      | Confirmed |        |  +-----+
+ *                     |      |           |        |  2xx from TU
+ *       Timer H fires |      +-----------+        |  send response
+ *       -             |          |                |
+ *                     |          | Timer I fires  |
+ *                     |          | -              | Timer L fires
+ *                     |          V                | -
+ *                     |        +------------+     |
+ *                     |        |            |<----+
+ *                     +------->| Terminated |
+ *                              |            |
+ *                              +------------+
+ *
+ * </pre>
  */
 public class InviteServerTransactionActor implements TransactionActor {
 
@@ -127,7 +177,7 @@ public class InviteServerTransactionActor implements TransactionActor {
      * The proceeding state.
      */
     private final BiConsumer<ActorContext, Event> proceeding = (ctx, event) -> {
-        if (event instanceof SipEvent) {
+        if (event.isSipEvent()) {
             final SipEvent sipEvent = (SipEvent) event;
             final SipMessage msg = sipEvent.getSipMessage();
             if (msg.isRequest()) {
@@ -159,12 +209,12 @@ public class InviteServerTransactionActor implements TransactionActor {
                 .getStatus()) {
             this.lastResponseEvent = event;
         }
-        ctx.fireDownstreamEvent(event);
+        ctx.forwardDownstreamEvent(event);
     }
 
     private void processInitialInvite(final ActorContext ctx) {
         final SipResponse response = this.invite.getSipMessage().createResponse(100);
-        ctx.fireDownstreamEvent(SipEvent.create(this.invite.key(), response));
+        ctx.forwardDownstreamEvent(SipEvent.create(this.invite.key(), response));
     }
 
     /**
@@ -175,7 +225,7 @@ public class InviteServerTransactionActor implements TransactionActor {
     private final BiConsumer<ActorContext, Event> init = (ctx, event) -> {
         if (event == this.invite) {
             processInitialInvite(ctx);
-            ctx.fireUpstreamEvent(event); // this must not be processed until we are done
+            ctx.forwardUpstreamEvent(event); // this must not be processed until we are done
         } else {
             System.err.println("Queue??? shouldn't be able to happen");
         }

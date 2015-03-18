@@ -10,9 +10,13 @@ import io.sipstack.event.Event;
  */
 public interface Actor {
 
-    void onUpstreamEvent(ActorContext ctx, Event event);
+    default void onUpstreamEvent(final ActorContext ctx, final Event event) {
+        ctx.forwardUpstreamEvent(event);
+    }
 
-    void onDownstreamEvent(ActorContext ctx, Event event);
+    default void onDownstreamEvent(final ActorContext ctx, final Event event) {
+        ctx.forwardDownstreamEvent(event);
+    }
 
     default Supervisor getSupervisor() {
         return null;

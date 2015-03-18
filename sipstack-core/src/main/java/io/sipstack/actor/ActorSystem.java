@@ -5,6 +5,7 @@ package io.sipstack.actor;
 
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.ActorContext.DefaultActorContext;
+import io.sipstack.application.ApplicationSupervisor;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOReadEvent;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
@@ -27,6 +28,7 @@ public class ActorSystem {
 
     private final BlockingQueue<Runnable>[] workerJobs = new BlockingQueue[this.workerPoolSize];
     private final ExecutorService workers = Executors.newFixedThreadPool(this.workerPoolSize);
+    private final ApplicationSupervisor[] applicationSupervisors = new ApplicationSupervisor[this.workerPoolSize];
     private final TransactionSupervisor[] transactionSupervisors = new TransactionSupervisor[this.workerPoolSize];
     private final TransportSupervisor[] transpotSupervisors = new TransportSupervisor[this.workerPoolSize];
     private final PipeLineFactory[] inboundPipefactory = new PipeLineFactory[this.workerPoolSize];
@@ -46,13 +48,25 @@ public class ActorSystem {
 
             final TransactionSupervisor transactionSupervisor = new TransactionSupervisor();
             this.transactionSupervisors[i] = transactionSupervisor;
-            this.inboundPipefactory[i] = PipeLineFactory.withDefaultChain(transportSupervisor, transactionSupervisor);
+
+            // TODO: insert DialogSupervisor if configured to do so.
+
+            final ApplicationSupervisor applicationSupervisor = new ApplicationSupervisor();
+            this.applicationSupervisors[i] = applicationSupervisor;
+
+            this.inboundPipefactory[i] =
+                    PipeLineFactory.withDefaultChain(transportSupervisor, transactionSupervisor, applicationSupervisor);
 
             final Worker worker = new Worker(i, jobQueue);
             this.workers.execute(worker);
         }
     }
 
+    /**
+     * Dispatch an inbound event using the pre-configured inbound pipe factory.
+     * 
+     * @param event
+     */
     public void dispatchInboundEvent(final Event event) {
         final Key key = event.key();
         final int worker = Math.abs(key.hashCode() % this.workerPoolSize);
@@ -62,11 +76,17 @@ public class ActorSystem {
         if (!this.workerJobs[worker].offer(job)) {
             // TODO: handle non accepted job
         }
-
     }
 
+    /**
+     * Dispatch an event using the supplied {@link PipeLine}. Since the pipe line is already
+     * supplied there is no "inbound" vs "outbound" because the direction is determined by the
+     * {@link PipeLine} itself.
+     * 
+     * @param event
+     * @param pipeLine
+     */
     public void dispatchEvent(final Event event, final PipeLine pipeLine) {
-        System.err.println("Dispatching event to an existing pipeline");
         final Key key = event.key();
         final int worker = Math.abs(key.hashCode() % this.workerPoolSize);
         final DispatchJob job = new DispatchJob(this, worker, pipeLine, event);
@@ -97,7 +117,7 @@ public class ActorSystem {
         public void run() {
             final DefaultActorContext ctx =
                     (DefaultActorContext) ActorContext.withInboundPipeLine(this.system, this.pipeLine);
-            ctx.fireUpstreamEvent(this.event);
+            ctx.forwardUpstreamEvent(this.event);
         }
     }
 

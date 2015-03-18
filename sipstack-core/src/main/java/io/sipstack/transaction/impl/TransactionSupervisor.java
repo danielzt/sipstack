@@ -15,11 +15,16 @@ import io.sipstack.transaction.TransactionId;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * @author jonas@jonasborjesson.com
  * 
  */
 public class TransactionSupervisor implements Actor, Supervisor {
+
+    private final Logger logger = LoggerFactory.getLogger(TransactionSupervisor.class);
 
     private final Map<TransactionId, TransactionActor> transactions = new HashMap<>(100, 0.75f);
 
@@ -55,6 +60,16 @@ public class TransactionSupervisor implements Actor, Supervisor {
             return t;
         }
 
+        // if this is an ACK and we didn't find a transaction for this
+        // ACK that can only mean that this is an ACK to a 2xx response
+        // and therefore this ACK doesn't really have a transaction (an
+        // ACK goes in its own transaction for 2xx responses but ACK doesn't
+        // expect a response so therefore we will not actually create a new
+        // transaction for it)
+        if (event.getSipMessage().isAck()) {
+            return null;
+        }
+
         final TransactionActor newTransaction = TransactionActor.create(this, id, event);
         this.transactions.put(id, newTransaction);
         return newTransaction;
@@ -62,20 +77,30 @@ public class TransactionSupervisor implements Actor, Supervisor {
 
     @Override
     public void onUpstreamEvent(final ActorContext ctx, final Event event) {
-        if (event instanceof SipEvent) {
+        if (event.isSipEvent()) {
             final SipEvent sipEvent = (SipEvent) event;
             final SipMessage msg = sipEvent.getSipMessage();
             final TransactionId id = TransactionId.create(msg);
+
+            // because of the msg.getMethod()
+            // if (this.logger.isDebugEnabled()) {
+            // this.logger.debug("[{}] Processing SIP event for transaction {} for an {}", this, id,
+            // msg.getMethod());
+            // }
+
             final TransactionActor t = ensureTransaction(id, sipEvent);
-            ctx.replace(t);
-            ctx.fireUpstreamEvent(event);
+            if (t != null) {
+                ctx.replace(t);
+            }
+            ctx.forwardUpstreamEvent(event);
         }
     }
 
     @Override
     public void onDownstreamEvent(final ActorContext ctx, final Event event) {
         // TODO Auto-generated method stub
-        System.err.println("[TransactionSupervisor] Got a downstream event, now what????");
+        // System.err.println("[TransactionSupervisor] Got a downstream event, now what????");
+        ctx.forwardDownstreamEvent(event);
     }
 
     @Override
@@ -91,7 +116,7 @@ public class TransactionSupervisor implements Actor, Supervisor {
             final TransactionId id = ((TransactionActor) actor).getTransactionId();
             final TransactionActor transaction = this.transactions.remove(id);
             if (transaction != null) {
-                System.err.println("Killed off the transaction...");
+                // System.err.println("Killed off the transaction...");
             }
         } catch (final ClassCastException e) {
             // strange...

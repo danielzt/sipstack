@@ -6,6 +6,11 @@ package io.sipstack.event;
 import io.sipstack.actor.Key;
 
 /**
+ * Represents an {@link Event} in the system.
+ * 
+ * Note, an {@link Event} is internal to the sipstack implementation and should never ever be
+ * exposed to the actual user application.
+ * 
  * @author jonas@jonasborjesson.com
  *
  */
@@ -21,5 +26,14 @@ public interface Event {
      * @return
      */
     long getArrivalTime();
+
+    default boolean isIOEvent() {
+        return false;
+    }
+
+    default boolean isSipEvent() {
+        return false;
+    }
+
 
 }

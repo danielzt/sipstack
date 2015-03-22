@@ -3,6 +3,8 @@
  */
 package io.sipstack.config;
 
+import io.pkts.packet.sip.impl.PreConditions;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -23,7 +25,10 @@ public class SipConfiguration {
     private List<NetworkInterfaceConfiguration> networkInterfaces;
 
     @JsonProperty()
-    private TransactionLayerConfiguration transaction;
+    private final TransactionLayerConfiguration transaction = new TransactionLayerConfiguration();
+    
+    @JsonProperty()
+    private int workerThreads = 4;
 
     @JsonIgnore
     public List<NetworkInterfaceConfiguration> getNetworkInterfaces() {
@@ -38,6 +43,21 @@ public class SipConfiguration {
      */
     public TransactionLayerConfiguration getTransaction() {
         return this.transaction;
+    }
+
+    /**
+     * @return the workerThreads
+     */
+    public int getWorkerThreads() {
+        return this.workerThreads;
+    }
+
+    /**
+     * @param workerThreads the workerThreads to set
+     */
+    public void setWorkerThreads(final int workerThreads) {
+        PreConditions.ensureArgument(workerThreads > 0, "The number of worker threads must be greater than zero");
+        this.workerThreads = workerThreads;
     }
 
 }

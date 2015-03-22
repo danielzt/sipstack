@@ -5,12 +5,17 @@ package io.sipstack.core;
 
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.ActorSystem;
+import io.sipstack.actor.WorkerContext;
+import io.sipstack.application.ApplicationSupervisor;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.NetworkInterfaceDeserializer;
+import io.sipstack.config.SipConfiguration;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.server.SipBridgeHandler;
+import io.sipstack.transaction.impl.TransactionSupervisor;
+import io.sipstack.transport.TransportSupervisor;
 import io.sipstack.utils.Generics;
 
 import java.io.FileInputStream;
@@ -18,6 +23,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,10 +117,11 @@ public abstract class Application<T extends Configuration> {
             run(config, environment);
 
             // Create and initialize the actual Sip server
-            final List<NetworkInterfaceConfiguration> ifs = config.getSipConfiguration().getNetworkInterfaces();
+            final SipConfiguration sipConfig = config.getSipConfiguration();
+            final List<NetworkInterfaceConfiguration> ifs = sipConfig.getNetworkInterfaces();
             final NetworkLayer.Builder networkBuilder = NetworkLayer.with(ifs);
 
-            final ActorSystem system = new ActorSystem("sipstack.io");
+            final ActorSystem system = configureActorSystem(config);
             final SipBridgeHandler handler = new SipBridgeHandler(system);
             networkBuilder.serverHandler(handler);
             final NetworkLayer server = networkBuilder.build();
@@ -158,6 +166,29 @@ public abstract class Application<T extends Configuration> {
         // ServerCommand.run will:
         // Create a new Jetty Server and will then start it, which is what starts the Jetty Server.
 
+    }
+
+    private ActorSystem configureActorSystem(final Configuration config) {
+        final ActorSystem.Builder builder = ActorSystem.withName("sipstack.io");
+        final SipConfiguration sipConfig = config.getSipConfiguration();
+
+        for (int i = 0; i < sipConfig.getWorkerThreads(); ++i) {
+
+            // TODO: may want this to be configurable as well.
+            final TransportSupervisor transportSupervisor = new TransportSupervisor();
+            final TransactionSupervisor transactionSupervisor = new TransactionSupervisor(sipConfig.getTransaction());
+            final ApplicationSupervisor applicationSupervisor = new ApplicationSupervisor();
+
+            // TODO: should probably be configurable as well
+            final BlockingQueue<Runnable> jobQueue = new LinkedBlockingQueue<Runnable>(100);
+
+            final WorkerContext.Builder wcBuilder =
+                    WorkerContext.withDefaultChain(transportSupervisor, transactionSupervisor, applicationSupervisor);
+            wcBuilder.withQueue(jobQueue);
+            builder.withWorkerContext(wcBuilder.build());
+        }
+
+        return builder.build();
     }
 
     /**

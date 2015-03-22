@@ -34,8 +34,6 @@ public class FlowActor implements Actor {
     @SuppressWarnings("unchecked")
     @Override
     public void onUpstreamEvent(final ActorContext ctx, final Event event) {
-        // logger.debug("Processing new event {} ", event.getClass());
-
         if (event.isIOEvent()) {
             final IOEvent ioEvent = (IOEvent) event;
             if (ioEvent.isSipReadEvent()) {

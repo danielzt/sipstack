@@ -5,6 +5,7 @@ package io.sipstack.actor;
 
 import io.sipstack.event.Event;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -55,6 +56,8 @@ public interface ActorContext {
     void fireUpstreamEvent(Event event);
 
     void fireDownstreamEvent(Event event);
+
+    Scheduler scheduler();
 
     static ActorContext withInboundPipeLine(final ActorSystem system, final PipeLine pipeLine) {
         return new DefaultActorContext(system, true, pipeLine);
@@ -139,22 +142,44 @@ public interface ActorContext {
             final BufferedActorContext bufferedCtx = invokeActor(inbound, next, pipeLine, event);
 
             final List<Event> downstreamEvents = bufferedCtx.getDownstreamEvents();
-            if (!downstreamEvents.isEmpty()) {
+            final List<Event> continueDownstreamEvents = bufferedCtx.getContinueDownstreamEvents();
+            final List<DelayedEvent> delayedDownstreamEvents = bufferedCtx.getDownstreamDelayedEvents();
+
+            if (!downstreamEvents.isEmpty() || !continueDownstreamEvents.isEmpty()
+                    || !delayedDownstreamEvents.isEmpty()) {
                 // if this is an inbound event then we have to get the outbound
                 // pipe first and progress on it. If this already was an outbound
                 // event than the 'pipeLine' is our outbound pipe so no reason
                 // to call getOutboundPipe() again. Waste of time and resources...
-                final PipeLine nextOutboundPipe = inbound ? getOutboundPipe().progress() : pipeLine.progress();
+                PipeLine nextOutboundPipe = inbound ? getOutboundPipe() : pipeLine;
+
+                if (bufferedCtx.getNewActor() != null) {
+                    nextOutboundPipe = nextOutboundPipe.insert(bufferedCtx.getNewActor()).removeCurrent();
+                } else {
+                    nextOutboundPipe = nextOutboundPipe.progress();
+                }
+
                 for (final Event downstream : downstreamEvents) {
                     final ActorContext nextCtx = ActorContext.withOutboundPipeLine(this.system, nextOutboundPipe);
                     nextCtx.forwardDownstreamEvent(downstream);
+                }
+
+                for (final Event downstream : continueDownstreamEvents) {
+                    this.system.dispatchEvent(downstream, nextOutboundPipe);
+                }
+
+                for (final DelayedEvent downstream : delayedDownstreamEvents) {
+                    final Duration delay = downstream.delay;
+                    final Event delayedEvent = downstream.event;
+                    this.system.scheduleEvent(delay, delayedEvent, nextOutboundPipe);
                 }
             }
 
             final List<Event> upstreamEvents = bufferedCtx.getUpstreamEvents();
             final List<Event> continueUpstreamEvents = bufferedCtx.getContinueUpstreamEvents();
+            final List<DelayedEvent> delayedUpstreamEvents = bufferedCtx.getUpstreamDelayedEvents();
 
-            if (!upstreamEvents.isEmpty() || !continueUpstreamEvents.isEmpty()) {
+            if (!upstreamEvents.isEmpty() || !continueUpstreamEvents.isEmpty() || !delayedUpstreamEvents.isEmpty()) {
                 PipeLine nextInboundPipe = inbound ? pipeLine : getInboundPipe();
                 if (bufferedCtx.getNewActor() != null) {
                     nextInboundPipe = nextInboundPipe.insert(bufferedCtx.getNewActor()).removeCurrent();
@@ -170,7 +195,14 @@ public interface ActorContext {
                 for (final Event upstream : continueUpstreamEvents) {
                     this.system.dispatchEvent(upstream, nextInboundPipe);
                 }
+
+                for (final DelayedEvent upstream : delayedUpstreamEvents) {
+                    final Duration delay = upstream.delay;
+                    final Event delayedEvent = upstream.event;
+                    this.system.scheduleEvent(delay, delayedEvent, nextInboundPipe);
+                }
             }
+
 
             // if the actor have asked to die, then kill it off by telling its parent.
             // Note, because of how things are setup, an actor that asked to be disposed of will
@@ -222,6 +254,11 @@ public interface ActorContext {
             throw new RuntimeException("You shouldn't call this method outside of an Actor invocation");
         }
 
+        @Override
+        public Scheduler scheduler() {
+            throw new RuntimeException("You shouldn't call this method outside of an Actor invocation");
+        }
+
     }
 
     /**
@@ -232,13 +269,19 @@ public interface ActorContext {
      * it way easier to test!
      * 
      */
-    static class BufferedActorContext implements ActorContext {
+    static class BufferedActorContext implements ActorContext, Scheduler {
 
         private List<Event> upstreamEvents;
         private List<Event> downstreamEvents;
 
         private List<Event> continueUpstreamEvents;
         private List<Event> continueDownstreamEvents;
+
+        /**
+         * A list of events that are scheduled to be executed at a later point
+         */
+        private List<DelayedEvent> delayedUpstreamEvents;
+        private List<DelayedEvent> delayedDownstreamEvents;
 
         /**
          * If the user calls {@link #replace(Actor)} then this is that actor that the user wished to
@@ -264,6 +307,20 @@ public interface ActorContext {
         protected List<Event> getDownstreamEvents() {
             if (downstreamEvents != null) {
                 return downstreamEvents;
+            }
+            return Collections.emptyList();
+        }
+
+        protected List<DelayedEvent> getUpstreamDelayedEvents() {
+            if (delayedUpstreamEvents != null) {
+                return delayedUpstreamEvents;
+            }
+            return Collections.emptyList();
+        }
+
+        protected List<DelayedEvent> getDownstreamDelayedEvents() {
+            if (delayedDownstreamEvents != null) {
+                return delayedDownstreamEvents;
             }
             return Collections.emptyList();
         }
@@ -332,6 +389,38 @@ public interface ActorContext {
                 this.continueDownstreamEvents = new ArrayList<>();
             }
             this.continueDownstreamEvents.add(event);
+        }
+
+        @Override
+        public Scheduler scheduler() {
+            return this;
+        }
+
+        @Override
+        public void scheduleUpstreamEventOnce(final Duration delay, final Event event) {
+            System.err.println("yeah, im going to schedule upstream something. Jesus!!!");
+            if (delayedUpstreamEvents == null) {
+                this.delayedUpstreamEvents = new ArrayList<>();
+            }
+            this.delayedDownstreamEvents.add(new DelayedEvent(delay, event));
+        }
+
+        @Override
+        public void scheduleDownstreamEventOnce(final Duration delay, final Event event) {
+            System.err.println("yeah, im going to schedule downstream something. Jesus!!!");
+            if (delayedDownstreamEvents == null) {
+                this.delayedDownstreamEvents = new ArrayList<>();
+            }
+            this.delayedDownstreamEvents.add(new DelayedEvent(delay, event));
+        }
+    }
+
+    public static class DelayedEvent {
+        private final Duration delay;
+        private final Event event;
+        private DelayedEvent(final Duration delay, final Event event) {
+            this.delay = delay;
+            this.event = event;
         }
     }
 

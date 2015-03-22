@@ -6,9 +6,11 @@ package io.sipstack.actor;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipEvent;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,6 +23,8 @@ import org.junit.Before;
  * @author jonas@jonasborjesson.com
  */
 public class SipTestBase {
+
+    protected SipConfiguration sipConfig = new SipConfiguration();
 
     protected SipRequest invite;
     protected SipResponse ringing;
@@ -129,6 +133,26 @@ public class SipTestBase {
      */
     @After
     public void tearDown() throws Exception {}
+
+    /**
+     * Simple {@link Scheduler} that simply just saves all the events.
+     * 
+     * @author jonas
+     *
+     */
+    public static class MockSheduler implements Scheduler {
+
+        @Override
+        public void scheduleUpstreamEventOnce(final Duration delay, final Event event) {
+            // TODO Auto-generated method stub
+        }
+
+        @Override
+        public void scheduleDownstreamEventOnce(final Duration delay, final Event event) {
+            // TODO Auto-generated method stub
+        }
+
+    }
 
 
     /**

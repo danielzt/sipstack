@@ -35,7 +35,6 @@ public final class ApplicationSupervisor implements Actor, Supervisor {
     @Override
     public void killChild(final Actor actor) {
         // TODO Auto-generated method stub
-
     }
 
     /**

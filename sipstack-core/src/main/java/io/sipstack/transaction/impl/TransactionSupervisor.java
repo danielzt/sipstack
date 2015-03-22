@@ -3,10 +3,13 @@
  */
 package io.sipstack.transaction.impl;
 
+import static io.sipstack.actor.ActorUtils.safePostStop;
+import static io.sipstack.actor.ActorUtils.safePreStart;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.Actor;
 import io.sipstack.actor.ActorContext;
 import io.sipstack.actor.Supervisor;
+import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipEvent;
 import io.sipstack.transaction.Transaction;
@@ -14,6 +17,7 @@ import io.sipstack.transaction.TransactionId;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,11 +32,13 @@ public class TransactionSupervisor implements Actor, Supervisor {
 
     private final Map<TransactionId, TransactionActor> transactions = new HashMap<>(100, 0.75f);
 
+    private final TransactionLayerConfiguration config;
+
     /**
      * 
      */
-    public TransactionSupervisor() {
-        // TODO Auto-generated constructor stub
+    public TransactionSupervisor(final TransactionLayerConfiguration config) {
+        this.config = config;
     }
 
     /**
@@ -54,6 +60,10 @@ public class TransactionSupervisor implements Actor, Supervisor {
         return null;
     }
 
+    public TransactionLayerConfiguration getConfig() {
+        return this.config;
+    }
+
     private TransactionActor ensureTransaction(final TransactionId id, final SipEvent event) {
         final TransactionActor t = this.transactions.get(id);
         if (t != null) {
@@ -71,6 +81,12 @@ public class TransactionSupervisor implements Actor, Supervisor {
         }
 
         final TransactionActor newTransaction = TransactionActor.create(this, id, event);
+        final Optional<Throwable> exception = safePreStart(newTransaction);
+        if (exception.isPresent()) {
+            // TODO: do something about it... such as do not put it in the transactions table
+            throw new RuntimeException("The actor threw an exception in PostStop and I havent coded that up yet",
+                    exception.get());
+        }
         this.transactions.put(id, newTransaction);
         return newTransaction;
     }
@@ -111,12 +127,15 @@ public class TransactionSupervisor implements Actor, Supervisor {
 
     @Override
     public void killChild(final Actor actor) {
-        // can only be a TransactionActor
         try {
+            // can only be a TransactionActor
             final TransactionId id = ((TransactionActor) actor).getTransactionId();
             final TransactionActor transaction = this.transactions.remove(id);
-            if (transaction != null) {
-                // System.err.println("Killed off the transaction...");
+            final Optional<Throwable> exception = safePostStop(transaction);
+            if (exception.isPresent()) {
+                // TODO: do something about it.
+                throw new RuntimeException("The actor threw an exception in PostStop and I havent coded that up yet",
+                        exception.get());
             }
         } catch (final ClassCastException e) {
             // strange...

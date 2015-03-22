@@ -5,13 +5,14 @@ package io.sipstack.actor;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.Mockito.mock;
 import io.pkts.packet.sip.SipMessage;
+import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipEvent;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
+import io.sipstack.transaction.impl.InviteServerTransactionActor;
 import io.sipstack.transaction.impl.TransactionSupervisor;
 
 import org.junit.After;
@@ -98,16 +99,29 @@ public class InviteServerTransactionTest extends SipTestBase {
      * @param responses
      */
     protected void init(final Integer... responses) {
-        this.actorSystem = mock(ActorSystem.class);
+        init(this.sipConfig.getTransaction(), responses);
+    }
+
+    protected void init(final TransactionLayerConfiguration config, final Integer... responses) {
+
+        final ActorSystem.Builder builder = ActorSystem.withName("unit tests");
+        builder.withConfiguration(this.sipConfig);
+
         this.first = new EventProxy();
         this.last = new EventProxy(responses);
-        this.supervisor = new TransactionSupervisor();
+        this.supervisor = new TransactionSupervisor(config);
+
+        final WorkerContext workerCtx = WorkerContext.withDefaultChain(this.first, this.supervisor, this.last).build();
+        builder.withWorkerContext(workerCtx);
+        this.actorSystem = builder.build();
+
         this.factory = PipeLineFactory.withDefaultChain(this.first, this.supervisor, this.last);
         this.defaultInviteEvent = SipEvent.create(this.invite);
         this.default180RingingEvent = SipEvent.create(this.ringing);
         this.default200OKEvent = SipEvent.create(this.twoHundredToInvite);
         this.defaultCtx = ActorContext.withInboundPipeLine(this.actorSystem, this.factory.newPipeLine());
     }
+
 
     /**
      * Test so that an initial invite is handled correctly in that a new transaction is created, a
@@ -119,6 +133,23 @@ public class InviteServerTransactionTest extends SipTestBase {
     public void testInitialInvite() {
         this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
         assertInitialInvite(this.defaultInviteEvent);
+    }
+
+    /**
+     * By default the {@link InviteServerTransactionActor} sends a 100 Trying right away but if
+     * configured it will delay it with 200 ms so let's make sure that that's what happens.
+     */
+    @Test
+    public void testSend100TryingAfter200ms() throws Exception {
+        final TransactionLayerConfiguration config = new TransactionLayerConfiguration();
+        config.setSend100TryingImmediately(false);
+        init(config, null);
+        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+        assertServerTransactionState(this.defaultInviteEvent, TransactionState.PROCEEDING);
+
+        Thread.sleep(300);
+        final TransactionId id = getTransactionId(this.defaultInviteEvent);
+        assertResponses(this.first, id, 100);
     }
 
     /**

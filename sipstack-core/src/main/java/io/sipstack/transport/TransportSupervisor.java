@@ -3,6 +3,7 @@
  */
 package io.sipstack.transport;
 
+import static io.sipstack.actor.ActorUtils.safePreStart;
 import io.sipstack.actor.Actor;
 import io.sipstack.actor.ActorContext;
 import io.sipstack.actor.Supervisor;
@@ -13,6 +14,7 @@ import io.sipstack.netty.codec.sip.ConnectionId;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The {@link TransportSupervisor} is responsible for creating and maintaining
@@ -62,6 +64,12 @@ public class TransportSupervisor implements Actor, Supervisor {
         }
 
         final FlowActor newFlow = FlowActor.create(this, connection);
+        final Optional<Throwable> exception = safePreStart(newFlow);
+        if (exception.isPresent()) {
+            throw new RuntimeException("The actor threw an exception in PostStop and I havent coded that up yet",
+                    exception.get());
+        }
+
         this.flows.put(id, newFlow);
         return newFlow;
     }

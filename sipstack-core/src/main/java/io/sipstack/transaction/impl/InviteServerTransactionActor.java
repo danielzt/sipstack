@@ -13,6 +13,7 @@ import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
 
+import java.time.Duration;
 import java.util.function.BiConsumer;
 
 
@@ -214,7 +215,13 @@ public class InviteServerTransactionActor implements TransactionActor {
 
     private void processInitialInvite(final ActorContext ctx) {
         final SipResponse response = this.invite.getSipMessage().createResponse(100);
-        ctx.forwardDownstreamEvent(SipEvent.create(this.invite.key(), response));
+        if (this.parent.getConfig().isSend100TryingImmediately()) {
+            ctx.forwardDownstreamEvent(SipEvent.create(this.invite.key(), response));
+        } else {
+            System.err.println("Ok, so i am scheduling it for later...");
+            final SipEvent event = SipEvent.create(this.invite.key(), response);
+            ctx.scheduler().scheduleDownstreamEventOnce(Duration.ofMillis(200), event);
+        }
     }
 
     /**

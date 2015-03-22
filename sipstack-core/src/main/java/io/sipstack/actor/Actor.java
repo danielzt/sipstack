@@ -18,6 +18,22 @@ public interface Actor {
         ctx.forwardDownstreamEvent(event);
     }
 
+    /**
+     * Called exactly once when the {@link Actor} is created the very first time.
+     */
+    default void preStart() {
+        // left empty intentionally. Actor implementations should
+        // override and do something useful here
+    }
+
+    /**
+     * Called exactly once when the {@link Actor} is stopped.
+     */
+    default void postStop() {
+        // left empty intentionally. Actor implementations should
+        // override and do something useful here
+    }
+
     default Supervisor getSupervisor() {
         return null;
     }

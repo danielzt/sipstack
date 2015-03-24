@@ -119,22 +119,26 @@ public final class TimersConfiguration {
     @JsonIgnore
     private Duration timerK;
     
+    public TimersConfiguration() {
+        init();
+    }
+    
     /**
      * Called as soon as the values of T1, T2, T4 changes since
      * the timers below are based on the values of those base timers.
      */
     private void init() {
-        this.timerA = Duration.ofNanos(this.t1.getNano());
-        this.timerB = Duration.ofNanos(64 * this.t1.getNano());
-        this.timerE = Duration.ofNanos(this.t1.getNano());
-        this.timerF = Duration.ofNanos(64 * this.t1.getNano());
-        this.timerG = Duration.ofNanos(this.t1.getNano());
-        this.timerG = Duration.ofNanos(64 * this.t1.getNano());
-        this.timerI = Duration.ofNanos(this.t4.getNano());
-        this.timerJ = Duration.ofNanos(64 * this.t1.getNano());
-        this.timerK = Duration.ofNanos(this.t4.getNano());
+        this.timerA = Duration.ofMillis(this.t1.toMillis());
+        this.timerB = Duration.ofMillis(64 * this.t1.toMillis());
+        this.timerE = Duration.ofMillis(this.t1.toMillis());
+        this.timerF = Duration.ofMillis(64 * this.t1.toMillis());
+        this.timerG = Duration.ofMillis(this.t1.toMillis());
+        this.timerH = Duration.ofMillis(64 * this.t1.toMillis());
+        this.timerI = Duration.ofMillis(this.t4.toMillis());
+        this.timerJ = Duration.ofMillis(64 * this.t1.toMillis());
+        this.timerK = Duration.ofMillis(this.t4.toMillis());
     }
-
+    
     /**
      * @return the t1
      */

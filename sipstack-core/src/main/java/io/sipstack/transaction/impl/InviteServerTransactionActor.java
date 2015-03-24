@@ -3,10 +3,12 @@
  */
 package io.sipstack.transaction.impl;
 
+import io.netty.util.Timeout;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.actor.ActorContext;
 import io.sipstack.actor.Supervisor;
+import io.sipstack.config.TimersConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipEvent;
 import io.sipstack.transaction.Transaction;
@@ -14,7 +16,11 @@ import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.function.BiConsumer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -117,6 +123,8 @@ import java.util.function.BiConsumer;
  */
 public class InviteServerTransactionActor implements TransactionActor {
 
+    private static final Logger logger = LoggerFactory.getLogger(InviteServerTransactionActor.class);
+
     private final TransactionId id;
     private final SipEvent invite;
     private TransactionState state;
@@ -141,6 +149,24 @@ public class InviteServerTransactionActor implements TransactionActor {
     private final BiConsumer<ActorContext, Event>[] states = new BiConsumer[6];
 
     /**
+     * If we enter the completed state we will setup Timer G for response retransmissions if this
+     * transaction is over an unreliable transport.
+     */
+    private Optional<Timeout> timerG = Optional.empty();
+
+    /**
+     * How many times Timer G has fired.
+     */
+    private final int timerGCount = 0;
+
+    /**
+     * If we enter the completed state, Timer H will take us from completed to terminated unless we
+     * do receive an ACK before then. Hence, Timer H determines the longest amount of time we can
+     * stay in the completed state.
+     */
+    private final Optional<Timeout> timerH = Optional.empty();
+
+    /**
      * 
      */
     protected InviteServerTransactionActor(final TransactionSupervisor parent, final TransactionId id,
@@ -158,6 +184,7 @@ public class InviteServerTransactionActor implements TransactionActor {
     }
 
     private void become(final TransactionState state) {
+        logger.info("{} {} -> {}", this.id, this.state, state);
         this.state = state;
         this.receive = this.states[state.ordinal()];
     }
@@ -192,12 +219,30 @@ public class InviteServerTransactionActor implements TransactionActor {
             if (response.isSuccess()) {
                 terminate(ctx);
             } else if (response.isFinal()) {
+            // TODO: shouldn't really be Timeout object here. We should give out something else.
+                final Timeout timerG = ctx.scheduler().scheduleDownstreamEventOnce(calculateNextTimerG(), event);
+                this.timerG = Optional.of(timerG);
                 become(TransactionState.COMPLETED);
             }
         } else {
 
         }
     };
+
+    /**
+     * While in the completed state we will re-transmit the final response (which then must be a
+     * error response only otherwise we wouldn't be in the completed state to begin with) every time
+     * this timer fires.
+     * 
+     * @return
+     */
+    private Duration calculateNextTimerG() {
+        final TimersConfiguration timers = this.parent.getConfig().getTimers();
+        final long defaultTimerG = timers.getTimerG().toMillis();
+        final long t2 = timers.getT2().toMillis();
+        final long g = Math.min(defaultTimerG * (int) Math.pow(2, this.timerGCount), t2);
+        return Duration.ofMillis(g);
+    }
 
     private void terminate(final ActorContext ctx) {
         become(TransactionState.TERMINATED);
@@ -218,7 +263,6 @@ public class InviteServerTransactionActor implements TransactionActor {
         if (this.parent.getConfig().isSend100TryingImmediately()) {
             ctx.forwardDownstreamEvent(SipEvent.create(this.invite.key(), response));
         } else {
-            System.err.println("Ok, so i am scheduling it for later...");
             final SipEvent event = SipEvent.create(this.invite.key(), response);
             ctx.scheduler().scheduleDownstreamEventOnce(Duration.ofMillis(200), event);
         }

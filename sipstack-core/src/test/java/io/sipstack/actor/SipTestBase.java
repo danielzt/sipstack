@@ -3,18 +3,31 @@
  */
 package io.sipstack.actor;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import io.netty.util.Timeout;
+import io.netty.util.Timer;
+import io.netty.util.TimerTask;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipEvent;
+import io.sipstack.netty.codec.sip.Connection;
+import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.Transport;
 
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
@@ -23,6 +36,14 @@ import org.junit.Before;
  * @author jonas@jonasborjesson.com
  */
 public class SipTestBase {
+
+    /**
+     * When kicking off new tests we usually send a SipMessage via the {@link ActorSystem} and when
+     * doing so we need a {@link ConnectionId} as part of the {@link SipMessageEvent} (inderectly
+     * via {@link Connection}). This is the default one if your test doesn't care which connection
+     * the message came from.
+     */
+    protected ConnectionId defaultConnectionId;
 
     protected SipConfiguration sipConfig = new SipConfiguration();
 
@@ -37,7 +58,9 @@ public class SipTestBase {
     private final String byeStr;
     private final String twoHundredByeStr;
 
-    public SipTestBase() {
+    public SipTestBase() throws Exception {
+        this.defaultConnectionId = createConnectionId(Transport.udp, "10.36.10.10", 5060, "192.168.0.100", 5060);
+
         StringBuilder sb = new StringBuilder();
         sb.append("INVITE sip:service@127.0.0.1:5060 SIP/2.0\r\n");
         sb.append("Via: SIP/2.0/UDP 127.0.1.1:5061;branch=z9hG4bK-25980-1-0\r\n");
@@ -135,21 +158,132 @@ public class SipTestBase {
     public void tearDown() throws Exception {}
 
     /**
-     * Simple {@link Scheduler} that simply just saves all the events.
+     * Helper method for creating a new {@link ConnectionId} object.
+     */
+    public ConnectionId createConnectionId(final Transport transport, final String localIp, final int localPort,
+            final String remoteIp, final int remotePort) throws Exception {
+        final InetSocketAddress local = new InetSocketAddress(localIp, localPort);
+        final InetSocketAddress remote = new InetSocketAddress(remoteIp, remotePort);
+        return ConnectionId.create(transport, local, remote);
+    }
+
+    public SipMessageEvent mockSipMessageEvent(final SipMessage msg) {
+        final SipMessageEvent event = mock(SipMessageEvent.class);
+        final Connection connection = mockConnection(this.defaultConnectionId);
+        // TODO: should be our internal fake clock
+        when(event.getArrivalTime()).thenReturn(System.currentTimeMillis());
+        when(event.getConnection()).thenReturn(connection);
+        when(event.getMessage()).thenReturn(msg);
+        return event;
+    }
+
+    /**
+     * Helper method for creating a mocked {@link Connection} based off of a {@link ConnectionId}.
      * 
-     * @author jonas
+     * @param connectionId
+     * @return
+     */
+    public Connection mockConnection(final ConnectionId connectionId) {
+        final Connection connection = mock(Connection.class);
+        when(connection.id()).thenReturn(connectionId);
+        when(connection.getTransport()).thenReturn(connectionId.getProtocol());
+        when(connection.getLocalIpAddress()).thenReturn(connectionId.getLocalIpAddress());
+        when(connection.getLocalPort()).thenReturn(connectionId.getLocalPort());
+        when(connection.getRemoteIpAddress()).thenReturn(connectionId.getRemoteIpAddress());
+        when(connection.getRemotePort()).thenReturn(connectionId.getRemotePort());
+        return connection;
+    }
+
+
+    /**
+     * Simple {@link Timer} that simply just saves all the events so that we can examine them later
+     * and also "fire" them off..
+     * 
+     * @author jonas@jonasborjesson.com
      *
      */
-    public static class MockSheduler implements Scheduler {
+    public static class MockTimer implements Timer {
+        public final List<TimerTaskSnapshot> tasks = new ArrayList<TimerTaskSnapshot>();
 
         @Override
-        public void scheduleUpstreamEventOnce(final Duration delay, final Event event) {
+        public Timeout newTimeout(final TimerTask task, final long delay, final TimeUnit unit) {
+            final Timeout timeout = mock(Timeout.class);
+            this.tasks.add(new TimerTaskSnapshot(task, delay, unit, timeout));
+            return timeout;
+        }
+
+        @Override
+        public Set<Timeout> stop() {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
+    }
+
+    /**
+     * Simple class just to keep all the parameters together when it comes to the timer task that
+     * was scheduled on a {@link Timer}.
+     * 
+     */
+    public static class TimerTaskSnapshot {
+        public final TimerTask task;
+        public final long delay;
+        public final TimeUnit unit;
+        public final Timeout timeout;
+
+        private TimerTaskSnapshot(final TimerTask task, final long delay, final TimeUnit unit, final Timeout timeout) {
+            this.task = task;
+            this.delay = delay;
+            this.unit = unit;
+            this.timeout = timeout;
+        }
+    }
+
+    public static class DelayedJob {
+        public final Duration delay;
+        public final DispatchJob job;
+
+        private DelayedJob(final Duration delay, final DispatchJob job) {
+            this.delay = delay;
+            this.job = job;
+        }
+    }
+
+    public class MockActorSystem implements ActorSystem {
+        public final List<DelayedJob> scheduledJobs = new ArrayList<>();
+        public final List<DispatchJob> jobs = new ArrayList<>();
+
+        private final PipeLineFactory pipeLineFactory;
+
+        public MockActorSystem(final PipeLineFactory pipeLineFactory) {
+            this.pipeLineFactory = pipeLineFactory;
+        }
+
+        @Override
+        public void receive(final SipMessageEvent event) {
             // TODO Auto-generated method stub
         }
 
         @Override
-        public void scheduleDownstreamEventOnce(final Duration delay, final Event event) {
-            // TODO Auto-generated method stub
+        public Timeout scheduleJob(final Duration delay, final DispatchJob job) {
+            this.scheduledJobs.add(new DelayedJob(delay, job));
+            return mock(Timeout.class);
+        }
+
+        @Override
+        public void dispatchJob(final DispatchJob job) {
+            this.jobs.add(job);
+        }
+
+        @Override
+        public DispatchJob createJob(final Direction direction, final Event event, final PipeLine pipeLine) {
+            return new DispatchJob(this, 0, pipeLine, event, direction);
+        }
+
+        @Override
+        public DispatchJob createJob(final Direction direction, final Event event) {
+            final PipeLine pipeLine = this.pipeLineFactory.newPipeLine();
+            return new DispatchJob(this, 0, pipeLine, event, direction);
         }
 
     }

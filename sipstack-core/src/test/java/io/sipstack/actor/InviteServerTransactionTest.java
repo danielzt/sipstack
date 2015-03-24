@@ -15,6 +15,8 @@ import io.sipstack.transaction.TransactionState;
 import io.sipstack.transaction.impl.InviteServerTransactionActor;
 import io.sipstack.transaction.impl.TransactionSupervisor;
 
+import java.time.Duration;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -29,6 +31,11 @@ public class InviteServerTransactionTest extends SipTestBase {
      * The transaction supervisor used for all tests within this test class.
      */
     private TransactionSupervisor supervisor;
+
+    /**
+     * The fake timer used for checking whether tasks where scheduled for later execution.
+     */
+    private MockTimer timer;
 
     /**
      * An event proxy that is inserted before the supervisor.
@@ -70,7 +77,11 @@ public class InviteServerTransactionTest extends SipTestBase {
      */
     private ActorContext defaultCtx;
 
-    private ActorSystem actorSystem;
+    private MockActorSystem actorSystem;
+
+    public InviteServerTransactionTest() throws Exception {
+        super();
+    }
 
     /**
      * @throws java.lang.Exception
@@ -104,22 +115,58 @@ public class InviteServerTransactionTest extends SipTestBase {
 
     protected void init(final TransactionLayerConfiguration config, final Integer... responses) {
 
-        final ActorSystem.Builder builder = ActorSystem.withName("unit tests");
-        builder.withConfiguration(this.sipConfig);
+        // final ActorSystem.Builder builder = ActorSystem.withName("unit tests");
+        // builder.withConfiguration(this.sipConfig);
+        // builder.withTimer(this.timer);
+
+        this.timer = new MockTimer();
 
         this.first = new EventProxy();
         this.last = new EventProxy(responses);
         this.supervisor = new TransactionSupervisor(config);
 
-        final WorkerContext workerCtx = WorkerContext.withDefaultChain(this.first, this.supervisor, this.last).build();
-        builder.withWorkerContext(workerCtx);
-        this.actorSystem = builder.build();
-
         this.factory = PipeLineFactory.withDefaultChain(this.first, this.supervisor, this.last);
+        this.actorSystem = new MockActorSystem(this.factory);
+
         this.defaultInviteEvent = SipEvent.create(this.invite);
         this.default180RingingEvent = SipEvent.create(this.ringing);
         this.default200OKEvent = SipEvent.create(this.twoHundredToInvite);
+
         this.defaultCtx = ActorContext.withInboundPipeLine(this.actorSystem, this.factory.newPipeLine());
+
+    }
+
+    /**
+     * Make sure that if we get an error responses to the INVITE that the transaction is
+     * transitioning to the correct states etc.
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testAllErrorResponses() throws Exception {
+        for (int i = 300; i < 700; ++i) {
+            init(i);
+            this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+            final TransactionId id = getTransactionId(this.defaultInviteEvent);
+            assertResponses(this.first, id, 100, i);
+            assertServerTransactionState(this.defaultInviteEvent, TransactionState.COMPLETED);
+
+            // We should also have setup a timer G for re-transmitting the response
+            // and that delay should the first time around be the same as T1.
+            // Hence make sure that there is a response ready to be sent out and the
+            // response code is the same as what we just created (i.e. equal to loop variable 'i')
+            // and the delay is T1
+            final Duration t1 = this.sipConfig.getTransaction().getTimers().getT1();
+            assertThat(this.actorSystem.scheduledJobs.size(), is(1));
+            final DelayedJob scheduledEvent = this.actorSystem.scheduledJobs.get(0);
+            assertThat(scheduledEvent.delay, is(t1));
+            assertThat(scheduledEvent.job.getDirection(), is(Direction.DOWNSTREAM));
+            assertThat(scheduledEvent.job.getEvent().isSipEvent(), is(true));
+            final SipEvent trying = (SipEvent) scheduledEvent.job.getEvent();
+            assertThat(trying.getSipMessage().isResponse(), is(true));
+            assertThat(trying.getSipMessage().toResponse().getStatus(), is(i));
+
+        }
     }
 
 
@@ -143,11 +190,30 @@ public class InviteServerTransactionTest extends SipTestBase {
     public void testSend100TryingAfter200ms() throws Exception {
         final TransactionLayerConfiguration config = new TransactionLayerConfiguration();
         config.setSend100TryingImmediately(false);
-        init(config, null);
+        init(config);
+
         this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+
+        // there should be one delayed 100 Trying waiting to be sent.
+        assertThat(this.actorSystem.scheduledJobs.size(), is(1));
+        final DelayedJob scheduledEvent = this.actorSystem.scheduledJobs.get(0);
+        assertThat(scheduledEvent.delay, is(Duration.ofMillis(200)));
+        assertThat(scheduledEvent.job.getDirection(), is(Direction.DOWNSTREAM));
+        assertThat(scheduledEvent.job.getEvent().isSipEvent(), is(true));
+        final SipEvent trying = (SipEvent) scheduledEvent.job.getEvent();
+        assertThat(trying.getSipMessage().isResponse(), is(true));
+        assertThat(trying.getSipMessage().toResponse().is100Trying(), is(true));
+
+        // our transaction should be in the proceeding state though
         assertServerTransactionState(this.defaultInviteEvent, TransactionState.PROCEEDING);
 
-        Thread.sleep(300);
+        // ensure no other responses have been sent.
+        assertThat(this.first.downstreamEvents.isEmpty(), is(true));
+
+        // ok, "execute" the timeout.
+        scheduledEvent.job.run();
+
+        // and how we should have the 100 trying
         final TransactionId id = getTransactionId(this.defaultInviteEvent);
         assertResponses(this.first, id, 100);
     }
@@ -167,6 +233,9 @@ public class InviteServerTransactionTest extends SipTestBase {
         // of the initial invite transaction. We should also have received a 100 Trying.
         final TransactionId id = getTransactionId(this.defaultInviteEvent);
         assertResponses(this.first, id, 100, 180);
+
+        // no timers or anything should have been scheduled just yet.
+        assertThat(this.actorSystem.scheduledJobs.isEmpty(), is(true));
     }
 
     @Test

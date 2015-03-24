@@ -3,6 +3,10 @@
  */
 package io.sipstack.actor;
 
+import io.netty.util.Timeout;
+import io.netty.util.Timer;
+import io.netty.util.TimerTask;
+import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
 import io.sipstack.event.Event;
 
 import java.time.Duration;
@@ -165,13 +169,17 @@ public interface ActorContext {
                 }
 
                 for (final Event downstream : continueDownstreamEvents) {
-                    this.system.dispatchEvent(downstream, nextOutboundPipe);
+                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, downstream, nextOutboundPipe);
+                    this.system.dispatchJob(job);
                 }
 
                 for (final DelayedEvent downstream : delayedDownstreamEvents) {
                     final Duration delay = downstream.delay;
                     final Event delayedEvent = downstream.event;
-                    this.system.scheduleEvent(delay, delayedEvent, nextOutboundPipe);
+                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, delayedEvent, nextOutboundPipe);
+                    this.system.scheduleJob(delay, job);
+                    // this.system.scheduleEvent(Direction.DOWNSTREAM, delay, delayedEvent,
+                    // nextOutboundPipe);
                 }
             }
 
@@ -193,13 +201,22 @@ public interface ActorContext {
                 }
 
                 for (final Event upstream : continueUpstreamEvents) {
-                    this.system.dispatchEvent(upstream, nextInboundPipe);
+                    final DispatchJob job = this.system.createJob(Direction.UPSTREAM, upstream, nextInboundPipe);
+                    this.system.dispatchJob(job);
+                    // this.system.dispatchEvent(Direction.UPSTREAM, upstream, nextInboundPipe);
                 }
 
                 for (final DelayedEvent upstream : delayedUpstreamEvents) {
                     final Duration delay = upstream.delay;
                     final Event delayedEvent = upstream.event;
-                    this.system.scheduleEvent(delay, delayedEvent, nextInboundPipe);
+                    final DispatchJob job = this.system.createJob(Direction.UPSTREAM, delayedEvent, nextInboundPipe);
+
+                    // TODO: need to take this timeout and connect it with the timeout promise
+                    // we made to the caller. Right now they are not connected!!!
+                    final Timeout timeout = this.system.scheduleJob(delay, job);
+
+                    // this.system.scheduleEvent(Direction.UPSTREAM, delay, delayedEvent,
+                    // nextInboundPipe);
                 }
             }
 
@@ -397,28 +414,60 @@ public interface ActorContext {
         }
 
         @Override
-        public void scheduleUpstreamEventOnce(final Duration delay, final Event event) {
-            System.err.println("yeah, im going to schedule upstream something. Jesus!!!");
+        public Timeout scheduleUpstreamEventOnce(final Duration delay, final Event event) {
             if (delayedUpstreamEvents == null) {
                 this.delayedUpstreamEvents = new ArrayList<>();
             }
-            this.delayedDownstreamEvents.add(new DelayedEvent(delay, event));
+            this.delayedUpstreamEvents.add(new DelayedEvent(Direction.UPSTREAM, delay, event));
+            // TODO: need to figure this out.
+            return null;
         }
 
         @Override
-        public void scheduleDownstreamEventOnce(final Duration delay, final Event event) {
-            System.err.println("yeah, im going to schedule downstream something. Jesus!!!");
+        public Timeout scheduleDownstreamEventOnce(final Duration delay, final Event event) {
             if (delayedDownstreamEvents == null) {
                 this.delayedDownstreamEvents = new ArrayList<>();
             }
-            this.delayedDownstreamEvents.add(new DelayedEvent(delay, event));
+            this.delayedDownstreamEvents.add(new DelayedEvent(Direction.DOWNSTREAM, delay, event));
+
+            // TODO: eh yeah, fix it...
+            return new Timeout() {
+
+                @Override
+                public Timer timer() {
+                    throw new RuntimeException("sorry, should use something else than Timeout object here");
+                }
+
+                @Override
+                public TimerTask task() {
+                    throw new RuntimeException("sorry, should use something else than Timeout object here");
+                }
+
+                @Override
+                public boolean isExpired() {
+                    throw new RuntimeException("sorry, should use something else than Timeout object here");
+                }
+
+                @Override
+                public boolean isCancelled() {
+                    throw new RuntimeException("sorry, should use something else than Timeout object here");
+                }
+
+                @Override
+                public boolean cancel() {
+                    throw new RuntimeException("sorry, should use something else than Timeout object here");
+                }
+            };
         }
     }
 
     public static class DelayedEvent {
+        private final Direction direction;
         private final Duration delay;
         private final Event event;
-        private DelayedEvent(final Duration delay, final Event event) {
+
+        private DelayedEvent(final Direction direction, final Duration delay, final Event event) {
+            this.direction = direction;
             this.delay = delay;
             this.event = event;
         }

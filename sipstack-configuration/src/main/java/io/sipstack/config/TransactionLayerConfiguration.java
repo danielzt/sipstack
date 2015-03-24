@@ -6,8 +6,7 @@ package io.sipstack.config;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * @author jonas
- *
+ * @author jonas@jonasborjesson.com
  */
 public final class TransactionLayerConfiguration {
     
@@ -16,7 +15,7 @@ public final class TransactionLayerConfiguration {
      * should send 100 Trying if the TU won't within 200ms, however,
      * quite often  you may just want the transaction to do it right
      * away. In sipstack.io, it is the default behavior to send the 100 Trying
-     * right away.
+     * right away but can be changed by setting this property to false.
      */
     @JsonProperty
     private boolean send100TryingImmediately = true;

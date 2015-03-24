@@ -3,6 +3,7 @@
  */
 package io.sipstack.actor;
 
+import io.netty.util.Timeout;
 import io.sipstack.event.Event;
 
 import java.time.Duration;
@@ -21,7 +22,7 @@ public interface Scheduler {
      * @param delay the time delay.
      * @param event the event to pass to the actor after the delay has elapsed.
      */
-    void scheduleUpstreamEventOnce(Duration delay, Event event);
+    Timeout scheduleUpstreamEventOnce(Duration delay, Event event);
 
     /**
      * Same as {@link #scheduleUpstreamEventOnce(Duration, Event)} but the direction of the event is
@@ -30,6 +31,5 @@ public interface Scheduler {
      * @param delay
      * @param event
      */
-    void scheduleDownstreamEventOnce(Duration delay, Event event);
-
+    Timeout scheduleDownstreamEventOnce(Duration delay, Event event);
 }

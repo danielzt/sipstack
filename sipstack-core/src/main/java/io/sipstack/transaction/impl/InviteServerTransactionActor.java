@@ -7,6 +7,8 @@ import io.netty.util.Timeout;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.actor.ActorContext;
+import io.sipstack.actor.ActorRef;
+import io.sipstack.actor.ActorUtils;
 import io.sipstack.actor.Supervisor;
 import io.sipstack.config.TimersConfiguration;
 import io.sipstack.event.Event;
@@ -152,7 +154,7 @@ public class InviteServerTransactionActor implements TransactionActor {
      * If we enter the completed state we will setup Timer G for response retransmissions if this
      * transaction is over an unreliable transport.
      */
-    private Optional<Timeout> timerG = Optional.empty();
+    private final Optional<Timeout> timerG = Optional.empty();
 
     /**
      * How many times Timer G has fired.
@@ -219,10 +221,15 @@ public class InviteServerTransactionActor implements TransactionActor {
             if (response.isSuccess()) {
                 terminate(ctx);
             } else if (response.isFinal()) {
-            // TODO: shouldn't really be Timeout object here. We should give out something else.
-                final Timeout timerG = ctx.scheduler().scheduleDownstreamEventOnce(calculateNextTimerG(), event);
-                this.timerG = Optional.of(timerG);
+                // TODO: shouldn't really be Timeout object here. We should give out something else.
+                // TODO: only schedule if unreliable transport.
+                // final TimerEvent timerG =
+                // ctx.scheduler().scheduleDownstreamEventOnce(calculateNextTimerG(), "timerG");
+                final Duration delay = calculateNextTimerG();
+                ctx.scheduler().schedule(delay, "timerG");
+                // this.timerG = Optional.of(timerG);
                 become(TransactionState.COMPLETED);
+
             }
         } else {
 
@@ -240,8 +247,7 @@ public class InviteServerTransactionActor implements TransactionActor {
         final TimersConfiguration timers = this.parent.getConfig().getTimers();
         final long defaultTimerG = timers.getTimerG().toMillis();
         final long t2 = timers.getT2().toMillis();
-        final long g = Math.min(defaultTimerG * (int) Math.pow(2, this.timerGCount), t2);
-        return Duration.ofMillis(g);
+        return ActorUtils.calculateBackoffTimer(this.timerGCount, defaultTimerG, t2);
     }
 
     private void terminate(final ActorContext ctx) {
@@ -255,16 +261,15 @@ public class InviteServerTransactionActor implements TransactionActor {
                 .getStatus()) {
             this.lastResponseEvent = event;
         }
-        ctx.forwardDownstreamEvent(event);
+        ctx.reverse().forward(event);
     }
 
     private void processInitialInvite(final ActorContext ctx) {
-        final SipResponse response = this.invite.getSipMessage().createResponse(100);
         if (this.parent.getConfig().isSend100TryingImmediately()) {
-            ctx.forwardDownstreamEvent(SipEvent.create(this.invite.key(), response));
+            final SipResponse response = this.invite.getSipMessage().createResponse(100);
+            ctx.reverse().forward(SipEvent.create(this.invite.key(), response));
         } else {
-            final SipEvent event = SipEvent.create(this.invite.key(), response);
-            ctx.scheduler().scheduleDownstreamEventOnce(Duration.ofMillis(200), event);
+            ctx.scheduler().schedule(Duration.ofMillis(200), "100Trying");
         }
     }
 
@@ -276,23 +281,15 @@ public class InviteServerTransactionActor implements TransactionActor {
     private final BiConsumer<ActorContext, Event> init = (ctx, event) -> {
         if (event == this.invite) {
             processInitialInvite(ctx);
-            ctx.forwardUpstreamEvent(event); // this must not be processed until we are done
+            ctx.forward(event);
         } else {
             System.err.println("Queue??? shouldn't be able to happen");
         }
         become(TransactionState.PROCEEDING);
     };
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void onUpstreamEvent(final ActorContext ctx, final Event event) {
-        this.receive.accept(ctx, event);
-    }
-
-    @Override
-    public void onDownstreamEvent(final ActorContext ctx, final Event event) {
+    public void onEvent(final ActorContext ctx, final Event event) {
         this.receive.accept(ctx, event);
     }
 
@@ -309,5 +306,11 @@ public class InviteServerTransactionActor implements TransactionActor {
     @Override
     public TransactionId getTransactionId() {
         return this.id;
+    }
+
+    @Override
+    public ActorRef self() {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

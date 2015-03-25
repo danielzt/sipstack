@@ -20,7 +20,6 @@ public interface Key {
         return new ConnectionIdKey(id);
     }
 
-
     /**
      * Convenience method for creating a new {@link Key} based on a {@link SipMessage}.
      * 

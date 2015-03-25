@@ -41,7 +41,7 @@ public final class ApplicationSupervisor implements Actor, Supervisor {
      * {@inheritDoc}
      */
     @Override
-    public void onUpstreamEvent(final ActorContext ctx, final Event event) {
+    public void onEvent(final ActorContext ctx, final Event event) {
         final SipEvent sipEvent = (SipEvent) event;
         final SipMessage msg = sipEvent.getSipMessage();
         // just consume the ACK
@@ -54,22 +54,10 @@ public final class ApplicationSupervisor implements Actor, Supervisor {
             final SipResponse response = msg.createResponse(200);
             final Key key = event.key();
             final SipEvent responseEvent = SipEvent.create(key, response);
-            ctx.forwardDownstreamEvent(responseEvent);
+            ctx.reverse().forward(responseEvent);
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onDownstreamEvent(final ActorContext ctx, final Event event) {
-        // TODO Auto-generated method stub
-        logger.error("Got an downstream event");
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Supervisor getSupervisor() {
         // TODO Auto-generated method stub

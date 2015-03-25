@@ -5,6 +5,13 @@ import java.util.concurrent.BlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Super simple worker class that all it does is grab {@link Runnable}s off of a queue and executes
+ * them. Each worker is always executing on the same single thread.
+ * 
+ * @author jonas@jonasborjesson.com
+ *
+ */
 public class Worker implements Runnable {
 
     private final Logger logger = LoggerFactory.getLogger(Worker.class);
@@ -16,8 +23,6 @@ public class Worker implements Runnable {
     private final int id;
 
     private final BlockingQueue<Runnable> queue;
-
-    // private final PipeLineFactory pipeFactory;
 
     /**
      * 

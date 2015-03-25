@@ -3,11 +3,9 @@
  */
 package io.sipstack.actor;
 
-import io.netty.util.Timeout;
-import io.netty.util.Timer;
-import io.netty.util.TimerTask;
 import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
 import io.sipstack.event.Event;
+import io.sipstack.event.TimerEvent;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -53,23 +51,33 @@ public interface ActorContext {
      * 
      * @param event
      */
-    void forwardUpstreamEvent(Event event);
+    // void forwardUpstreamEvent(Event event);
 
-    void forwardDownstreamEvent(Event event);
+    // void forwardDownstreamEvent(Event event);
 
-    void fireUpstreamEvent(Event event);
+    // void fireUpstreamEvent(Event event);
 
-    void fireDownstreamEvent(Event event);
+    // void fireDownstreamEvent(Event event);
+
+    void forward(Event event);
+
+    void fire(Event event);
+
+    ActorContext reverse();
 
     Scheduler scheduler();
 
-    static ActorContext withInboundPipeLine(final ActorSystem system, final PipeLine pipeLine) {
-        return new DefaultActorContext(system, true, pipeLine);
+    static ActorContext withPipeLine(final ActorSystem system, final PipeLine pipeLine) {
+        return new DefaultActorContext(system, pipeLine);
     }
 
-    static ActorContext withOutboundPipeLine(final ActorSystem system, final PipeLine pipeLine) {
-        return new DefaultActorContext(system, false, pipeLine);
-    }
+    // static ActorContext withInboundPipeLine(final ActorSystem system, final PipeLine pipeLine) {
+    // return new DefaultActorContext(system, true, pipeLine);
+    // }
+
+    // static ActorContext withOutboundPipeLine(final ActorSystem system, final PipeLine pipeLine) {
+    // return new DefaultActorContext(system, false, pipeLine);
+    // }
 
 
     /**
@@ -85,11 +93,8 @@ public interface ActorContext {
 
         private final PipeLine pipeLine;
 
-        private final boolean isInbound;
-
-        private DefaultActorContext(final ActorSystem actorSystem, final boolean isInbound, final PipeLine pipeLine) {
+        private DefaultActorContext(final ActorSystem actorSystem, final PipeLine pipeLine) {
             this.system = actorSystem;
-            this.isInbound = isInbound;
             this.pipeLine = pipeLine;
         }
 
@@ -101,41 +106,8 @@ public interface ActorContext {
             throw new RuntimeException("Not implemented yet");
         }
 
-
         @Override
-        public void forwardUpstreamEvent(final Event event) {
-            dispatchEvent(true, event);
-        }
-
-        @Override
-        public void forwardDownstreamEvent(final Event event) {
-            dispatchEvent(false, event);
-        }
-
-        /**
-         * If the current "direction" of this {@link ActorContext} is inbound, then this method will
-         * return the current configured {@link PipeLine}. However, if the direction is outbound
-         * then we have to reverse the pipe so that it becomes an "inbound" pipe.
-         * 
-         * @param pipeLine
-         * @return
-         */
-        private PipeLine getInboundPipe() {
-            return isInbound ? this.pipeLine : this.pipeLine.reverse();
-        }
-
-        /**
-         * Same as {@link #getInboundPipe(PipeLine)} but different :-)
-         * 
-         * @param pipeLine
-         * @return
-         */
-        private PipeLine getOutboundPipe() {
-            return isInbound ? this.pipeLine.reverse() : this.pipeLine;
-        }
-
-        private void dispatchEvent(final boolean inbound, final Event event) {
-            final PipeLine pipeLine = inbound ? getInboundPipe() : getOutboundPipe();
+        public void forward(final Event event) {
             final Optional<Actor> optional = pipeLine.next();
 
             if (!optional.isPresent()) {
@@ -143,83 +115,9 @@ public interface ActorContext {
             }
 
             final Actor next = optional.get();
-            final BufferedActorContext bufferedCtx = invokeActor(inbound, next, pipeLine, event);
-
-            final List<Event> downstreamEvents = bufferedCtx.getDownstreamEvents();
-            final List<Event> continueDownstreamEvents = bufferedCtx.getContinueDownstreamEvents();
-            final List<DelayedEvent> delayedDownstreamEvents = bufferedCtx.getDownstreamDelayedEvents();
-
-            if (!downstreamEvents.isEmpty() || !continueDownstreamEvents.isEmpty()
-                    || !delayedDownstreamEvents.isEmpty()) {
-                // if this is an inbound event then we have to get the outbound
-                // pipe first and progress on it. If this already was an outbound
-                // event than the 'pipeLine' is our outbound pipe so no reason
-                // to call getOutboundPipe() again. Waste of time and resources...
-                PipeLine nextOutboundPipe = inbound ? getOutboundPipe() : pipeLine;
-
-                if (bufferedCtx.getNewActor() != null) {
-                    nextOutboundPipe = nextOutboundPipe.insert(bufferedCtx.getNewActor()).removeCurrent();
-                } else {
-                    nextOutboundPipe = nextOutboundPipe.progress();
-                }
-
-                for (final Event downstream : downstreamEvents) {
-                    final ActorContext nextCtx = ActorContext.withOutboundPipeLine(this.system, nextOutboundPipe);
-                    nextCtx.forwardDownstreamEvent(downstream);
-                }
-
-                for (final Event downstream : continueDownstreamEvents) {
-                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, downstream, nextOutboundPipe);
-                    this.system.dispatchJob(job);
-                }
-
-                for (final DelayedEvent downstream : delayedDownstreamEvents) {
-                    final Duration delay = downstream.delay;
-                    final Event delayedEvent = downstream.event;
-                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, delayedEvent, nextOutboundPipe);
-                    this.system.scheduleJob(delay, job);
-                    // this.system.scheduleEvent(Direction.DOWNSTREAM, delay, delayedEvent,
-                    // nextOutboundPipe);
-                }
-            }
-
-            final List<Event> upstreamEvents = bufferedCtx.getUpstreamEvents();
-            final List<Event> continueUpstreamEvents = bufferedCtx.getContinueUpstreamEvents();
-            final List<DelayedEvent> delayedUpstreamEvents = bufferedCtx.getUpstreamDelayedEvents();
-
-            if (!upstreamEvents.isEmpty() || !continueUpstreamEvents.isEmpty() || !delayedUpstreamEvents.isEmpty()) {
-                PipeLine nextInboundPipe = inbound ? pipeLine : getInboundPipe();
-                if (bufferedCtx.getNewActor() != null) {
-                    nextInboundPipe = nextInboundPipe.insert(bufferedCtx.getNewActor()).removeCurrent();
-                } else {
-                    nextInboundPipe = nextInboundPipe.progress();
-                }
-
-                for (final Event upstream : upstreamEvents) {
-                    final ActorContext nextCtx = ActorContext.withInboundPipeLine(this.system, nextInboundPipe);
-                    nextCtx.forwardUpstreamEvent(upstream);
-                }
-
-                for (final Event upstream : continueUpstreamEvents) {
-                    final DispatchJob job = this.system.createJob(Direction.UPSTREAM, upstream, nextInboundPipe);
-                    this.system.dispatchJob(job);
-                    // this.system.dispatchEvent(Direction.UPSTREAM, upstream, nextInboundPipe);
-                }
-
-                for (final DelayedEvent upstream : delayedUpstreamEvents) {
-                    final Duration delay = upstream.delay;
-                    final Event delayedEvent = upstream.event;
-                    final DispatchJob job = this.system.createJob(Direction.UPSTREAM, delayedEvent, nextInboundPipe);
-
-                    // TODO: need to take this timeout and connect it with the timeout promise
-                    // we made to the caller. Right now they are not connected!!!
-                    final Timeout timeout = this.system.scheduleJob(delay, job);
-
-                    // this.system.scheduleEvent(Direction.UPSTREAM, delay, delayedEvent,
-                    // nextInboundPipe);
-                }
-            }
-
+            final BufferedActorContext bufferedCtx = invokeActor(next, pipeLine, event);
+            processCtx(bufferedCtx);
+            processCtx(bufferedCtx.reversedCtx);
 
             // if the actor have asked to die, then kill it off by telling its parent.
             // Note, because of how things are setup, an actor that asked to be disposed of will
@@ -229,6 +127,45 @@ public interface ActorContext {
                 final Supervisor supervisor = next.getSupervisor();
                 supervisor.killChild(next);
             }
+        }
+
+        private void processCtx(final BufferedActorContext bufferedCtx) {
+            if (bufferedCtx == null) {
+                return;
+            }
+
+            final List<Event> events = bufferedCtx.getForwaredEvents();
+            final List<Event> continues = bufferedCtx.getContinueEvents();
+            final List<DelayedEvent> delayed = bufferedCtx.getDelayedEvents();
+
+            if (!events.isEmpty() || !continues.isEmpty() || !delayed.isEmpty()) {
+                PipeLine nextPipe = bufferedCtx.pipeLine;
+
+                if (bufferedCtx.getNewActor() != null) {
+                    nextPipe = nextPipe.insert(bufferedCtx.getNewActor()).removeCurrent();
+                } else {
+                    nextPipe = nextPipe.progress();
+                }
+
+                for (final Event nextEvent : events) {
+                    final ActorContext nextCtx = ActorContext.withPipeLine(this.system, nextPipe);
+                    nextCtx.forward(nextEvent);
+                }
+
+                for (final Event downstream : continues) {
+                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, downstream, nextPipe);
+                    this.system.dispatchJob(job);
+                }
+
+                for (final DelayedEvent downstream : delayed) {
+                    final Duration delay = downstream.delay;
+                    final Event delayedEvent = downstream.event;
+                    final TimerEvent timerEvent = TimerEvent.withDelay(delay).withEvent(delayedEvent).build();
+                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, timerEvent, this.pipeLine);
+                    this.system.scheduleJob(delay, job);
+                }
+            }
+
         }
 
         /**
@@ -241,15 +178,11 @@ public interface ActorContext {
          * @param pipeLine
          * @return
          */
-        private BufferedActorContext invokeActor(final boolean inbound, final Actor next, final PipeLine pipeLine,
+        private BufferedActorContext invokeActor(final Actor next, final PipeLine pipeLine,
                 final Event event) {
             final BufferedActorContext bufferedCtx = new BufferedActorContext(pipeLine);
             try {
-                if (inbound) {
-                    next.onUpstreamEvent(bufferedCtx, event);
-                } else {
-                    next.onDownstreamEvent(bufferedCtx, event);
-                }
+                next.onEvent(bufferedCtx, event);
             } catch (final Throwable t) {
                 t.printStackTrace();
             }
@@ -262,18 +195,18 @@ public interface ActorContext {
         }
 
         @Override
-        public void fireUpstreamEvent(final Event event) {
-            throw new RuntimeException("You shouldn't call this method outside of an Actor invocation");
-        }
-
-        @Override
-        public void fireDownstreamEvent(final Event event) {
-            throw new RuntimeException("You shouldn't call this method outside of an Actor invocation");
-        }
-
-        @Override
         public Scheduler scheduler() {
             throw new RuntimeException("You shouldn't call this method outside of an Actor invocation");
+        }
+
+        @Override
+        public void fire(final Event event) {
+            throw new RuntimeException("You cannot call fire an event outside of an Actor invocation");
+        }
+
+        @Override
+        public ActorContext reverse() {
+            throw new RuntimeException("You cannot call reverse outside of an Actor invocation");
         }
 
     }
@@ -288,17 +221,11 @@ public interface ActorContext {
      */
     static class BufferedActorContext implements ActorContext, Scheduler {
 
-        private List<Event> upstreamEvents;
-        private List<Event> downstreamEvents;
+        private List<Event> forwardedEvents;
 
-        private List<Event> continueUpstreamEvents;
-        private List<Event> continueDownstreamEvents;
+        private List<Event> continueEvents;
 
-        /**
-         * A list of events that are scheduled to be executed at a later point
-         */
-        private List<DelayedEvent> delayedUpstreamEvents;
-        private List<DelayedEvent> delayedDownstreamEvents;
+        private List<DelayedEvent> delayedEvents;
 
         /**
          * If the user calls {@link #replace(Actor)} then this is that actor that the user wished to
@@ -310,48 +237,34 @@ public interface ActorContext {
 
         private boolean killMe = false;
 
+        /**
+         * The reversed version of this context. If a user calls ctx.reverse().reverse().reverse()
+         * etc we will actually be returning the previous reversed instance. Hence, there can only
+         * ever be two contexts present at any given time for this particular context.
+         */
+        private BufferedActorContext reversedCtx;
+
         private BufferedActorContext(final PipeLine pipeLine) {
             this.pipeLine = pipeLine;
         }
 
-        protected List<Event> getUpstreamEvents() {
-            if( upstreamEvents != null) {
-                return upstreamEvents;
+        protected List<Event> getForwaredEvents() {
+            if (forwardedEvents != null) {
+                return forwardedEvents;
             }
             return Collections.emptyList();
         }
 
-        protected List<Event> getDownstreamEvents() {
-            if (downstreamEvents != null) {
-                return downstreamEvents;
+        protected List<DelayedEvent> getDelayedEvents() {
+            if (delayedEvents != null) {
+                return delayedEvents;
             }
             return Collections.emptyList();
         }
 
-        protected List<DelayedEvent> getUpstreamDelayedEvents() {
-            if (delayedUpstreamEvents != null) {
-                return delayedUpstreamEvents;
-            }
-            return Collections.emptyList();
-        }
-
-        protected List<DelayedEvent> getDownstreamDelayedEvents() {
-            if (delayedDownstreamEvents != null) {
-                return delayedDownstreamEvents;
-            }
-            return Collections.emptyList();
-        }
-
-        protected List<Event> getContinueDownstreamEvents() {
-            if (continueDownstreamEvents != null) {
-                return continueDownstreamEvents;
-            }
-            return Collections.emptyList();
-        }
-
-        protected List<Event> getContinueUpstreamEvents() {
-            if (continueUpstreamEvents != null) {
-                return continueUpstreamEvents;
+        protected List<Event> getContinueEvents() {
+            if (continueEvents != null) {
+                return continueEvents;
             }
             return Collections.emptyList();
         }
@@ -361,7 +274,10 @@ public interface ActorContext {
         }
 
         protected boolean disposeOfActor() {
-            return this.killMe;
+            // we could have been asked to kill the actor on either
+            // the "regular" ctx or the reversed ctx. Either or, the
+            // result is the same, kill the actor.
+            return this.killMe || this.reversedCtx != null && this.reversedCtx.killMe;
         }
 
         @Override
@@ -371,41 +287,8 @@ public interface ActorContext {
         }
 
         @Override
-        public void forwardUpstreamEvent(final Event event) {
-            if (upstreamEvents == null) {
-                this.upstreamEvents = new ArrayList<>();
-            }
-            this.upstreamEvents.add(event);
-        }
-
-
-        @Override
-        public void forwardDownstreamEvent(final Event event) {
-            if (downstreamEvents == null) {
-                this.downstreamEvents = new ArrayList<>();
-            }
-            this.downstreamEvents.add(event);
-        }
-
-        @Override
         public void killMe() {
             this.killMe = true;
-        }
-
-        @Override
-        public void fireUpstreamEvent(final Event event) {
-            if (continueUpstreamEvents == null) {
-                this.continueUpstreamEvents = new ArrayList<>();
-            }
-            this.continueUpstreamEvents.add(event);
-        }
-
-        @Override
-        public void fireDownstreamEvent(final Event event) {
-            if (continueDownstreamEvents == null) {
-                this.continueDownstreamEvents = new ArrayList<>();
-            }
-            this.continueDownstreamEvents.add(event);
         }
 
         @Override
@@ -414,50 +297,47 @@ public interface ActorContext {
         }
 
         @Override
-        public Timeout scheduleUpstreamEventOnce(final Duration delay, final Event event) {
-            if (delayedUpstreamEvents == null) {
-                this.delayedUpstreamEvents = new ArrayList<>();
-            }
-            this.delayedUpstreamEvents.add(new DelayedEvent(Direction.UPSTREAM, delay, event));
-            // TODO: need to figure this out.
-            return null;
+        public Cancellable schedule(final Duration delay, final Object msg) {
+            throw new RuntimeException("getting there");
         }
 
         @Override
-        public Timeout scheduleDownstreamEventOnce(final Duration delay, final Event event) {
-            if (delayedDownstreamEvents == null) {
-                this.delayedDownstreamEvents = new ArrayList<>();
+        public Cancellable schedule(final Duration delay, final Event event) {
+            throw new RuntimeException("getting there");
+        }
+
+        @Override
+        public Cancellable schedule(final Duration delay, final Work work) {
+            throw new RuntimeException("getting there");
+        }
+
+        @Override
+        public void schedule(final Work work) {
+            throw new RuntimeException("getting there");
+        }
+
+        @Override
+        public void forward(final Event event) {
+            if (forwardedEvents == null) {
+                this.forwardedEvents = new ArrayList<>();
             }
-            this.delayedDownstreamEvents.add(new DelayedEvent(Direction.DOWNSTREAM, delay, event));
+            this.forwardedEvents.add(event);
 
-            // TODO: eh yeah, fix it...
-            return new Timeout() {
+        }
 
-                @Override
-                public Timer timer() {
-                    throw new RuntimeException("sorry, should use something else than Timeout object here");
-                }
+        @Override
+        public void fire(final Event event) {
+            throw new RuntimeException("getting there");
+        }
 
-                @Override
-                public TimerTask task() {
-                    throw new RuntimeException("sorry, should use something else than Timeout object here");
-                }
-
-                @Override
-                public boolean isExpired() {
-                    throw new RuntimeException("sorry, should use something else than Timeout object here");
-                }
-
-                @Override
-                public boolean isCancelled() {
-                    throw new RuntimeException("sorry, should use something else than Timeout object here");
-                }
-
-                @Override
-                public boolean cancel() {
-                    throw new RuntimeException("sorry, should use something else than Timeout object here");
-                }
-            };
+        @Override
+        public ActorContext reverse() {
+            if (this.reversedCtx == null) {
+                final BufferedActorContext reverse = new BufferedActorContext(pipeLine.reverse());
+                reverse.reversedCtx = this;
+                this.reversedCtx = reverse;
+            }
+            return this.reversedCtx;
         }
     }
 
@@ -465,8 +345,10 @@ public interface ActorContext {
         private final Direction direction;
         private final Duration delay;
         private final Event event;
+        private final int worker;
 
-        private DelayedEvent(final Direction direction, final Duration delay, final Event event) {
+        private DelayedEvent(final int worker, final Direction direction, final Duration delay, final Event event) {
+            this.worker = worker;
             this.direction = direction;
             this.delay = delay;
             this.event = event;

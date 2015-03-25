@@ -33,6 +33,11 @@ public interface IOEvent extends Event {
         return false;
     }
 
+    @Override
+    default IOEvent toIOEvent() {
+        return this;
+    }
+
     static abstract class BaseIOEvent implements IOEvent {
 
         private final Connection connection;

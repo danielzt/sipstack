@@ -132,13 +132,13 @@ public class InviteServerTransactionTest extends SipTestBase {
         this.default180RingingEvent = SipEvent.create(this.ringing);
         this.default200OKEvent = SipEvent.create(this.twoHundredToInvite);
 
-        this.defaultCtx = ActorContext.withInboundPipeLine(this.actorSystem, this.factory.newPipeLine());
+        this.defaultCtx = ActorContext.withPipeLine(this.actorSystem, this.factory.newPipeLine());
 
     }
 
     /**
      * Make sure that if we get an error responses to the INVITE that the transaction is
-     * transitioning to the correct states etc.
+     * transitioning to the correct state and that we schedule the appropriate timers.
      * 
      * @throws Exception
      */
@@ -146,7 +146,7 @@ public class InviteServerTransactionTest extends SipTestBase {
     public void testAllErrorResponses() throws Exception {
         for (int i = 300; i < 700; ++i) {
             init(i);
-            this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+            this.defaultCtx.forward(this.defaultInviteEvent);
             final TransactionId id = getTransactionId(this.defaultInviteEvent);
             assertResponses(this.first, id, 100, i);
             assertServerTransactionState(this.defaultInviteEvent, TransactionState.COMPLETED);
@@ -165,7 +165,6 @@ public class InviteServerTransactionTest extends SipTestBase {
             final SipEvent trying = (SipEvent) scheduledEvent.job.getEvent();
             assertThat(trying.getSipMessage().isResponse(), is(true));
             assertThat(trying.getSipMessage().toResponse().getStatus(), is(i));
-
         }
     }
 
@@ -178,7 +177,7 @@ public class InviteServerTransactionTest extends SipTestBase {
      */
     @Test
     public void testInitialInvite() {
-        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+        this.defaultCtx.forward(this.defaultInviteEvent);
         assertInitialInvite(this.defaultInviteEvent);
     }
 
@@ -192,15 +191,15 @@ public class InviteServerTransactionTest extends SipTestBase {
         config.setSend100TryingImmediately(false);
         init(config);
 
-        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+        this.defaultCtx.forward(this.defaultInviteEvent);
 
         // there should be one delayed 100 Trying waiting to be sent.
         assertThat(this.actorSystem.scheduledJobs.size(), is(1));
         final DelayedJob scheduledEvent = this.actorSystem.scheduledJobs.get(0);
         assertThat(scheduledEvent.delay, is(Duration.ofMillis(200)));
         assertThat(scheduledEvent.job.getDirection(), is(Direction.DOWNSTREAM));
-        assertThat(scheduledEvent.job.getEvent().isSipEvent(), is(true));
-        final SipEvent trying = (SipEvent) scheduledEvent.job.getEvent();
+        assertThat(scheduledEvent.job.getEvent().isTimerEvent(), is(true));
+        final SipEvent trying = (SipEvent) scheduledEvent.job.getEvent().toTimerEvent().getEvent();
         assertThat(trying.getSipMessage().isResponse(), is(true));
         assertThat(trying.getSipMessage().toResponse().is100Trying(), is(true));
 
@@ -224,7 +223,7 @@ public class InviteServerTransactionTest extends SipTestBase {
     @Test
     public void testInviteRinging() {
         init(180);
-        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+        this.defaultCtx.forward(this.defaultInviteEvent);
 
         // should still be in proceeding
         assertServerTransactionState(this.defaultInviteEvent, TransactionState.PROCEEDING);
@@ -241,7 +240,7 @@ public class InviteServerTransactionTest extends SipTestBase {
     @Test
     public void testInviteRinging200Ok() {
         init(180, 200);
-        this.defaultCtx.forwardUpstreamEvent(this.defaultInviteEvent);
+        this.defaultCtx.forward(this.defaultInviteEvent);
 
         // should be in terminated state because of the 200 response
         assertServerTransactionState(this.defaultInviteEvent, TransactionState.TERMINATED);

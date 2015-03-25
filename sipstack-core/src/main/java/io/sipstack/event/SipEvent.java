@@ -51,6 +51,11 @@ public class SipEvent implements Event {
         return new SipEvent(key, System.currentTimeMillis(), response);
     }
 
+    @Override
+    public SipEvent toSipEvent() {
+        return this;
+    }
+
     /**
      * 
      */

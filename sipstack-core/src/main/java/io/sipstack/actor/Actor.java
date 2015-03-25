@@ -10,12 +10,15 @@ import io.sipstack.event.Event;
  */
 public interface Actor {
 
-    default void onUpstreamEvent(final ActorContext ctx, final Event event) {
-        ctx.forwardUpstreamEvent(event);
+    default void onEvent(final ActorContext ctx, final Event event) {
+        ctx.forward(event);
+        // ctx.next(event);
+        // ctx.reverse().next(event);
+        // ctx.reverse().fire(event);
     }
 
-    default void onDownstreamEvent(final ActorContext ctx, final Event event) {
-        ctx.forwardDownstreamEvent(event);
+    default ActorRef self() {
+        return null;
     }
 
     /**

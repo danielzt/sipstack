@@ -3,6 +3,7 @@ package io.sipstack.transport;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.Actor;
 import io.sipstack.actor.ActorContext;
+import io.sipstack.actor.ActorRef;
 import io.sipstack.actor.Key;
 import io.sipstack.actor.Supervisor;
 import io.sipstack.event.Event;
@@ -33,7 +34,7 @@ public class FlowActor implements Actor {
 
     @SuppressWarnings("unchecked")
     @Override
-    public void onUpstreamEvent(final ActorContext ctx, final Event event) {
+    public void onEvent(final ActorContext ctx, final Event event) {
         if (event.isIOEvent()) {
             final IOEvent ioEvent = (IOEvent) event;
             if (ioEvent.isSipReadEvent()) {
@@ -41,18 +42,13 @@ public class FlowActor implements Actor {
                 final SipMessage msg = ((IOReadEvent<SipMessage>) event).getObject();
                 final Key key = Key.withSipMessage(msg);
                 final SipEvent sipEvent = SipEvent.create(key, arrivalTime, msg);
-                ctx.fireUpstreamEvent(sipEvent);
+                ctx.forward(sipEvent);
             }
-        }
-
-    }
-
-    @Override
-    public void onDownstreamEvent(final ActorContext ctx, final Event event) {
-        if (event instanceof SipEvent) {
-            final SipMessage msg = ((SipEvent) event).getSipMessage();
+        } else if (event.isSipEvent()) {
+            final SipMessage msg = event.toSipEvent().getSipMessage();
             this.connection.send(msg);
         }
+
     }
 
     @Override
@@ -68,6 +64,12 @@ public class FlowActor implements Actor {
             return null;
         }
 
+    }
+
+    @Override
+    public ActorRef self() {
+        // TODO Auto-generated method stub
+        return null;
     }
 
 }

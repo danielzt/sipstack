@@ -6,6 +6,7 @@ package io.sipstack.transport;
 import static io.sipstack.actor.ActorUtils.safePreStart;
 import io.sipstack.actor.Actor;
 import io.sipstack.actor.ActorContext;
+import io.sipstack.actor.ActorRef;
 import io.sipstack.actor.Supervisor;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOEvent;
@@ -25,11 +26,13 @@ public class TransportSupervisor implements Actor, Supervisor {
 
     private final Map<ConnectionId, FlowActor> flows = new HashMap<>(100, 0.75f);
 
+    private final ActorRef self;
+
     /**
      * 
      */
-    public TransportSupervisor() {
-        // TODO Auto-generated constructor stub
+    public TransportSupervisor(final ActorRef self) {
+        this.self = self;
     }
 
     @Override
@@ -38,22 +41,17 @@ public class TransportSupervisor implements Actor, Supervisor {
     }
 
     @Override
-    public void onUpstreamEvent(final ActorContext ctx, final Event event) {
+    public void onEvent(final ActorContext ctx, final Event event) {
         try {
-            final IOEvent ioEvent = (IOEvent) event;
+            final IOEvent ioEvent = event.toIOEvent();
             final FlowActor flow = ensureFlow(ioEvent.getConnection());
             ctx.replace(flow);
-            ctx.forwardUpstreamEvent(event);
+            ctx.forward(event);
         } catch (final ClassCastException e) {
             // no???
             e.printStackTrace();
             throw e;
         }
-    }
-
-    @Override
-    public void onDownstreamEvent(final ActorContext ctx, final Event event) {
-        throw new RuntimeException("Not implemented just yet");
     }
 
     private FlowActor ensureFlow(final Connection connection) {
@@ -72,6 +70,11 @@ public class TransportSupervisor implements Actor, Supervisor {
 
         this.flows.put(id, newFlow);
         return newFlow;
+    }
+
+    @Override
+    public ActorRef self() {
+        return this.self;
     }
 
 

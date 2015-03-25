@@ -4,6 +4,7 @@
 package io.sipstack.core;
 
 import io.pkts.packet.sip.impl.PreConditions;
+import io.sipstack.actor.ActorRef;
 import io.sipstack.actor.ActorSystem;
 import io.sipstack.actor.WorkerContext;
 import io.sipstack.application.ApplicationSupervisor;
@@ -175,8 +176,13 @@ public abstract class Application<T extends Configuration> {
         for (int i = 0; i < sipConfig.getWorkerThreads(); ++i) {
 
             // TODO: may want this to be configurable as well.
-            final TransportSupervisor transportSupervisor = new TransportSupervisor();
+            final ActorRef refTransport = ActorRef.withWorkerPool(i).withName("transport").build();
+            final TransportSupervisor transportSupervisor = new TransportSupervisor(refTransport);
+
+            final ActorRef refTransaction = ActorRef.withWorkerPool(i).withName("transaction").build();
             final TransactionSupervisor transactionSupervisor = new TransactionSupervisor(sipConfig.getTransaction());
+
+            final ActorRef refApplication = ActorRef.withWorkerPool(i).withName("application").build();
             final ApplicationSupervisor applicationSupervisor = new ApplicationSupervisor();
 
             // TODO: should probably be configurable as well

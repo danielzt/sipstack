@@ -286,6 +286,12 @@ public class SipTestBase {
             return new DispatchJob(this, 0, pipeLine, event, direction);
         }
 
+        @Override
+        public Actor actorOf(final Key key) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
     }
 
 
@@ -312,23 +318,17 @@ public class SipTestBase {
         }
 
         @Override
-        public void onUpstreamEvent(final ActorContext ctx, final Event event) {
+        public void onEvent(final ActorContext ctx, final Event event) {
             this.upstreamEvents.add(event);
             if (event instanceof SipEvent) {
                 final SipRequest request = ((SipEvent) event).getSipMessage().toRequest();
                 for (final Integer responseStatus : this.responses) {
                     final SipResponse response = request.createResponse(responseStatus);
                     final SipEvent responseEvent = SipEvent.create(event.key(), response);
-                    ctx.forwardDownstreamEvent(responseEvent);
+                    ctx.reverse().forward(responseEvent);
                 }
             }
-            ctx.forwardUpstreamEvent(event);
-        }
-
-        @Override
-        public void onDownstreamEvent(final ActorContext ctx, final Event event) {
-            this.downstreamEvents.add(event);
-            ctx.forwardDownstreamEvent(event);
+            ctx.forward(event);
         }
 
         public void reset() {
@@ -341,7 +341,6 @@ public class SipTestBase {
             // TODO Auto-generated method stub
             return null;
         }
-
     }
 
 

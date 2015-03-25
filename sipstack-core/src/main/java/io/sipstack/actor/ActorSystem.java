@@ -9,7 +9,6 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.actor.ActorContext.DefaultActorContext;
 import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
@@ -44,6 +43,8 @@ public interface ActorSystem {
     DispatchJob createJob(Direction direction, Event event);
 
     void receive(final SipMessageEvent event);
+
+    Actor actorOf(Key key);
 
     static Builder withName(final String name) {
         PreConditions.ensureNotEmpty(name, "Name of Actor System cannot be null or empty");
@@ -117,6 +118,12 @@ public interface ActorSystem {
 
         }
 
+        @Override
+        public Actor actorOf(final Key key) {
+            // TODO Auto-generated method stub
+            return null;
+        }
+
         /*
          * @Override public void scheduleEvent(final Direction direction, final Duration delay,
          * final Event event, final PipeLine pipeLine) { final TimerTask task = new TimerTask() {
@@ -139,17 +146,6 @@ public interface ActorSystem {
 
             return this.timer.newTimeout(task, delay.toMillis(), TimeUnit.MILLISECONDS);
         }
-
-        /**
-         * Dispatch an inbound event using the pre-configured inbound pipe factory.
-         * 
-         * 
-         * @param event
-         */
-        // @Override
-        // public void dispatchInboundEvent(final Event event) {
-        // dispatchJob(createJob(event));
-        // }
 
         @Override
         public DispatchJob createJob(final Direction direction, final Event event) {
@@ -215,17 +211,10 @@ public interface ActorSystem {
 
             @Override
             public void run() {
-                if (this.direction == Direction.UPSTREAM) {
-                    final DefaultActorContext ctx =
-                            (DefaultActorContext) ActorContext.withInboundPipeLine(this.system, this.pipeLine);
-                    ctx.forwardUpstreamEvent(this.event);
-                } else {
-                    final DefaultActorContext ctx =
-                            (DefaultActorContext) ActorContext.withOutboundPipeLine(this.system, this.pipeLine);
-                    ctx.forwardDownstreamEvent(this.event);
-                }
+                ActorContext.withPipeLine(this.system, this.pipeLine).forward(this.event);
             }
         }
+
 
     }
 

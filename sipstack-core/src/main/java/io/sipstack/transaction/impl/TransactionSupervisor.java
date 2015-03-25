@@ -8,6 +8,7 @@ import static io.sipstack.actor.ActorUtils.safePreStart;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.Actor;
 import io.sipstack.actor.ActorContext;
+import io.sipstack.actor.ActorRef;
 import io.sipstack.actor.Supervisor;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
@@ -92,9 +93,9 @@ public class TransactionSupervisor implements Actor, Supervisor {
     }
 
     @Override
-    public void onUpstreamEvent(final ActorContext ctx, final Event event) {
+    public void onEvent(final ActorContext ctx, final Event event) {
         if (event.isSipEvent()) {
-            final SipEvent sipEvent = (SipEvent) event;
+            final SipEvent sipEvent = event.toSipEvent();
             final SipMessage msg = sipEvent.getSipMessage();
             final TransactionId id = TransactionId.create(msg);
 
@@ -108,15 +109,8 @@ public class TransactionSupervisor implements Actor, Supervisor {
             if (t != null) {
                 ctx.replace(t);
             }
-            ctx.forwardUpstreamEvent(event);
+            ctx.forward(event);
         }
-    }
-
-    @Override
-    public void onDownstreamEvent(final ActorContext ctx, final Event event) {
-        // TODO Auto-generated method stub
-        // System.err.println("[TransactionSupervisor] Got a downstream event, now what????");
-        ctx.forwardDownstreamEvent(event);
     }
 
     @Override
@@ -141,6 +135,12 @@ public class TransactionSupervisor implements Actor, Supervisor {
             // strange...
             throw e;
         }
+    }
+
+    @Override
+    public ActorRef self() {
+        // TODO Auto-generated method stub
+        return null;
     }
 
 }

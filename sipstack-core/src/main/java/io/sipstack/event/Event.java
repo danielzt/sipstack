@@ -35,5 +35,21 @@ public interface Event {
         return false;
     }
 
+    default boolean isTimerEvent() {
+        return false;
+    }
+
+    default TimerEvent toTimerEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + TimerEvent.class.getName());
+    }
+
+    default SipEvent toSipEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + SipEvent.class.getName());
+    }
+
+    default IOEvent toIOEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + IOEvent.class.getName());
+    }
+
 
 }

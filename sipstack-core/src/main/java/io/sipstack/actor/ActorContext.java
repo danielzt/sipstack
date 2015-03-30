@@ -3,9 +3,12 @@
  */
 package io.sipstack.actor;
 
+import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
+import io.sipstack.config.Configuration;
 import io.sipstack.event.Event;
-import io.sipstack.event.TimerEvent;
+import io.sipstack.event.SipTimerEvent;
+import io.sipstack.timers.SipTimer;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -19,7 +22,7 @@ import java.util.Optional;
 public interface ActorContext {
 
     /**
-     * Replace the current {@link Actor} with this one. The next {@link #forwardUpstreamEvent(Event)}
+     * Replace the current {@link Actor} with this one. The next {@link #forward(Event)}
      * will go through the newly inserted actor.
      * 
      * @param actor
@@ -39,15 +42,15 @@ public interface ActorContext {
     /**
      * When your {@link Actor} is done processing its {@link Event} it can decide to forward the
      * same (or a new) event upstream. There are two methods for forwarding an event upstream, the
-     * {@link #forwardUpstreamEvent(Event)} and the {@link #fireUpstreamEvent(Event)} and the
+     * {@link #forward(Event)} and the {@link #forward(Event)} and the
      * difference is that the former will use the same thread as this {@link Actor} is currently
      * using while the latter may select another thread to run on as decided by the
      * {@link Event#key()}
      * 
      * Usually, if you are sure that the same thread should handle the next execution in the
      * pipeline (because e.g. the very same key is used, which is true for all the actors handling a
-     * sip message) then use {@link #forwardUpstreamEvent(Event)} but if you are not sure, or if a
-     * different key indeed is used, then use the {@link #fireUpstreamEvent(Event)} instead.
+     * sip message) then use {@link #forward(Event)} but if you are not sure, or if a
+     * different key indeed is used, then use the {@link #fire(Event)} instead.
      * 
      * @param event
      */
@@ -67,8 +70,11 @@ public interface ActorContext {
 
     Scheduler scheduler();
 
-    static ActorContext withPipeLine(final ActorSystem system, final PipeLine pipeLine) {
-        return new DefaultActorContext(system, pipeLine);
+    Configuration getConfig();
+
+    static ActorContext withPipeLine(final int workerThread, final ActorSystem system, final PipeLine pipeLine) {
+        PreConditions.ensureArgument(workerThread >= 0, "The worker thread must >= 0");
+        return new DefaultActorContext(workerThread, system, pipeLine);
     }
 
     // static ActorContext withInboundPipeLine(final ActorSystem system, final PipeLine pipeLine) {
@@ -93,7 +99,15 @@ public interface ActorContext {
 
         private final PipeLine pipeLine;
 
-        private DefaultActorContext(final ActorSystem actorSystem, final PipeLine pipeLine) {
+        /**
+         * The worker thread we are currently executing on as in, this is the "index" of the worker
+         * thread that we are on and that is managed by the {@link ActorSystem}. Note, this is
+         * internal implementaion detail only and is never ever exposed to the applications.
+         */
+        private final int workerThread;
+
+        private DefaultActorContext(final int workerThread, final ActorSystem actorSystem, final PipeLine pipeLine) {
+            this.workerThread = workerThread;
             this.system = actorSystem;
             this.pipeLine = pipeLine;
         }
@@ -114,10 +128,15 @@ public interface ActorContext {
                 return;
             }
 
+            // process the reversed context first because we want to
+            // prioritize events coming back as a response to another event.
+            // E.g., if an actor gets an INVITE and generates a 100 Trying we want
+            // to get that Trying out before the INVITE propagates up to the next
+            // actor.
             final Actor next = optional.get();
             final BufferedActorContext bufferedCtx = invokeActor(next, pipeLine, event);
-            processCtx(bufferedCtx);
             processCtx(bufferedCtx.reversedCtx);
+            processCtx(bufferedCtx);
 
             // if the actor have asked to die, then kill it off by telling its parent.
             // Note, because of how things are setup, an actor that asked to be disposed of will
@@ -136,7 +155,7 @@ public interface ActorContext {
 
             final List<Event> events = bufferedCtx.getForwaredEvents();
             final List<Event> continues = bufferedCtx.getContinueEvents();
-            final List<DelayedEvent> delayed = bufferedCtx.getDelayedEvents();
+            final List<Delayed> delayed = bufferedCtx.getDelayedEvents();
 
             if (!events.isEmpty() || !continues.isEmpty() || !delayed.isEmpty()) {
                 PipeLine nextPipe = bufferedCtx.pipeLine;
@@ -148,20 +167,21 @@ public interface ActorContext {
                 }
 
                 for (final Event nextEvent : events) {
-                    final ActorContext nextCtx = ActorContext.withPipeLine(this.system, nextPipe);
+                    final ActorContext nextCtx = ActorContext.withPipeLine(workerThread, system, nextPipe);
                     nextCtx.forward(nextEvent);
                 }
 
                 for (final Event downstream : continues) {
-                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, downstream, nextPipe);
+                    final DispatchJob job = this.system.createJob(downstream, nextPipe);
                     this.system.dispatchJob(job);
                 }
 
-                for (final DelayedEvent downstream : delayed) {
-                    final Duration delay = downstream.delay;
-                    final Event delayedEvent = downstream.event;
-                    final TimerEvent timerEvent = TimerEvent.withDelay(delay).withEvent(delayedEvent).build();
-                    final DispatchJob job = this.system.createJob(Direction.DOWNSTREAM, timerEvent, this.pipeLine);
+                for (final Delayed delayedMsg : delayed) {
+                    final Duration delay = delayedMsg.delay;
+                    final Event delayedEvent = delayedMsg.event;
+                    // final TimerEvent timerEvent =
+                    // TimerEvent.withDelay(delay).withEvent(delayedEvent).build();
+                    final DispatchJob job = this.system.createJob(delayedEvent, this.pipeLine);
                     this.system.scheduleJob(delay, job);
                 }
             }
@@ -180,7 +200,7 @@ public interface ActorContext {
          */
         private BufferedActorContext invokeActor(final Actor next, final PipeLine pipeLine,
                 final Event event) {
-            final BufferedActorContext bufferedCtx = new BufferedActorContext(pipeLine);
+            final BufferedActorContext bufferedCtx = new BufferedActorContext(system.getConfig(), workerThread, event.key(), pipeLine);
             try {
                 next.onEvent(bufferedCtx, event);
             } catch (final Throwable t) {
@@ -200,6 +220,11 @@ public interface ActorContext {
         }
 
         @Override
+        public Configuration getConfig() {
+            return system.getConfig();
+        }
+
+        @Override
         public void fire(final Event event) {
             throw new RuntimeException("You cannot call fire an event outside of an Actor invocation");
         }
@@ -214,7 +239,7 @@ public interface ActorContext {
     /**
      * Acts as a place holder when we invoke the next {@link Actor}. The reason is that whenever an
      * {@link Actor} is invoked it can produce new events but our contract guarantees that no event
-     * is actually never ever processed until the {@link Actor#onUpstreamEvent(ActorContext, Event)} has
+     * is actually never ever processed until the {@link Actor#onEvent(ActorContext, Event)} has
      * returned. This makes it much easier to reason about what happens in the system and also makes
      * it way easier to test!
      * 
@@ -225,7 +250,7 @@ public interface ActorContext {
 
         private List<Event> continueEvents;
 
-        private List<DelayedEvent> delayedEvents;
+        private List<Delayed> delayedEvents;
 
         /**
          * If the user calls {@link #replace(Actor)} then this is that actor that the user wished to
@@ -244,7 +269,19 @@ public interface ActorContext {
          */
         private BufferedActorContext reversedCtx;
 
-        private BufferedActorContext(final PipeLine pipeLine) {
+        private final int workerThread;
+
+        /**
+         * The {@link Key} for the current even that we are working with.
+         */
+        private final Key currentKey;
+
+        private final Configuration config;
+
+        private BufferedActorContext(final Configuration config, final int workerThread, final Key currentKey, final PipeLine pipeLine) {
+            this.config = config;
+            this.workerThread = workerThread;
+            this.currentKey = currentKey;
             this.pipeLine = pipeLine;
         }
 
@@ -255,7 +292,7 @@ public interface ActorContext {
             return Collections.emptyList();
         }
 
-        protected List<DelayedEvent> getDelayedEvents() {
+        protected List<Delayed> getDelayedEvents() {
             if (delayedEvents != null) {
                 return delayedEvents;
             }
@@ -297,32 +334,39 @@ public interface ActorContext {
         }
 
         @Override
-        public Cancellable schedule(final Duration delay, final Object msg) {
-            throw new RuntimeException("getting there");
+        public Configuration getConfig() {
+            return config;
         }
 
         @Override
         public Cancellable schedule(final Duration delay, final Event event) {
-            throw new RuntimeException("getting there");
+            ensureDelayedEventsList();
+            final Delayed delayed = new Delayed(this.workerThread, delay, event);
+            this.delayedEvents.add(delayed);
+            return new Cancellable() {
+                @Override
+                public boolean cancel() {
+                    return true;
+                }
+            };
         }
 
         @Override
-        public Cancellable schedule(final Duration delay, final Work work) {
-            throw new RuntimeException("getting there");
-        }
-
-        @Override
-        public void schedule(final Work work) {
-            throw new RuntimeException("getting there");
+        public Cancellable schedule(final Duration delay, final SipTimer timer) {
+            final SipTimerEvent timerEvent = SipTimerEvent.withTimer(timer).withKey(this.currentKey).build();
+            return schedule(delay, timerEvent);
         }
 
         @Override
         public void forward(final Event event) {
+            if (event == null) {
+                return;
+            }
+
             if (forwardedEvents == null) {
                 this.forwardedEvents = new ArrayList<>();
             }
             this.forwardedEvents.add(event);
-
         }
 
         @Override
@@ -333,25 +377,35 @@ public interface ActorContext {
         @Override
         public ActorContext reverse() {
             if (this.reversedCtx == null) {
-                final BufferedActorContext reverse = new BufferedActorContext(pipeLine.reverse());
+                final BufferedActorContext reverse =
+                        new BufferedActorContext(config, workerThread, currentKey, pipeLine.reverse());
                 reverse.reversedCtx = this;
                 this.reversedCtx = reverse;
             }
             return this.reversedCtx;
         }
+
+        private void ensureDelayedEventsList() {
+            if (this.delayedEvents == null) {
+                this.delayedEvents = new ArrayList<>(5);
+            }
+        }
+
     }
 
-    public static class DelayedEvent {
-        private final Direction direction;
+    /**
+     * Simple class to keep the information together.
+     */
+    public static class Delayed {
+
         private final Duration delay;
         private final Event event;
         private final int worker;
 
-        private DelayedEvent(final int worker, final Direction direction, final Duration delay, final Event event) {
+        private Delayed(final int worker, final Duration delay, final Event msg) {
             this.worker = worker;
-            this.direction = direction;
             this.delay = delay;
-            this.event = event;
+            this.event = msg;
         }
     }
 

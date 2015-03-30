@@ -28,7 +28,7 @@ public final class TimersConfiguration {
      *                                                responses
      */
     @JsonProperty
-    private Duration t2 = Duration.ofSeconds(2);
+    private Duration t2 = Duration.ofSeconds(4);
 
     /**
      * T4       5s               Section 17.1.2.2     Maximum duration a
@@ -36,7 +36,7 @@ public final class TimersConfiguration {
      *                                                remain in the network
      */
     @JsonProperty
-    private Duration t4 = Duration.ofSeconds(4);
+    private Duration t4 = Duration.ofSeconds(5);
     
     /**
      * Timer A  initially T1     Section 17.1.1.2     INVITE request retransmit
@@ -118,7 +118,13 @@ public final class TimersConfiguration {
      */
     @JsonIgnore
     private Duration timerK;
-    
+
+    /**
+     * Timer L  64*T1            Section 7.1 (rfc6026)
+     */
+    @JsonIgnore
+    private Duration timerL;
+
     public TimersConfiguration() {
         init();
     }
@@ -137,129 +143,83 @@ public final class TimersConfiguration {
         this.timerI = Duration.ofMillis(this.t4.toMillis());
         this.timerJ = Duration.ofMillis(64 * this.t1.toMillis());
         this.timerK = Duration.ofMillis(this.t4.toMillis());
+        this.timerL = Duration.ofMillis(64 * this.t1.toMillis());
     }
-    
-    /**
-     * @return the t1
-     */
+
     public Duration getT1() {
         return this.t1;
     }
 
-    /**
-     * @return the t2
-     */
     public Duration getT2() {
         return this.t2;
     }
 
-    /**
-     * @return the t4
-     */
     public Duration getT4() {
         return this.t4;
     }
 
-    /**
-     * @param t1 the t1 to set
-     */
     public void setT1(final Duration t1) {
         this.t1 = t1;
         init();
     }
 
-    /**
-     * @param t2 the t2 to set
-     */
     public void setT2(final Duration t2) {
         this.t2 = t2;
         init();
     }
 
-    /**
-     * @param t4 the t4 to set
-     */
     public void setT4(final Duration t4) {
         this.t4 = t4;
         init();
     }
 
-    /**
-     * @return the timerA
-     */
     public Duration getTimerA() {
         return this.timerA;
     }
 
-    /**
-     * @return the timerB
-     */
     public Duration getTimerB() {
         return this.timerB;
     }
 
-    /**
-     * @return the timerC
-     */
     public Duration getTimerC() {
         return this.timerC;
     }
 
-    /**
-     * @return the timerD
-     */
     public Duration getTimerD() {
         return this.timerD;
     }
 
-    /**
-     * @return the timerE
-     */
     public Duration getTimerE() {
         return this.timerE;
     }
 
-    /**
-     * @return the timerF
-     */
     public Duration getTimerF() {
         return this.timerF;
     }
 
-    /**
-     * @return the timerG
-     */
     public Duration getTimerG() {
         return this.timerG;
     }
 
-    /**
-     * @return the timerH
-     */
     public Duration getTimerH() {
         return this.timerH;
     }
 
-    /**
-     * @return the timerI
-     */
     public Duration getTimerI() {
         return this.timerI;
     }
 
-    /**
-     * @return the timerJ
-     */
     public Duration getTimerJ() {
         return this.timerJ;
     }
 
-    /**
-     * @return the timerK
-     */
     public Duration getTimerK() {
         return this.timerK;
     }
-    
+
+    public Duration getTimerL() {
+        return this.timerL;
+    }
+
 
 }

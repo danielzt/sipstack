@@ -27,7 +27,7 @@ public class CommandLineArgs {
     @Option(name = "-h", aliases = "-help", usage = "print this message")
     private boolean help;
 
-    @Option(name = "-c", aliases = { "-config"}, metaVar = "<config>",
+    @Option(name = "-c", aliases = { "-getConfig"}, metaVar = "<getConfig>",
             usage = "use given configuration file")
     private File configFile;
 

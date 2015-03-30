@@ -4,6 +4,7 @@
 package io.sipstack.actor;
 
 import io.sipstack.event.Event;
+import io.sipstack.timers.SipTimer;
 
 import java.time.Duration;
 
@@ -32,20 +33,20 @@ public interface Scheduler {
      */
     // TimerEvent scheduleDownstreamEventOnce(Duration delay, Object msg);
 
-    Cancellable schedule(Duration delay, Object msg);
+    // Cancellable schedule(Duration delay, Object msg);
+
+    // Cancellable schedule(Duration delay, Object object);
+
+    Cancellable schedule(Duration delay, SipTimer timer);
 
     Cancellable schedule(Duration delay, Event event);
 
-    Cancellable schedule(Duration delay, Work work);
-
-    void schedule(Work work);
-
-
     interface Cancellable {
+        boolean cancel();
 
     }
 
     interface Work {
-        default void workItRealGood(final ActorContext ctx) {}
+        void doWork(final ActorContext ctx, final PipeLine pipeLine);
     }
 }

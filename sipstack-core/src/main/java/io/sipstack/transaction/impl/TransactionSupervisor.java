@@ -12,7 +12,7 @@ import io.sipstack.actor.ActorRef;
 import io.sipstack.actor.Supervisor;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
-import io.sipstack.event.SipEvent;
+import io.sipstack.event.SipMsgEvent;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 
@@ -65,7 +65,7 @@ public class TransactionSupervisor implements Actor, Supervisor {
         return this.config;
     }
 
-    private TransactionActor ensureTransaction(final TransactionId id, final SipEvent event) {
+    private TransactionActor ensureTransaction(final TransactionId id, final SipMsgEvent event) {
         final TransactionActor t = this.transactions.get(id);
         if (t != null) {
             return t;
@@ -94,8 +94,8 @@ public class TransactionSupervisor implements Actor, Supervisor {
 
     @Override
     public void onEvent(final ActorContext ctx, final Event event) {
-        if (event.isSipEvent()) {
-            final SipEvent sipEvent = event.toSipEvent();
+        if (event.isSipMsgEvent()) {
+            final SipMsgEvent sipEvent = event.toSipMsgEvent();
             final SipMessage msg = sipEvent.getSipMessage();
             final TransactionId id = TransactionId.create(msg);
 

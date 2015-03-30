@@ -5,7 +5,7 @@ package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.Actor;
-import io.sipstack.event.SipEvent;
+import io.sipstack.event.SipMsgEvent;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 
@@ -24,7 +24,7 @@ public interface TransactionActor extends Actor {
 
     TransactionId getTransactionId();
 
-    static TransactionActor create(final TransactionSupervisor parent, final TransactionId id, final SipEvent event) {
+    static TransactionActor create(final TransactionSupervisor parent, final TransactionId id, final SipMsgEvent event) {
         final SipMessage msg = event.getSipMessage();
         if (msg.isRequest() && msg.isInvite()) {
             return new InviteServerTransactionActor(parent, id, event);

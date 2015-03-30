@@ -20,6 +20,9 @@ public final class TransactionLayerConfiguration {
     @JsonProperty
     private boolean send100TryingImmediately = true;
 
+    /**
+     * Configuration object for all Timers as defined within the various SIP specifications.
+     */
     @JsonProperty
     private TimersConfiguration timers = new TimersConfiguration();
 

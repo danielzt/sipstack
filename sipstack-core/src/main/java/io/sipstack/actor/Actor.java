@@ -12,9 +12,6 @@ public interface Actor {
 
     default void onEvent(final ActorContext ctx, final Event event) {
         ctx.forward(event);
-        // ctx.next(event);
-        // ctx.reverse().next(event);
-        // ctx.reverse().fire(event);
     }
 
     default ActorRef self() {

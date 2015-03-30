@@ -12,9 +12,10 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
+import io.sipstack.config.Configuration;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
-import io.sipstack.event.SipEvent;
+import io.sipstack.event.SipMsgEvent;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
@@ -265,6 +266,11 @@ public class SipTestBase {
         }
 
         @Override
+        public Configuration getConfig() {
+            return null;
+        }
+
+        @Override
         public Timeout scheduleJob(final Duration delay, final DispatchJob job) {
             this.scheduledJobs.add(new DelayedJob(delay, job));
             return mock(Timeout.class);
@@ -276,15 +282,15 @@ public class SipTestBase {
         }
 
         @Override
-        public DispatchJob createJob(final Direction direction, final Event event, final PipeLine pipeLine) {
-            return new DispatchJob(this, 0, pipeLine, event, direction);
+        public DispatchJob createJob(final Event event, final PipeLine pipeLine) {
+            return new DispatchJob(this, 0, pipeLine, event);
         }
 
-        @Override
-        public DispatchJob createJob(final Direction direction, final Event event) {
-            final PipeLine pipeLine = this.pipeLineFactory.newPipeLine();
-            return new DispatchJob(this, 0, pipeLine, event, direction);
-        }
+        // @Override
+        // public DispatchJob createJob(final Event event) {
+        // final PipeLine pipeLine = this.pipeLineFactory.newPipeLine();
+        // return new DispatchJob(this, 0, pipeLine, event);
+        // }
 
         @Override
         public Actor actorOf(final Key key) {
@@ -304,8 +310,8 @@ public class SipTestBase {
      */
     public static class EventProxy implements Actor {
 
-        public final List<Event> upstreamEvents = new ArrayList<Event>();
-        public final List<Event> downstreamEvents = new ArrayList<Event>();
+        public final List<Event> requestEvents = new ArrayList<Event>();
+        public final List<Event> responseEvents = new ArrayList<Event>();
 
         List<Integer> responses;
 
@@ -319,21 +325,27 @@ public class SipTestBase {
 
         @Override
         public void onEvent(final ActorContext ctx, final Event event) {
-            this.upstreamEvents.add(event);
-            if (event instanceof SipEvent) {
-                final SipRequest request = ((SipEvent) event).getSipMessage().toRequest();
-                for (final Integer responseStatus : this.responses) {
-                    final SipResponse response = request.createResponse(responseStatus);
-                    final SipEvent responseEvent = SipEvent.create(event.key(), response);
-                    ctx.reverse().forward(responseEvent);
+            if (event.isSipMsgEvent()) {
+                final SipMessage msg = event.toSipMsgEvent().getSipMessage();
+                if (msg.isRequest()) {
+                    this.requestEvents.add(event);
+                    for (final Integer responseStatus : this.responses) {
+                        final SipRequest request = msg.toRequest();
+                        final SipResponse response = request.createResponse(responseStatus);
+                        final SipMsgEvent responseEvent = SipMsgEvent.create(event.key(), response);
+                        ctx.reverse().forward(responseEvent);
+                    }
+                } else {
+                    this.responseEvents.add(event);
                 }
+
+                ctx.forward(event);
             }
-            ctx.forward(event);
         }
 
         public void reset() {
-            this.upstreamEvents.clear();
-            this.downstreamEvents.clear();
+            this.requestEvents.clear();
+            this.responseEvents.clear();
         }
 
         @Override

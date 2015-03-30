@@ -8,5 +8,5 @@ package io.sipstack.transaction;
  *
  */
 public enum TransactionState {
-    INIT, TRYING, PROCEEDING, COMPLETED, CONFIRMED, TERMINATED;
+    INIT, TRYING, PROCEEDING, ACCEPTED, COMPLETED, CONFIRMED, TERMINATED;
 }

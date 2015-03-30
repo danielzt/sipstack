@@ -10,6 +10,7 @@ import io.netty.util.TimerTask;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
+import io.sipstack.config.Configuration;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOReadEvent;
@@ -38,11 +39,15 @@ public interface ActorSystem {
 
     void dispatchJob(DispatchJob job);
 
-    DispatchJob createJob(final Direction direction, final Event event, final PipeLine pipeLine);
+    DispatchJob createJob(final Event event, final PipeLine pipeLine);
 
-    DispatchJob createJob(Direction direction, Event event);
+    // DispatchJob createJob(Direction direction, Event event);
 
     void receive(final SipMessageEvent event);
+
+    Configuration getConfig();
+
+    // Scheduler scheduler();
 
     Actor actorOf(Key key);
 
@@ -51,10 +56,10 @@ public interface ActorSystem {
         return new Builder(name);
     }
 
-    public static final class Builder {
+    final class Builder {
         private final String name;
         private final List<WorkerContext> workerContexts = new ArrayList<>();
-        private SipConfiguration config;
+        private Configuration config;
         private Timer timer;
 
         private Builder(final String name) {
@@ -66,7 +71,7 @@ public interface ActorSystem {
             return this;
         }
 
-        public Builder withConfiguration(final SipConfiguration config) {
+        public Builder withConfiguration(final Configuration config) {
             this.config = config;
             return this;
         }
@@ -81,7 +86,7 @@ public interface ActorSystem {
             PreConditions
             .ensureArgument(!this.workerContexts.isEmpty(), "You must specify at least one worker context");
             final Timer t = this.timer != null ? this.timer : new HashedWheelTimer();
-            final SipConfiguration c = this.config != null ? this.config : new SipConfiguration();
+            final Configuration c = config != null ? config : new Configuration();
             return new DefaultActorSystem(this.name, t, c, this.workerContexts);
         }
     }
@@ -93,14 +98,14 @@ public interface ActorSystem {
         private final WorkerContext[] workerCtxs;
         private final int workerPoolSize;
 
-        private final SipConfiguration config;
+        private final Configuration config;
 
         private final Timer timer;
 
         /**
          * 
          */
-        private DefaultActorSystem(final String name, final Timer timer, final SipConfiguration config,
+        private DefaultActorSystem(final String name, final Timer timer, final Configuration config,
                 final List<WorkerContext> workerContexts) {
             this.timer = timer;
             this.name = name;
@@ -147,29 +152,36 @@ public interface ActorSystem {
             return this.timer.newTimeout(task, delay.toMillis(), TimeUnit.MILLISECONDS);
         }
 
-        @Override
-        public DispatchJob createJob(final Direction direction, final Event event) {
+        // @Override
+        public DispatchJob createJob(final Event event) {
             final Key key = event.key();
             final int worker = Math.abs(key.hashCode() % this.workerPoolSize);
             final WorkerContext ctx = this.workerCtxs[worker];
             final PipeLineFactory factory = ctx.defaultPipeLineFactory();
             final PipeLine pipeLine = factory.newPipeLine();
-            return new DispatchJob(this, worker, pipeLine, event, direction);
+            return new DispatchJob(this, worker, pipeLine, event);
         }
 
         @Override
-        public DispatchJob createJob(final Direction direction, final Event event, final PipeLine pipeLine) {
+        public DispatchJob createJob(final Event event, final PipeLine pipeLine) {
+            try {
             final Key key = event.key();
             final int worker = Math.abs(key.hashCode() % this.workerPoolSize);
-            return new DispatchJob(this, worker, pipeLine, event, direction);
+            return new DispatchJob(this, worker, pipeLine, event);
+            } catch (final NullPointerException e) {
+                e.printStackTrace();
+                throw e;
+            }
         }
 
 
+        // @Override
         @Override
         public void dispatchJob(final DispatchJob job) {
             final WorkerContext ctx = this.workerCtxs[job.getWorker()];
             if (!ctx.workerQueue().offer(job)) {
                 // TODO: handle non accepted job
+                System.err.println("Dropping jobs!!!! ");
             }
 
         }
@@ -177,8 +189,13 @@ public interface ActorSystem {
         @Override
         public void receive(final SipMessageEvent event) {
             final IOReadEvent<SipMessage> readEvent = IOReadEvent.create(event);
-            final DispatchJob job = createJob(Direction.UPSTREAM, readEvent);
+            final DispatchJob job = createJob(readEvent);
             dispatchJob(job);
+        }
+
+        @Override
+        public Configuration getConfig() {
+            return config;
         }
 
         public static final class DispatchJob implements Runnable {
@@ -186,11 +203,8 @@ public interface ActorSystem {
             private final Event event;
             private final int worker;
             private final ActorSystem system;
-            private final Direction direction;
 
-            public DispatchJob(final ActorSystem system, final int worker, final PipeLine pipeLine, final Event event,
-                    final Direction direction) {
-                this.direction = direction;
+            public DispatchJob(final ActorSystem system, final int worker, final PipeLine pipeLine, final Event event) {
                 this.system = system;
                 this.worker = worker;
                 this.pipeLine = pipeLine;
@@ -205,13 +219,9 @@ public interface ActorSystem {
                 return this.event;
             }
 
-            public Direction getDirection() {
-                return this.direction;
-            }
-
             @Override
             public void run() {
-                ActorContext.withPipeLine(this.system, this.pipeLine).forward(this.event);
+                ActorContext.withPipeLine(this.worker, this.system, this.pipeLine).forward(this.event);
             }
         }
 

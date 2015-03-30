@@ -9,7 +9,7 @@ import io.sipstack.actor.Supervisor;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOEvent;
 import io.sipstack.event.IOReadEvent;
-import io.sipstack.event.SipEvent;
+import io.sipstack.event.SipMsgEvent;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
 
@@ -41,11 +41,11 @@ public class FlowActor implements Actor {
                 final long arrivalTime = event.getArrivalTime();
                 final SipMessage msg = ((IOReadEvent<SipMessage>) event).getObject();
                 final Key key = Key.withSipMessage(msg);
-                final SipEvent sipEvent = SipEvent.create(key, arrivalTime, msg);
+                final SipMsgEvent sipEvent = SipMsgEvent.create(key, arrivalTime, msg);
                 ctx.forward(sipEvent);
             }
-        } else if (event.isSipEvent()) {
-            final SipMessage msg = event.toSipEvent().getSipMessage();
+        } else if (event.isSipMsgEvent()) {
+            final SipMessage msg = event.toSipMsgEvent().getSipMessage();
             this.connection.send(msg);
         }
 

@@ -3,26 +3,22 @@
  */
 package io.sipstack.transaction.impl;
 
-import io.netty.util.Timeout;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
-import io.sipstack.actor.ActorContext;
-import io.sipstack.actor.ActorRef;
-import io.sipstack.actor.ActorUtils;
-import io.sipstack.actor.Supervisor;
+import io.sipstack.actor.*;
 import io.sipstack.config.TimersConfiguration;
+import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
-import io.sipstack.event.SipEvent;
+import io.sipstack.event.SipMsgEvent;
+import io.sipstack.timers.SipTimer;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
-
-import java.time.Duration;
-import java.util.Optional;
-import java.util.function.BiConsumer;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.util.function.BiConsumer;
 
 
 /**
@@ -123,118 +119,355 @@ import org.slf4j.LoggerFactory;
  *
  * </pre>
  */
-public class InviteServerTransactionActor implements TransactionActor {
+public class InviteServerTransactionActor extends ActorBase<TransactionState> implements TransactionActor {
 
     private static final Logger logger = LoggerFactory.getLogger(InviteServerTransactionActor.class);
 
     private final TransactionId id;
-    private final SipEvent invite;
-    private TransactionState state;
+
+    private final SipMsgEvent invite;
 
     private final TransactionSupervisor parent;
+
+    private final TimersConfiguration timers;
+
+    private final TransactionLayerConfiguration transactionConfig;
 
     /**
      * If we receive any re-transmissions, we will send out the last response again if there is
      * one..
      */
-    private SipEvent lastResponseEvent;
+    private SipMsgEvent lastResponseEvent;
 
     /**
-     * Our behavior. This will change as we transition from one state to another.
+     * If the TU doesn't send 100 Trying within 200ms we will.
+     * This timer keeps track of that.
      */
-    private BiConsumer<ActorContext, Event> receive;
+    private Scheduler.Cancellable timer100Trying = null;
 
     /**
      * Contains all the states and their corresponding function pointers. Makes it for easy
      * transition to new behavior as the state changes.
      */
-    private final BiConsumer<ActorContext, Event>[] states = new BiConsumer[6];
 
     /**
      * If we enter the completed state we will setup Timer G for response retransmissions if this
      * transaction is over an unreliable transport.
      */
-    private final Optional<Timeout> timerG = Optional.empty();
+    private Scheduler.Cancellable timerG = null;
+
 
     /**
      * How many times Timer G has fired.
      */
-    private final int timerGCount = 0;
+    private int timerGCount = 0;
 
     /**
      * If we enter the completed state, Timer H will take us from completed to terminated unless we
      * do receive an ACK before then. Hence, Timer H determines the longest amount of time we can
      * stay in the completed state.
      */
-    private final Optional<Timeout> timerH = Optional.empty();
+    private Scheduler.Cancellable timerH = null;
+
+    /**
+     * If we enter the accpted state, Timer L will let us know when it is time to transition
+     * over to the terminated state. The accepted state is a "new" state introduced by RFC6026
+     * in order to deal with re-transmitted INVITEs. In the old state machine, we transitioned
+     * directly to terminated state as soon as we got a 2xx to the INVITE which meant that
+     * any re-transmissions on the INVITE created a brand new transaction, which is not what
+     * we want.
+     */
+    private Scheduler.Cancellable timerL = null;
 
     /**
      * 
      */
     protected InviteServerTransactionActor(final TransactionSupervisor parent, final TransactionId id,
-            final SipEvent inviteEvent) {
+            final SipMsgEvent inviteEvent) {
+        super(id.toString(), TransactionState.INIT, TransactionState.values());
+        this.timers = parent.getConfig().getTimers();
+        this.transactionConfig = parent.getConfig();
         this.parent = parent;
         this.id = id;
         this.invite = inviteEvent;
 
-        this.states[TransactionState.INIT.ordinal()] = this.init;
-        this.states[TransactionState.PROCEEDING.ordinal()] = this.proceeding;
-        this.states[TransactionState.COMPLETED.ordinal()] = this.completed;
-        this.states[TransactionState.CONFIRMED.ordinal()] = this.confirmed;
-        this.states[TransactionState.TERMINATED.ordinal()] = this.terminated;
-        become(TransactionState.INIT);
+        // setup all the states and the function we are supposed to
+        // execute while in that state.
+        when(TransactionState.INIT, init);
+
+        when(TransactionState.PROCEEDING, proceeding);
+        onEnter(TransactionState.PROCEEDING, onEnterProceeding);
+        onExit(TransactionState.PROCEEDING, onExitProceeding);
+
+        when(TransactionState.ACCEPTED, accepted);
+        onEnter(TransactionState.ACCEPTED, onEnterAccepted);
+        onExit(TransactionState.ACCEPTED, onExitAccepted);
+
+        when(TransactionState.COMPLETED, completed);
+        onEnter(TransactionState.COMPLETED, onEnterCompleted);
+        onExit(TransactionState.COMPLETED, onExitCompleted);
+
+        when(TransactionState.CONFIRMED, confirmed);
+        onEnter(TransactionState.CONFIRMED, onEnterConfirmed);
+
+        // no exit from terminated. You are dead
+        when(TransactionState.TERMINATED, terminated);
+        onEnter(TransactionState.TERMINATED, onEnterTerminated);
+
     }
-
-    private void become(final TransactionState state) {
-        logger.info("{} {} -> {}", this.id, this.state, state);
-        this.state = state;
-        this.receive = this.states[state.ordinal()];
-    }
-
-    private final BiConsumer<ActorContext, Event> terminated = (ctx, event) -> {
-        System.out.println("in terminated state");
-    };
-
-    private final BiConsumer<ActorContext, Event> completed = (ctx, event) -> {
-        System.out.println("in completed state");
-    };
-
-    private final BiConsumer<ActorContext, Event> confirmed = (ctx, event) -> {
-        System.out.println("in confirmed state");
-    };
 
     /**
-     * The proceeding state.
+     * Check whether the request is a re-transmitted INVITE.
+     * @param msg
+     * @return
+     */
+    private boolean isRetransmittedInvite(SipMessage msg) {
+        if (msg.isRequest() && msg.isInvite()) {
+            // TODO: actually check it...
+            return true;
+        }
+
+        return false;
+    }
+
+    private SipMsgEvent getInitialInviteEvent() {
+        return invite;
+    }
+
+    private TimersConfiguration getTimerConfig() {
+        return timers;
+    }
+
+    private TransactionLayerConfiguration getConfig() {
+        return transactionConfig;
+    }
+
+    /**
+     * Implements the proceeding state as follows:
+     * 
+     * <pre>
+     * 
+     *                                    |INVITE
+     *                                    |pass INV to TU
+     *                 INVITE             V send 100 if TU won't in 200 ms
+     *                 send response+------------+
+     *                     +--------|            |--------+ 101-199 from TU
+     *                     |        |            |        | send response
+     *                     +------->|            |<-------+
+     *                              | Proceeding |
+     *                              |            |--------+ Transport Err.
+     *                              |            |        | Inform TU
+     *                              |            |<-------+
+     *                              +------------+
+     *                 300-699 from TU |    |2xx from TU
+     *                 send response   |    |send response
+     *                  +--------------+    +------------+
+     *                  |                                |
+     *                  V                                V
+     *         +------------+                     +------------+
+     *         |  Completed |                     |  Accepted  | 
+     *         +------------+                     +------------+
+     * </pre>
      */
     private final BiConsumer<ActorContext, Event> proceeding = (ctx, event) -> {
-        if (event.isSipEvent()) {
-            final SipEvent sipEvent = (SipEvent) event;
+        if (event.isSipMsgEvent()) {
+            final SipMsgEvent sipEvent = (SipMsgEvent) event;
             final SipMessage msg = sipEvent.getSipMessage();
-            if (msg.isRequest()) {
-                // better be a re-transmission of the invite.
-                // TODO: check
+            if (isRetransmittedInvite(msg)) {
+                ctx.reverse().forward(lastResponseEvent);
                 return;
             }
 
             final SipResponse response = msg.toResponse();
             relayResponse(ctx, sipEvent);
             if (response.isSuccess()) {
-                terminate(ctx);
+                become(TransactionState.ACCEPTED);
             } else if (response.isFinal()) {
-                // TODO: shouldn't really be Timeout object here. We should give out something else.
-                // TODO: only schedule if unreliable transport.
-                // final TimerEvent timerG =
-                // ctx.scheduler().scheduleDownstreamEventOnce(calculateNextTimerG(), "timerG");
-                final Duration delay = calculateNextTimerG();
-                ctx.scheduler().schedule(delay, "timerG");
-                // this.timerG = Optional.of(timerG);
                 become(TransactionState.COMPLETED);
-
             }
+        } else if (event.isSipTimer100Trying()) {
+            // Note, we have to reverse the context because when we
+            // scheduled the 100 Trying event we had an 'upstream' context
+            // since we were processing an incoming INVITE at that time.
+            final SipResponse response = getInitialInviteEvent().getSipMessage().createResponse(100);
+            ctx.reverse().forward(SipMsgEvent.create(getInitialInviteEvent().key(), response));
         } else {
 
         }
     };
+
+    /**
+     * When entering the Proceeding state we may send a 100 Trying right away (depending on configuration) or we may
+     * delay it with 200 ms and send it later unless TU already have sent some kind of response (any kind really)
+     */
+    private final BiConsumer<ActorContext, Event> onEnterProceeding = (ctx, event) -> {
+        if (getConfig().isSend100TryingImmediately()) {
+            final SipResponse response = getInitialInviteEvent().getSipMessage().createResponse(100);
+            ctx.reverse().forward(SipMsgEvent.create(getInitialInviteEvent().key(), response));
+        } else {
+            timer100Trying = ctx.scheduler().schedule(Duration.ofMillis(200), SipTimer.Trying);
+        }
+    };
+
+    private final BiConsumer<ActorContext, Event> onExitProceeding = (ctx, event) -> {
+        if (timer100Trying != null) {
+            timer100Trying.cancel();
+        }
+    };
+
+
+    /**
+     * Implements the completed state, which is:
+     *
+     * <pre>
+     *
+     * INVITE                      Timer G fires
+     * send response +-----------+ send response         |
+     *      +--------|           |--------+
+     *      |        |           |        |
+     *      +------->| Completed |<-------+
+     *               |           |
+     *      +--------|           |----+
+     *      |        +-----------+    | ACK
+     *      |          ^   |          | -
+     *      |          |   |          |
+     *      +----------+   |          |
+     *      Transport Err. |          |
+     *      Inform TU      |          V
+     *                     |      +-----------+
+     *                     |      |           |
+     *                     |      | Confirmed |
+     *                     |      |           |
+     *       Timer H fires |      +-----------+
+     *       -             v
+     *              +------------+
+     *              |            |
+     *              | Terminated |
+     *              |            |
+     *              +------------+
+     * </pre>
+     */
+    private final BiConsumer<ActorContext, Event> completed = (ctx, event) -> {
+        if (event.isSipMsgEvent()) {
+            SipMsgEvent sipEvent = event.toSipMsgEvent();
+            SipMessage msg = sipEvent.getSipMessage();
+
+            if (msg.isAck()) {
+                become(TransactionState.CONFIRMED);
+            } else if (isRetransmittedInvite(msg)) {
+                ctx.reverse().forward(lastResponseEvent);
+            }
+        } else if (event.isSipTimerG()) {
+            ++this.timerGCount;
+            ctx.scheduler().schedule(calculateNextTimerG(), SipTimer.G);
+            ctx.forward(this.lastResponseEvent);
+        } else if (event.isSipTimerH()) {
+            become(TransactionState.TERMINATED);
+        }
+    };
+
+    private final BiConsumer<ActorContext, Event> onEnterCompleted = (ctx, event) -> {
+        timerG = ctx.scheduler().schedule(calculateNextTimerG(), SipTimer.G);
+        timerH = ctx.scheduler().schedule(getTimerConfig().getTimerH(), SipTimer.H);
+    };
+
+    private final BiConsumer<ActorContext, Event> onExitCompleted = (ctx, event) -> {
+        timerG.cancel();
+        timerH.cancel();
+    };
+
+    /**
+     * The primary purpose of the confirmed state is to absorb any re-transmitted ACKs
+     * so therefore we will simply absorb everything in this state and really only
+     * react to Timer I, which will take us to the terminated state.
+     */
+    private final BiConsumer<ActorContext, Event> confirmed = (ctx, event) -> {
+        if (event.isSipTimerI()) {
+            become(TransactionState.TERMINATED);
+        }
+
+        // anything else is absorbed.
+    };
+
+    private final BiConsumer<ActorContext, Event> onEnterConfirmed = (ctx, event) -> {
+        ctx.scheduler().schedule(getTimerConfig().getTimerI(), SipTimer.I);
+    };
+
+
+    /**
+     *
+     * Implements the proceeding state as follows:
+     * <pre>
+     *
+     *
+     *    INVITE     Transport Err.
+     *    -          Inform TU
+     *    +-----+    +---+
+     *    |     |    |   v
+     *    |  +------------+
+     *    |  |            |---+ ACK
+     *    +->|  Accepted  |   | to TU
+     *       |            |<--+
+     *       +------------+
+     *          |  ^     |
+     *          |  |     |
+     *          |  +-----+
+     *          |  2xx from TU
+     *          |  send response
+     *          |
+     *          |
+     *          | Timer L fires
+     *          | -
+     *          V
+     *   +------------+
+     *   | Terminated |
+     *   +------------+
+     *
+     * </pre>
+     */
+    private final BiConsumer<ActorContext, Event> accepted = (ctx, event) -> {
+        if (event.isSipMsgEvent()) {
+            SipMsgEvent sipEvent = event.toSipMsgEvent();
+            SipMessage msg = sipEvent.getSipMessage();
+            if (msg.isResponse() && msg.toResponse().isSuccess()) {
+                // only 2xx responses are forwarded. The rest are consumed.
+                // see above state machine
+                ctx.forward(event);
+            } else if (isRetransmittedInvite(msg)) {
+                // absorb. According to rfc6026, don't
+                // event forward it to TU...
+            }
+        } else if (event.isSipTimerL()) {
+            become(TransactionState.TERMINATED);
+        }
+    };
+
+    /**
+     *
+     */
+    private final BiConsumer<ActorContext, Event> onEnterAccepted = (ctx, event) -> {
+        final Duration l = getTimerConfig().getTimerL();
+        timerL = ctx.scheduler().schedule(l, SipTimer.L);
+    };
+
+    private final BiConsumer<ActorContext, Event> onExitAccepted = (ctx, event) -> {
+        timerL.cancel();
+    };
+
+    /**
+     * Implements the state terminated which really doesn't do anything at all.
+     */
+    private final BiConsumer<ActorContext, Event> terminated = (ctx, event) -> {
+        // left empty intentionally
+    };
+
+    /**
+     * Implements the state terminated which really doesn't do much other then dies...
+     */
+    private final BiConsumer<ActorContext, Event> onEnterTerminated = (ctx, event) -> {
+        ctx.killMe();;
+    };
+
 
     /**
      * While in the completed state we will re-transmit the final response (which then must be a
@@ -244,33 +477,18 @@ public class InviteServerTransactionActor implements TransactionActor {
      * @return
      */
     private Duration calculateNextTimerG() {
-        final TimersConfiguration timers = this.parent.getConfig().getTimers();
         final long defaultTimerG = timers.getTimerG().toMillis();
         final long t2 = timers.getT2().toMillis();
         return ActorUtils.calculateBackoffTimer(this.timerGCount, defaultTimerG, t2);
     }
 
-    private void terminate(final ActorContext ctx) {
-        become(TransactionState.TERMINATED);
-        ctx.killMe();
-    }
-
-    private void relayResponse(final ActorContext ctx, final SipEvent event) {
+    private void relayResponse(final ActorContext ctx, final SipMsgEvent event) {
         if (this.lastResponseEvent == null
                 || this.lastResponseEvent.getSipMessage().toResponse().getStatus() < event.getSipMessage().toResponse()
                 .getStatus()) {
             this.lastResponseEvent = event;
         }
-        ctx.reverse().forward(event);
-    }
-
-    private void processInitialInvite(final ActorContext ctx) {
-        if (this.parent.getConfig().isSend100TryingImmediately()) {
-            final SipResponse response = this.invite.getSipMessage().createResponse(100);
-            ctx.reverse().forward(SipEvent.create(this.invite.key(), response));
-        } else {
-            ctx.scheduler().schedule(Duration.ofMillis(200), "100Trying");
-        }
+        ctx.forward(event);
     }
 
     /**
@@ -279,8 +497,7 @@ public class InviteServerTransactionActor implements TransactionActor {
      * transition over to the proceeding state.
      */
     private final BiConsumer<ActorContext, Event> init = (ctx, event) -> {
-        if (event == this.invite) {
-            processInitialInvite(ctx);
+        if (event == getInitialInviteEvent()) {
             ctx.forward(event);
         } else {
             System.err.println("Queue??? shouldn't be able to happen");
@@ -289,13 +506,8 @@ public class InviteServerTransactionActor implements TransactionActor {
     };
 
     @Override
-    public void onEvent(final ActorContext ctx, final Event event) {
-        this.receive.accept(ctx, event);
-    }
-
-    @Override
     public Transaction getTransaction() {
-        return new ServerTransactionImpl(this.id, this.state);
+        return new ServerTransactionImpl(this.id, state());
     }
 
     @Override
@@ -309,8 +521,8 @@ public class InviteServerTransactionActor implements TransactionActor {
     }
 
     @Override
-    public ActorRef self() {
-        // TODO Auto-generated method stub
-        return null;
+    protected final Logger logger() {
+        return logger;
     }
+
 }

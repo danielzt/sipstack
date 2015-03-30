@@ -10,7 +10,7 @@ import io.sipstack.actor.ActorContext;
 import io.sipstack.actor.Key;
 import io.sipstack.actor.Supervisor;
 import io.sipstack.event.Event;
-import io.sipstack.event.SipEvent;
+import io.sipstack.event.SipMsgEvent;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +42,7 @@ public final class ApplicationSupervisor implements Actor, Supervisor {
      */
     @Override
     public void onEvent(final ActorContext ctx, final Event event) {
-        final SipEvent sipEvent = (SipEvent) event;
+        final SipMsgEvent sipEvent = (SipMsgEvent) event;
         final SipMessage msg = sipEvent.getSipMessage();
         // just consume the ACK
         if (msg.isAck()) {
@@ -53,7 +53,7 @@ public final class ApplicationSupervisor implements Actor, Supervisor {
         if (msg.isRequest()) {
             final SipResponse response = msg.createResponse(200);
             final Key key = event.key();
-            final SipEvent responseEvent = SipEvent.create(key, response);
+            final SipMsgEvent responseEvent = SipMsgEvent.create(key, response);
             ctx.reverse().forward(responseEvent);
         }
     }

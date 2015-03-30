@@ -105,7 +105,7 @@ public class ActorContextTest {
         initWorker(pipeLineFactory);
 
         final PipeLine pipe = pipeLineFactory.newPipeLine();
-        return ActorContext.withPipeLine(this.actorSystem, pipe);
+        return ActorContext.withPipeLine(0, this.actorSystem, pipe);
     }
 
     /**

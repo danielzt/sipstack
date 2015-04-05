@@ -364,14 +364,17 @@ public interface ActorContext {
             }
 
             if (forwardedEvents == null) {
-                this.forwardedEvents = new ArrayList<>();
+                this.forwardedEvents = new ArrayList<>(5);
             }
             this.forwardedEvents.add(event);
         }
 
         @Override
         public void fire(final Event event) {
-            throw new RuntimeException("getting there");
+            if (continueEvents == null) {
+                continueEvents = new ArrayList<>(2);
+            }
+            this.continueEvents.add(event);
         }
 
         @Override

@@ -42,7 +42,7 @@ public class FlowActor implements Actor {
                 final SipMessage msg = ((IOReadEvent<SipMessage>) event).getObject();
                 final Key key = Key.withSipMessage(msg);
                 final SipMsgEvent sipEvent = SipMsgEvent.create(key, arrivalTime, msg);
-                ctx.forward(sipEvent);
+                ctx.fire(sipEvent);
             }
         } else if (event.isSipMsgEvent()) {
             final SipMessage msg = event.toSipMsgEvent().getSipMessage();

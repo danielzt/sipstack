@@ -11,7 +11,6 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
 import io.sipstack.config.Configuration;
-import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOReadEvent;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
@@ -142,6 +141,8 @@ public interface ActorSystem {
 
         @Override
         public Timeout scheduleJob(final Duration delay, final DispatchJob job) {
+            if (true)
+                return null;
             final TimerTask task = new TimerTask() {
                 @Override
                 public void run(final Timeout timeout) throws Exception {
@@ -179,6 +180,7 @@ public interface ActorSystem {
         @Override
         public void dispatchJob(final DispatchJob job) {
             final WorkerContext ctx = this.workerCtxs[job.getWorker()];
+            // System.err.println("Dispatched job to worker no: " + job.getWorker());
             if (!ctx.workerQueue().offer(job)) {
                 // TODO: handle non accepted job
                 System.err.println("Dropping jobs!!!! ");

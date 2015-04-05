@@ -11,14 +11,9 @@ import java.util.function.BiConsumer;
 public abstract class ActorBase<S extends Enum<S>> implements Actor {
 
     /**
-     * An empty action allowing us not to have to check for Null all the time.
-     */
-    private static final BiConsumer<ActorContext, Event> EMPTY_ACTION = (ctx, event) -> {};
-
-    /**
      * Our current currentState.
      */
-    private S currentState;
+    protected S currentState;
 
     /**
      * The functions implementing the current state.
@@ -97,7 +92,7 @@ public abstract class ActorBase<S extends Enum<S>> implements Actor {
     }
 
     protected final void become(final S newState) {
-        logger().info("{} {} -> {}", this.id, currentState, newState);
+        // logger().info("{} {} -> {}", this.id, currentState, newState);
 
         if (currentState != newState) {
             final BiConsumer<ActorContext, Event> exitAction = onExitActions[currentState.ordinal()];

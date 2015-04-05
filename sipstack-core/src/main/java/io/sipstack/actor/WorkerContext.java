@@ -6,7 +6,6 @@ package io.sipstack.actor;
 import io.pkts.packet.sip.impl.PreConditions;
 
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -55,8 +54,8 @@ public interface WorkerContext {
 
         public WorkerContext build() {
             PreConditions.ensureNotNull(pipeLineFactory, "You must specity a default actor chain");
-            // final BlockingQueue<Runnable> jobQueue = queue != null ? queue : new LinkedBlockingQueue<Runnable>(100);
-            final BlockingQueue<Runnable> jobQueue = queue != null ? queue : new ConcurrentLinkedDeque<>()
+            final BlockingQueue<Runnable> jobQueue = queue != null ? queue : new LinkedBlockingQueue<Runnable>(100);
+            // final BlockingQueue<Runnable> jobQueue = queue != null ? queue : new ConcurrentLinkedDeque<>()
             return new DefaultWorkerContext(jobQueue, pipeLineFactory);
         }
     }

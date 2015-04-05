@@ -1,9 +1,11 @@
 package io.sipstack.actor;
 
-import java.util.concurrent.BlockingQueue;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
 
 /**
  * Super simple worker class that all it does is grab {@link Runnable}s off of a queue and executes
@@ -34,10 +36,20 @@ public class Worker implements Runnable {
 
     @Override
     public void run() {
+        final List<Runnable> jobs = new ArrayList<>(10);
         while (true) {
             try {
-                final Runnable event = this.queue.take();
+
+                // use take as
+                final Runnable event = queue.take();
                 event.run();
+
+                final int noOfJobs = this.queue.drainTo(jobs, 10);
+                for (int i = 0; i < noOfJobs; ++i) {
+                    final Runnable job = jobs.get(i);
+                    job.run();
+                }
+                jobs.clear();
             } catch (final Throwable t) {
                 // do something cool
                 t.printStackTrace();

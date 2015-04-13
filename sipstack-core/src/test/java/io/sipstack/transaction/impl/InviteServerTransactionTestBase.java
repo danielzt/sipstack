@@ -19,6 +19,8 @@ import org.junit.After;
 import org.junit.Before;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -58,10 +60,14 @@ public class InviteServerTransactionTestBase extends SipTestBase {
     protected PipeLineFactory factory;
 
     /**
-     * Most scenarios start off with an invite and if so, just use this one.
+     * Most scenarios for the INVITE server transaction start off with
+     * an invite and if so, just use this one.
      */
     protected SipMsgEvent defaultInviteEvent;
 
+    /**
+     * The transaction id for the default invite event.
+     */
     protected TransactionId defaultInviteTransactionId;
 
     /**
@@ -73,6 +79,22 @@ public class InviteServerTransactionTestBase extends SipTestBase {
      * Default 200 OK that is in the same transaction as the {@link #defaultInviteEvent}.
      */
     protected SipMsgEvent default200OKEvent;
+
+    /**
+     * Default BYE request commonly used by the non-invite transaction tests.
+     */
+    protected SipMsgEvent defaultByeEvent;
+
+    /**
+     * The transaction Id for the default bye event.
+     */
+    protected TransactionId defaultByeTransactionId;
+
+    /**
+     * The list of all non-invite requests. Typically, ALL tests that we execute will
+     * go through all requests there are in SIPs various specifications.
+     */
+    protected List<SipMsgEvent> nonInviteRequests;
 
     /**
      * Since everything is pretty much set in this test class the {@link ActorContext} is always
@@ -132,7 +154,12 @@ public class InviteServerTransactionTestBase extends SipTestBase {
         default180RingingEvent = SipMsgEvent.create(ringing);
         default200OKEvent = SipMsgEvent.create(twoHundredToInvite);
 
+        defaultByeEvent = SipMsgEvent.create(bye);
+        defaultByeTransactionId = getTransactionId(defaultByeEvent);
+
         defaultCtx = ActorContext.withPipeLine(0, actorSystem, factory.newPipeLine());
+
+        nonInviteRequests = Arrays.asList(defaultByeEvent);
     }
 
     /**
@@ -249,6 +276,12 @@ public class InviteServerTransactionTestBase extends SipTestBase {
                     break;
                 case H:
                     found = event.isSipTimerH();
+                    break;
+                case I:
+                    found = event.isSipTimerI();
+                    break;
+                case J:
+                    found = event.isSipTimerJ();
                     break;
                 default:
                     fail("Unkonwn timer type. Did you add one but forgot to update here?");

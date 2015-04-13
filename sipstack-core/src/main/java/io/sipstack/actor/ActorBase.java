@@ -92,7 +92,7 @@ public abstract class ActorBase<S extends Enum<S>> implements Actor {
     }
 
     protected final void become(final S newState) {
-        // logger().info("{} {} -> {}", this.id, currentState, newState);
+        logger().info("{} {} -> {}", this.id, currentState, newState);
 
         if (currentState != newState) {
             final BiConsumer<ActorContext, Event> exitAction = onExitActions[currentState.ordinal()];

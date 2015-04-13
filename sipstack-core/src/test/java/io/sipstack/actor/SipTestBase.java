@@ -3,8 +3,6 @@
  */
 package io.sipstack.actor;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
@@ -20,18 +18,16 @@ import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 import io.sipstack.netty.codec.sip.Transport;
+import org.junit.After;
+import org.junit.Before;
 
 import java.net.InetSocketAddress;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.After;
-import org.junit.Before;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -51,6 +47,8 @@ public class SipTestBase {
     protected SipRequest invite;
     protected SipResponse ringing;
     protected SipResponse twoHundredToInvite;
+    protected SipRequest bye;
+    protected SipResponse twoHundredToBye;
 
     private final String inviteStr;
     private final String ringingStr;
@@ -150,6 +148,8 @@ public class SipTestBase {
         this.invite = SipMessage.frame(this.inviteStr).toRequest();
         this.ringing = SipMessage.frame(this.ringingStr).toResponse();
         this.twoHundredToInvite = SipMessage.frame(this.twoHundredToInviteStr).toResponse();
+        this.bye = SipMessage.frame(this.byeStr).toRequest();
+        this.twoHundredToBye = SipMessage.frame(this.twoHundredByeStr).toResponse();
     }
 
     /**
@@ -315,6 +315,13 @@ public class SipTestBase {
 
         List<Integer> responses;
 
+        /**
+         * The last context we got.
+         */
+        private ActorContext lastCtx;
+
+        private Event lastEvent;
+
         public EventProxy(final Integer... responses) {
             if (responses != null && responses.length > 0) {
                 this.responses = Arrays.asList(responses);
@@ -325,6 +332,9 @@ public class SipTestBase {
 
         @Override
         public void onEvent(final ActorContext ctx, final Event event) {
+            lastCtx = ctx;
+            lastEvent = event;
+
             if (event.isSipMsgEvent()) {
                 final SipMessage msg = event.toSipMsgEvent().getSipMessage();
                 if (msg.isRequest()) {

@@ -398,8 +398,8 @@ public class InviteServerTransactionActor extends ActorBase<TransactionState> im
 
 
     /**
+     * Implements the accepted state as follows:
      *
-     * Implements the proceeding state as follows:
      * <pre>
      *
      *

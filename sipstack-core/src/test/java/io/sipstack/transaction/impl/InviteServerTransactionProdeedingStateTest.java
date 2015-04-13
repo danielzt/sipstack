@@ -15,7 +15,9 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
 /**
- * Created by jonas on 3/29/15.
+ * All tests concerning the proceeding state is found here.
+ *
+ * @author jonas@jonasborjesson.com
  */
 public class InviteServerTransactionProdeedingStateTest extends InviteServerTransactionTestBase {
 

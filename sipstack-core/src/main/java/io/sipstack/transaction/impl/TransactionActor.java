@@ -26,9 +26,12 @@ public interface TransactionActor extends Actor {
 
     static TransactionActor create(final TransactionSupervisor parent, final TransactionId id, final SipMsgEvent event) {
         final SipMessage msg = event.getSipMessage();
-        if (msg.isRequest() && msg.isInvite()) {
-            return new InviteServerTransactionActor(parent, id, event);
-            // return new InviteServerTransactionActorNoLambda(parent, id, event);
+        if (msg.isRequest()) {
+            if (msg.isInvite()) {
+                return new InviteServerTransactionActor(parent, id, event);
+            }
+            return new NonInviteServerTransactionActor(parent, id, event);
+
         }
         return null;
     }

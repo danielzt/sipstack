@@ -3,6 +3,12 @@
  */
 package io.sipstack.core;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.ActorRef;
 import io.sipstack.actor.ActorSystem;
@@ -18,6 +24,8 @@ import io.sipstack.server.SipBridgeHandler;
 import io.sipstack.transaction.impl.TransactionSupervisor;
 import io.sipstack.transport.TransportSupervisor;
 import io.sipstack.utils.Generics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -27,16 +35,6 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
-
 /**
  * @author jonas@jonasborjesson.com
  */
@@ -45,6 +43,8 @@ public abstract class Application<T extends Configuration> {
     private static final Logger logger = LoggerFactory.getLogger(Application.class);
 
     private final String name;
+
+    private static final ApplicationMapper DEFAULT_APPLICATION_MAPPER = new ApplicationMapper(){};
 
     /**
      * Default empty constructor.
@@ -65,6 +65,10 @@ public abstract class Application<T extends Configuration> {
      */
     public void initialize(final Bootstrap<T> bootstrap) {
         // sub-classes should override
+    }
+
+    public ApplicationMapper getApplicationMapper() {
+        return DEFAULT_APPLICATION_MAPPER;
     }
 
     /**
@@ -170,20 +174,39 @@ public abstract class Application<T extends Configuration> {
     }
 
     private ActorSystem configureActorSystem(final Configuration config) {
-        final ActorSystem.Builder builder = ActorSystem.withName("sipstack.io");
         final SipConfiguration sipConfig = config.getSipConfiguration();
+        final int noOfWorkers = sipConfig.getWorkerThreads();
 
-        for (int i = 0; i < sipConfig.getWorkerThreads(); ++i) {
+        final ActorRef systemRef = ActorRef.withWorkerPool(-1).withName("/").withNoOfWorkers(noOfWorkers).build();
+        final ActorSystem.Builder builder = ActorSystem.withName("sipstack.io");
+        builder.withActorRef(systemRef);
+
+        for (int i = 0; i < noOfWorkers; ++i) {
 
             // TODO: may want this to be configurable as well.
-            final ActorRef refTransport = ActorRef.withWorkerPool(i).withName("transport").build();
+            final ActorRef refTransport = ActorRef
+                    .withWorkerPool(i)
+                    .withParent(systemRef)
+                    .withName("transportSupervisor")
+                    .withNoOfWorkers(noOfWorkers)
+                    .build();
             final TransportSupervisor transportSupervisor = new TransportSupervisor(refTransport);
 
-            final ActorRef refTransaction = ActorRef.withWorkerPool(i).withName("transaction").build();
+            final ActorRef refTransaction = ActorRef
+                    .withWorkerPool(i)
+                    .withParent(systemRef)
+                    .withName("transactionSupervisor")
+                    .withNoOfWorkers(noOfWorkers)
+                    .build();
             final TransactionSupervisor transactionSupervisor = new TransactionSupervisor(sipConfig.getTransaction());
 
-            final ActorRef refApplication = ActorRef.withWorkerPool(i).withName("application").build();
-            final ApplicationSupervisor applicationSupervisor = new ApplicationSupervisor();
+            final ActorRef refApplication = ActorRef
+                    .withWorkerPool(i)
+                    .withParent(systemRef)
+                    .withName("applicationSupervisor")
+                    .withNoOfWorkers(noOfWorkers)
+                    .build();
+            final ApplicationSupervisor applicationSupervisor = new ApplicationSupervisor(refApplication, getApplicationMapper());
 
             // TODO: should probably be configurable as well
             final BlockingQueue<Runnable> jobQueue = new LinkedBlockingQueue<Runnable>(100);

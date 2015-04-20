@@ -31,7 +31,7 @@ public class InviteServerTransactionProdeedingStateTest extends InviteServerTran
 
     @After
     public void tearDown() throws Exception {
-        super.tearDown();;
+        super.tearDown();
     }
 
     /**

@@ -102,7 +102,7 @@ public interface ActorContext {
         /**
          * The worker thread we are currently executing on as in, this is the "index" of the worker
          * thread that we are on and that is managed by the {@link ActorSystem}. Note, this is
-         * internal implementaion detail only and is never ever exposed to the applications.
+         * internal implementation detail only and is never ever exposed to the applications.
          */
         private final int workerThread;
 

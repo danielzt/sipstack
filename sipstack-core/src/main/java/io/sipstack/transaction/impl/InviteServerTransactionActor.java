@@ -281,8 +281,8 @@ public class InviteServerTransactionActor extends ActorBase<TransactionState> im
                 final SipResponse response = msg.toResponse();
                 relayResponse(ctx, sipEvent);
                 if (response.isSuccess()) {
-                    // become(TransactionState.ACCEPTED);
-                    become(TransactionState.TERMINATED);
+                    become(TransactionState.ACCEPTED);
+                    // become(TransactionState.TERMINATED);
                 } else if (response.isFinal()) {
                     become(TransactionState.COMPLETED);
                 }

@@ -31,7 +31,6 @@ public interface TransactionActor extends Actor {
                 return new InviteServerTransactionActor(parent, id, event);
             }
             return new NonInviteServerTransactionActor(parent, id, event);
-
         }
         return null;
     }

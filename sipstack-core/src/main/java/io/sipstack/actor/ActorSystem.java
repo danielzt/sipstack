@@ -1,5 +1,5 @@
 /**
- * 
+ *
  */
 package io.sipstack.actor;
 
@@ -60,6 +60,7 @@ public interface ActorSystem {
         private final List<WorkerContext> workerContexts = new ArrayList<>();
         private Configuration config;
         private Timer timer;
+        private ActorRef self;
 
         private Builder(final String name) {
             this.name = name;
@@ -67,6 +68,11 @@ public interface ActorSystem {
 
         public Builder withTimer(final Timer timer) {
             this.timer = timer;
+            return this;
+        }
+
+        public Builder withActorRef(final ActorRef ref) {
+            this.self = ref;
             return this;
         }
 
@@ -82,11 +88,11 @@ public interface ActorSystem {
         }
 
         public ActorSystem build() {
-            PreConditions
-            .ensureArgument(!this.workerContexts.isEmpty(), "You must specify at least one worker context");
-            final Timer t = this.timer != null ? this.timer : new HashedWheelTimer();
+            PreConditions.ensureArgument(!this.workerContexts.isEmpty(), "You must specify at least one worker context");
+            PreConditions.assertNotNull(self);
+            final Timer t = timer != null ? timer : new HashedWheelTimer();
             final Configuration c = config != null ? config : new Configuration();
-            return new DefaultActorSystem(this.name, t, c, this.workerContexts);
+            return new DefaultActorSystem(self, this.name, t, c, this.workerContexts);
         }
     }
 
@@ -96,16 +102,18 @@ public interface ActorSystem {
         private final ExecutorService workers;
         private final WorkerContext[] workerCtxs;
         private final int workerPoolSize;
+        private final ActorRef self;
 
         private final Configuration config;
 
         private final Timer timer;
 
         /**
-         * 
+         *
          */
-        private DefaultActorSystem(final String name, final Timer timer, final Configuration config,
-                final List<WorkerContext> workerContexts) {
+        private DefaultActorSystem(final ActorRef ref, final String name, final Timer timer, final Configuration config,
+                                   final List<WorkerContext> workerContexts) {
+            this.self = ref;
             this.timer = timer;
             this.name = name;
             this.config = config;
@@ -156,7 +164,7 @@ public interface ActorSystem {
         // @Override
         public DispatchJob createJob(final Event event) {
             final Key key = event.key();
-            final int worker = Math.abs(key.hashCode() % this.workerPoolSize);
+            final int worker = self.willRunOnThread(key);
             final WorkerContext ctx = this.workerCtxs[worker];
             final PipeLineFactory factory = ctx.defaultPipeLineFactory();
             final PipeLine pipeLine = factory.newPipeLine();
@@ -166,9 +174,9 @@ public interface ActorSystem {
         @Override
         public DispatchJob createJob(final Event event, final PipeLine pipeLine) {
             try {
-            final Key key = event.key();
-            final int worker = Math.abs(key.hashCode() % this.workerPoolSize);
-            return new DispatchJob(this, worker, pipeLine, event);
+                final Key key = event.key();
+                final int worker = Math.abs(key.hashCode() % this.workerPoolSize);
+                return new DispatchJob(this, worker, pipeLine, event);
             } catch (final NullPointerException e) {
                 e.printStackTrace();
                 throw e;

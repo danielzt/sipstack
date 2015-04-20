@@ -4,11 +4,7 @@
 package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.actor.ActorContext;
-import io.sipstack.actor.PipeLine;
-import io.sipstack.actor.PipeLineFactory;
 import io.sipstack.actor.SipTestBase;
-import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipMsgEvent;
 import io.sipstack.timers.SipTimer;
@@ -19,8 +15,6 @@ import org.junit.After;
 import org.junit.Before;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -30,80 +24,6 @@ import static org.junit.Assert.fail;
  * @author jonas@jonasborjesson.com
  */
 public class InviteServerTransactionTestBase extends SipTestBase {
-
-    /**
-     * The transaction supervisor used for all tests within this test class.
-     */
-    protected TransactionSupervisor supervisor;
-
-    /**
-     * The fake timer used for checking whether tasks where scheduled for later execution.
-     */
-    protected MockTimer timer;
-
-    /**
-     * An event proxy that is inserted before the supervisor.
-     */
-    protected EventProxy first;
-
-    /**
-     * An event proxy that is inserted after the supervisor.
-     */
-    protected EventProxy last;
-
-    /**
-     * All tests herein uses the same pipeline setup. I.e. first -> supervisor -> last.
-     * <p/>
-     * By using this setup, we can drive all the events we need to test the transaction
-     * state machine.
-     */
-    protected PipeLineFactory factory;
-
-    /**
-     * Most scenarios for the INVITE server transaction start off with
-     * an invite and if so, just use this one.
-     */
-    protected SipMsgEvent defaultInviteEvent;
-
-    /**
-     * The transaction id for the default invite event.
-     */
-    protected TransactionId defaultInviteTransactionId;
-
-    /**
-     * Default 180 Ringing that is in the same transaction as the {@link #defaultInviteEvent}.
-     */
-    protected SipMsgEvent default180RingingEvent;
-
-    /**
-     * Default 200 OK that is in the same transaction as the {@link #defaultInviteEvent}.
-     */
-    protected SipMsgEvent default200OKEvent;
-
-    /**
-     * Default BYE request commonly used by the non-invite transaction tests.
-     */
-    protected SipMsgEvent defaultByeEvent;
-
-    /**
-     * The transaction Id for the default bye event.
-     */
-    protected TransactionId defaultByeTransactionId;
-
-    /**
-     * The list of all non-invite requests. Typically, ALL tests that we execute will
-     * go through all requests there are in SIPs various specifications.
-     */
-    protected List<SipMsgEvent> nonInviteRequests;
-
-    /**
-     * Since everything is pretty much set in this test class the {@link ActorContext} is always
-     * starting off the same way as well, which is really just reflecting how the {@link PipeLine}
-     * is configured.
-     */
-    protected ActorContext defaultCtx;
-
-    protected MockActorSystem actorSystem;
 
     public InviteServerTransactionTestBase() throws Exception {
         super();
@@ -126,40 +46,6 @@ public class InviteServerTransactionTestBase extends SipTestBase {
     @After
     public void tearDown() throws Exception {
         super.tearDown();
-    }
-
-    /**
-     * Setup the system with the option to respond with a set of responses. The responses will be
-     * created by the {@link EventProxy} that is configured last in the pipeline and is as such
-     * acting as the application using the transaction.
-     *
-     * @param responses
-     */
-    protected void init(final Integer... responses) {
-        init(this.sipConfig.getTransaction(), responses);
-    }
-
-    protected void init(final TransactionLayerConfiguration config, final Integer... responses) {
-        timer = new MockTimer();
-
-        first = new EventProxy();
-        last = new EventProxy(responses);
-        supervisor = new TransactionSupervisor(config);
-
-        factory = PipeLineFactory.withDefaultChain(first, supervisor, last);
-        actorSystem = new MockActorSystem(factory);
-
-        defaultInviteEvent = SipMsgEvent.create(invite);
-        defaultInviteTransactionId = getTransactionId(defaultInviteEvent);
-        default180RingingEvent = SipMsgEvent.create(ringing);
-        default200OKEvent = SipMsgEvent.create(twoHundredToInvite);
-
-        defaultByeEvent = SipMsgEvent.create(bye);
-        defaultByeTransactionId = getTransactionId(defaultByeEvent);
-
-        defaultCtx = ActorContext.withPipeLine(0, actorSystem, factory.newPipeLine());
-
-        nonInviteRequests = Arrays.asList(defaultByeEvent);
     }
 
     /**
@@ -429,9 +315,5 @@ public class InviteServerTransactionTestBase extends SipTestBase {
             assertThat(transaction.isClientTransaction(), is(false));
             assertThat(transaction.getState(), is(state));
         }
-    }
-
-    protected TransactionId getTransactionId(final SipMsgEvent event) {
-        return TransactionId.create(event.getSipMessage());
     }
 }

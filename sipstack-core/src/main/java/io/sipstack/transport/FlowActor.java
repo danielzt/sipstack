@@ -1,18 +1,12 @@
 package io.sipstack.transport;
 
+import io.hektor.core.Actor;
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.actor.Actor;
-import io.sipstack.actor.ActorContext;
-import io.sipstack.actor.ActorRef;
-import io.sipstack.actor.Key;
-import io.sipstack.actor.Supervisor;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOEvent;
 import io.sipstack.event.IOReadEvent;
-import io.sipstack.event.SipMsgEvent;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,39 +15,27 @@ public class FlowActor implements Actor {
     private static final Logger logger = LoggerFactory.getLogger(FlowActor.class);
 
     private final Connection connection;
-    private final TransportSupervisor supervisor;
 
-    public static FlowActor create(final TransportSupervisor parent, final Connection connection) {
-        return new FlowActor(parent, connection);
-    }
-
-    private FlowActor(final TransportSupervisor supervisor, final Connection connection) {
-        this.supervisor = supervisor;
+    public FlowActor(final Connection connection) {
         this.connection = connection;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public void onEvent(final ActorContext ctx, final Event event) {
+    public void onReceive(final Object msg) {
+        final Event event = (Event)msg;
         if (event.isIOEvent()) {
             final IOEvent ioEvent = (IOEvent) event;
             if (ioEvent.isSipReadEvent()) {
                 final long arrivalTime = event.getArrivalTime();
-                final SipMessage msg = ((IOReadEvent<SipMessage>) event).getObject();
-                final Key key = Key.withSipMessage(msg);
-                final SipMsgEvent sipEvent = SipMsgEvent.create(key, arrivalTime, msg);
-                ctx.fire(sipEvent);
+                final SipMessage sipMsg = ((IOReadEvent<SipMessage>) event).getObject();
+                // final Key key = Key.withSipMessage(sipMsg);
+                // final SipMsgEvent sipEvent = SipMsgEvent.create(key, arrivalTime, sipMsg);
             }
         } else if (event.isSipMsgEvent()) {
-            final SipMessage msg = event.toSipMsgEvent().getSipMessage();
-            this.connection.send(msg);
+            // final SipMessage msg = event.toSipMsgEvent().getSipMessage();
+            // this.connection.send(msg);
         }
 
-    }
-
-    @Override
-    public Supervisor getSupervisor() {
-        return this.supervisor;
     }
 
     private static final class DefaultFlow implements Flow {
@@ -64,12 +46,6 @@ public class FlowActor implements Actor {
             return null;
         }
 
-    }
-
-    @Override
-    public ActorRef self() {
-        // TODO Auto-generated method stub
-        return null;
     }
 
 }

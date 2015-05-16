@@ -3,10 +3,11 @@
  */
 package io.sipstack.config;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.hektor.config.HektorConfiguration;
+
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Sipstack.io is configured through a YAML file and this class represents that
@@ -31,13 +32,18 @@ public class Configuration {
     @JsonProperty
     private SipConfiguration sip = new SipConfiguration();
 
+    @Valid
+    @NotNull
+    @JsonProperty
+    private HektorConfiguration hektor = new HektorConfiguration();
+
     /**
      * Set the SIP specific configuration.
      * 
      * @param config
      */
     public void setSipConfiguration(final SipConfiguration config) {
-        this.sip = config;
+        sip = config;
     }
 
     /**
@@ -46,7 +52,11 @@ public class Configuration {
      * @return
      */
     public SipConfiguration getSipConfiguration() {
-        return this.sip;
+        return sip;
+    }
+
+    public HektorConfiguration getHektorConfiguration() {
+        return hektor;
     }
 
     /**

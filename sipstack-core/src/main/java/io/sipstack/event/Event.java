@@ -3,15 +3,13 @@
  */
 package io.sipstack.event;
 
-import io.sipstack.actor.Key;
-
 /**
  * Represents an {@link Event} in the system.
  * 
  * Note that all events that are being passed around will implement this interface. The reason for
  * this is that we are not building a generic Actor system but rather a very specific one tailored
  * to SIP only. Hence, even though it is very convenient to e.g. be able to send any type of Object
- * to any Actor (compare with akka.io, an really nice framework!) this system enforces SIP specific
+ * to any Actor (compare with akka.io, a really nice framework!) this system enforces SIP specific
  * events for type safety and performance reasons.
  * 
  * Note, an {@link Event} is internal to the sipstack implementation and should never ever be
@@ -21,7 +19,7 @@ import io.sipstack.actor.Key;
  */
 public interface Event {
 
-    Key key();
+    // Key key();
 
     /**
      * The arrival time of this {@link Event}. For incoming messages that will be the time they was

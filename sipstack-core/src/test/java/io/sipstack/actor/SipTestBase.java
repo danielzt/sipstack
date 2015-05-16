@@ -3,14 +3,14 @@
  */
 package io.sipstack.actor;
 
+import io.hektor.core.Actor;
+import io.hektor.core.ActorContext;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
-import io.sipstack.actor.ActorSystem.DefaultActorSystem.DispatchJob;
-import io.sipstack.config.Configuration;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
@@ -25,8 +25,11 @@ import org.junit.After;
 import org.junit.Before;
 
 import java.net.InetSocketAddress;
-import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.mockito.Mockito.mock;
@@ -37,12 +40,6 @@ import static org.mockito.Mockito.when;
  */
 public class SipTestBase {
 
-    /**
-     * When kicking off new tests we usually send a SipMessage via the {@link ActorSystem} and when
-     * doing so we need a {@link ConnectionId} as part of the {@link SipMessageEvent} (inderectly
-     * via {@link Connection}). This is the default one if your test doesn't care which connection
-     * the message came from.
-     */
     protected ConnectionId defaultConnectionId;
 
     protected SipConfiguration sipConfig = new SipConfiguration();
@@ -82,15 +79,6 @@ public class SipTestBase {
     protected EventProxy last;
 
     /**
-     * All tests herein uses the same pipeline setup.
-     * I.e. first -> supervisor -> last.
-     * <p/>
-     * By using this setup, we can drive all the events we need to test the transaction
-     * state machine.
-     */
-    protected PipeLineFactory factory;
-
-    /**
      * Most scenarios for the INVITE server transaction start off with
      * an invite and if so, just use this one.
      */
@@ -126,16 +114,6 @@ public class SipTestBase {
      * go through all requests there are in SIPs various specifications.
      */
     protected List<SipMsgEvent> nonInviteRequests;
-
-    /**
-     * Since everything is pretty much set in this test class the {@link ActorContext} is always
-     * starting off the same way as well, which is really just reflecting how the {@link PipeLine}
-     * is configured.
-     */
-    protected ActorContext defaultCtx;
-
-    protected MockActorSystem actorSystem;
-
 
     public SipTestBase() throws Exception {
         this.defaultConnectionId = createConnectionId(Transport.udp, "10.36.10.10", 5060, "192.168.0.100", 5060);
@@ -250,9 +228,6 @@ public class SipTestBase {
     }
 
     protected void init(List<Actor> chain) {
-        factory = PipeLineFactory.withDefaultChain(chain);
-        actorSystem = new MockActorSystem(factory);
-
         defaultInviteEvent = SipMsgEvent.create(invite);
         defaultInviteTransactionId = getTransactionId(defaultInviteEvent);
         default180RingingEvent = SipMsgEvent.create(ringing);
@@ -261,10 +236,7 @@ public class SipTestBase {
         defaultByeEvent = SipMsgEvent.create(bye);
         defaultByeTransactionId = getTransactionId(defaultByeEvent);
 
-        defaultCtx = ActorContext.withPipeLine(0, actorSystem, factory.newPipeLine());
-
         nonInviteRequests = Arrays.asList(defaultByeEvent);
-
     }
 
     protected void init(final TransactionLayerConfiguration config, final Integer... responses) {
@@ -362,67 +334,6 @@ public class SipTestBase {
         }
     }
 
-    public static class DelayedJob {
-        public final Duration delay;
-        public final DispatchJob job;
-
-        private DelayedJob(final Duration delay, final DispatchJob job) {
-            this.delay = delay;
-            this.job = job;
-        }
-    }
-
-    public class MockActorSystem implements ActorSystem {
-        public final List<DelayedJob> scheduledJobs = new ArrayList<>();
-        public final List<DispatchJob> jobs = new ArrayList<>();
-
-        private final PipeLineFactory pipeLineFactory;
-
-        public MockActorSystem(final PipeLineFactory pipeLineFactory) {
-            this.pipeLineFactory = pipeLineFactory;
-        }
-
-        @Override
-        public void receive(final SipMessageEvent event) {
-            // TODO Auto-generated method stub
-        }
-
-        @Override
-        public Configuration getConfig() {
-            return null;
-        }
-
-        @Override
-        public Timeout scheduleJob(final Duration delay, final DispatchJob job) {
-            this.scheduledJobs.add(new DelayedJob(delay, job));
-            return mock(Timeout.class);
-        }
-
-        @Override
-        public void dispatchJob(final DispatchJob job) {
-            this.jobs.add(job);
-        }
-
-        @Override
-        public DispatchJob createJob(final Event event, final PipeLine pipeLine) {
-            return new DispatchJob(this, 0, pipeLine, event);
-        }
-
-        // @Override
-        // public DispatchJob createJob(final Event event) {
-        // final PipeLine pipeLine = this.pipeLineFactory.newPipeLine();
-        // return new DispatchJob(this, 0, pipeLine, event);
-        // }
-
-        @Override
-        public Actor actorOf(final Key key) {
-            // TODO Auto-generated method stub
-            return null;
-        }
-
-    }
-
-
     /**
      * Simple {@link Actor} that simply just forwards the message in the same direction it came and
      * saves all the events it has seen.
@@ -452,38 +363,32 @@ public class SipTestBase {
             }
         }
 
-        @Override
-        public void onEvent(final ActorContext ctx, final Event event) {
-            lastCtx = ctx;
-            lastEvent = event;
-
-            if (event.isSipMsgEvent()) {
-                final SipMessage msg = event.toSipMsgEvent().getSipMessage();
-                if (msg.isRequest()) {
-                    this.requestEvents.add(event);
-                    for (final Integer responseStatus : this.responses) {
-                        final SipRequest request = msg.toRequest();
-                        final SipResponse response = request.createResponse(responseStatus);
-                        final SipMsgEvent responseEvent = SipMsgEvent.create(event.key(), response);
-                        ctx.reverse().forward(responseEvent);
-                    }
-                } else {
-                    this.responseEvents.add(event);
-                }
-
-                ctx.forward(event);
-            }
-        }
-
         public void reset() {
             this.requestEvents.clear();
             this.responseEvents.clear();
         }
 
         @Override
-        public Supervisor getSupervisor() {
-            // TODO Auto-generated method stub
-            return null;
+        public void onReceive(final Object msg) {
+            final Event event = (Event)msg;
+            if (event.isSipMsgEvent()) {
+                final SipMessage sipMsg = event.toSipMsgEvent().getSipMessage();
+                if (sipMsg.isRequest()) {
+                    this.requestEvents.add(event);
+                    for (final Integer responseStatus : this.responses) {
+                        final SipRequest request = sipMsg.toRequest();
+                        final SipResponse response = request.createResponse(responseStatus);
+                        final SipMsgEvent responseEvent = SipMsgEvent.create(response);
+                        sender().tell(responseEvent, self());
+                    }
+                } else {
+                    this.responseEvents.add(event);
+                }
+
+                // TODO: should go to out configured next actor
+                // ctx.forward(event);
+            }
+
         }
     }
 

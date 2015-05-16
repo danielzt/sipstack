@@ -1,8 +1,5 @@
 package io.sipstack.core;
 
-import io.sipstack.actor.Key;
-import io.sipstack.event.SipMsgEvent;
-
 /**
  * @author jonas@jonasborjesson.com
  */
@@ -15,7 +12,7 @@ public interface ApplicationMapper {
      * @param event
      * @return
      */
-    default Key map(SipMsgEvent event) {
-        return Key.withSipMessage(event.getSipMessage());
-    }
+    // default Key map(SipMsgEvent event) {
+        // return Key.withSipMessage(event.getSipMessage());
+    // }
 }

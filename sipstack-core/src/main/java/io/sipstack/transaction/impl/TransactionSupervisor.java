@@ -3,31 +3,24 @@
  */
 package io.sipstack.transaction.impl;
 
-import static io.sipstack.actor.ActorUtils.safePostStop;
-import static io.sipstack.actor.ActorUtils.safePreStart;
+import io.hektor.core.Actor;
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.actor.Actor;
-import io.sipstack.actor.ActorContext;
-import io.sipstack.actor.ActorRef;
-import io.sipstack.actor.Supervisor;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipMsgEvent;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author jonas@jonasborjesson.com
  * 
  */
-public class TransactionSupervisor implements Actor, Supervisor {
+public class TransactionSupervisor implements Actor {
 
     private final Logger logger = LoggerFactory.getLogger(TransactionSupervisor.class);
 
@@ -65,6 +58,7 @@ public class TransactionSupervisor implements Actor, Supervisor {
         return this.config;
     }
 
+    /*
     private TransactionActor ensureTransaction(final TransactionId id, final SipMsgEvent event) {
         final TransactionActor t = this.transactions.get(id);
         if (t != null) {
@@ -91,35 +85,10 @@ public class TransactionSupervisor implements Actor, Supervisor {
         this.transactions.put(id, newTransaction);
         return newTransaction;
     }
+    */
 
-    @Override
-    public void onEvent(final ActorContext ctx, final Event event) {
-        if (event.isSipMsgEvent()) {
-            final SipMsgEvent sipEvent = event.toSipMsgEvent();
-            final SipMessage msg = sipEvent.getSipMessage();
-            final TransactionId id = TransactionId.create(msg);
 
-            // because of the msg.getMethod()
-            // if (this.logger.isDebugEnabled()) {
-            // this.logger.debug("[{}] Processing SIP event for transaction {} for an {}", this, id,
-            // msg.getMethod());
-            // }
-
-            final TransactionActor t = ensureTransaction(id, sipEvent);
-            if (t != null) {
-                ctx.replace(t);
-            }
-            ctx.forward(event);
-        }
-    }
-
-    @Override
-    public Supervisor getSupervisor() {
-        // we are a supervisor so we don't have one ourselves.
-        return null;
-    }
-
-    @Override
+    /**
     public void killChild(final Actor actor) {
         try {
             // can only be a TransactionActor
@@ -136,11 +105,19 @@ public class TransactionSupervisor implements Actor, Supervisor {
             throw e;
         }
     }
+     */
+
 
     @Override
-    public ActorRef self() {
-        // TODO Auto-generated method stub
-        return null;
-    }
+    public void onReceive(final Object msg) {
+        final Event event = (Event)msg;
+        if (event.isSipMsgEvent()) {
+            final SipMsgEvent sipEvent = event.toSipMsgEvent();
+            final SipMessage sipMsg = sipEvent.getSipMessage();
+            final TransactionId id = TransactionId.create(sipMsg);
 
+            // final TransactionActor t = ensureTransaction(id, sipEvent);
+            // TODO: forward the message to the next dude
+        }
+    }
 }

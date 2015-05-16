@@ -9,19 +9,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
+import io.hektor.config.HektorConfiguration;
+import io.hektor.core.ActorRef;
+import io.hektor.core.Hektor;
+import io.hektor.core.Props;
+import io.hektor.core.RoutingLogic;
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.actor.ActorRef;
-import io.sipstack.actor.ActorSystem;
-import io.sipstack.actor.WorkerContext;
-import io.sipstack.application.ApplicationSupervisor;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.NetworkInterfaceDeserializer;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.net.NetworkLayer;
+import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 import io.sipstack.server.SipBridgeHandler;
-import io.sipstack.transaction.impl.TransactionSupervisor;
 import io.sipstack.transport.TransportSupervisor;
 import io.sipstack.utils.Generics;
 import org.slf4j.Logger;
@@ -32,8 +34,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -126,9 +126,14 @@ public abstract class Application<T extends Configuration> {
             final List<NetworkInterfaceConfiguration> ifs = sipConfig.getNetworkInterfaces();
             final NetworkLayer.Builder networkBuilder = NetworkLayer.with(ifs);
 
-            final ActorSystem system = configureActorSystem(config);
-            final SipBridgeHandler handler = new SipBridgeHandler(system);
+            // configure Hektor
+            final HektorConfiguration hektorConfig = config.getHektorConfiguration();
+            final Hektor hektor = Hektor.withName("hello").withConfiguration(hektorConfig).build();
+            final ActorRef transportSupervisorRef = configureActorSystem(hektor);
+
+            final SipBridgeHandler handler = new SipBridgeHandler(transportSupervisorRef);
             networkBuilder.serverHandler(handler);
+
             final NetworkLayer server = networkBuilder.build();
             server.start();
 
@@ -157,7 +162,7 @@ public abstract class Application<T extends Configuration> {
         // 2. Calls run on itself
         // 3. Runs a EnvironmentCommand that will:
         // 3a. Create a new Environment
-        // 3a. Call bootsrap.run(configuration, environment)
+        // 3a. Call ootsrap.run(configuration, environment)
         // 3a. Call application.run(configuration, environment);
         // 3a. call run(configuration, environment) on itself.
 
@@ -173,51 +178,31 @@ public abstract class Application<T extends Configuration> {
 
     }
 
-    private ActorSystem configureActorSystem(final Configuration config) {
-        final SipConfiguration sipConfig = config.getSipConfiguration();
-        final int noOfWorkers = sipConfig.getWorkerThreads();
+    private ActorRef configureActorSystem(final Hektor hektor) throws NoSuchMethodException {
 
-        final ActorRef systemRef = ActorRef.withWorkerPool(-1).withName("/").withNoOfWorkers(noOfWorkers).build();
-        final ActorSystem.Builder builder = ActorSystem.withName("sipstack.io");
-        builder.withActorRef(systemRef);
-
-        for (int i = 0; i < noOfWorkers; ++i) {
-
-            // TODO: may want this to be configurable as well.
-            final ActorRef refTransport = ActorRef
-                    .withWorkerPool(i)
-                    .withParent(systemRef)
-                    .withName("transportSupervisor")
-                    .withNoOfWorkers(noOfWorkers)
-                    .build();
-            final TransportSupervisor transportSupervisor = new TransportSupervisor(refTransport);
-
-            final ActorRef refTransaction = ActorRef
-                    .withWorkerPool(i)
-                    .withParent(systemRef)
-                    .withName("transactionSupervisor")
-                    .withNoOfWorkers(noOfWorkers)
-                    .build();
-            final TransactionSupervisor transactionSupervisor = new TransactionSupervisor(sipConfig.getTransaction());
-
-            final ActorRef refApplication = ActorRef
-                    .withWorkerPool(i)
-                    .withParent(systemRef)
-                    .withName("applicationSupervisor")
-                    .withNoOfWorkers(noOfWorkers)
-                    .build();
-            final ApplicationSupervisor applicationSupervisor = new ApplicationSupervisor(refApplication, getApplicationMapper());
-
-            // TODO: should probably be configurable as well
-            final BlockingQueue<Runnable> jobQueue = new LinkedBlockingQueue<Runnable>(100);
-
-            final WorkerContext.Builder wcBuilder =
-                    WorkerContext.withDefaultChain(transportSupervisor, transactionSupervisor, applicationSupervisor);
-            wcBuilder.withQueue(jobQueue);
-            builder.withWorkerContext(wcBuilder.build());
+        // The transport supervisor is responsible for maintaining flows etc.
+        // Hence it is responsible for keeping track of connections and everything
+        // regarding the "last mile".
+        Hektor.RouterBuilder routerBuilder = hektor.routerWithName("transport-router");
+        routerBuilder.withRoutingLogic(new SipMessageRoutingLogic());
+        for (int i = 0; i < 4; ++i) {
+            final Props props = Props.forActor(TransportSupervisor.class).build();
+            final ActorRef ref = hektor.actorOf(props, "transport-" + i);
+            routerBuilder.withRoutee(ref);
         }
 
-        return builder.build();
+        return routerBuilder.build();
+    }
+
+    private static class SipMessageRoutingLogic implements RoutingLogic {
+
+        @Override
+        public ActorRef select(final Object msg, final List<ActorRef> routees) {
+            final SipMessageEvent sipMsgEvent = (SipMessageEvent)msg;
+            final ConnectionId id = sipMsgEvent.getConnection().id();
+            // System.err.println("Selecting routee based on " + id);
+            return routees.get(Math.abs(id.hashCode() % routees.size()));
+        }
     }
 
     /**

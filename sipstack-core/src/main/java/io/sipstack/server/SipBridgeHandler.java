@@ -3,10 +3,10 @@
  */
 package io.sipstack.server;
 
+import io.hektor.core.ActorRef;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.sipstack.actor.ActorSystem;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 /**
@@ -14,20 +14,20 @@ import io.sipstack.netty.codec.sip.SipMessageEvent;
  */
 @Sharable
 public class SipBridgeHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
-    
-    private final ActorSystem system;
+
+    private final ActorRef actor;
 
     /**
      * 
      */
-    public SipBridgeHandler(final ActorSystem system) {
-        this.system = system;
+    public SipBridgeHandler(final ActorRef actor) {
+        this.actor = actor;
     }
 
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent msg) throws Exception {
-        this.system.receive(msg);
+        actor.tellAnonymously(msg);
     }
 
 }

@@ -4,7 +4,6 @@
 package io.sipstack.event;
 
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.actor.Key;
 
 import java.time.Duration;
 
@@ -97,12 +96,6 @@ public interface TimerEvent extends Event {
         @Override
         public Duration getDelay() {
             return this.delay;
-        }
-
-        @Override
-        public Key key() {
-            // return event.key();
-            return null;
         }
 
         @Override

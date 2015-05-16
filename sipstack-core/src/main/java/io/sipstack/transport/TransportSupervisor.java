@@ -3,18 +3,13 @@
  */
 package io.sipstack.transport;
 
-import static io.sipstack.actor.ActorUtils.safePreStart;
-import io.sipstack.actor.Actor;
-import io.sipstack.actor.ActorContext;
-import io.sipstack.actor.ActorRef;
-import io.sipstack.actor.Supervisor;
-import io.sipstack.event.Event;
-import io.sipstack.event.IOEvent;
-import io.sipstack.netty.codec.sip.Connection;
+import io.hektor.core.Actor;
+import io.hektor.core.ActorRef;
+import io.hektor.core.Props;
+import io.sipstack.event.IOReadEvent;
 import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -22,38 +17,15 @@ import java.util.Optional;
  * 
  * @author jonas@jonasborjesson.com
  */
-public class TransportSupervisor implements Actor, Supervisor {
-
-    private final Map<ConnectionId, FlowActor> flows = new HashMap<>(100, 0.75f);
-
-    private final ActorRef self;
+public class TransportSupervisor implements Actor {
 
     /**
      * 
      */
-    public TransportSupervisor(final ActorRef self) {
-        this.self = self;
+    public TransportSupervisor() {
     }
 
-    @Override
-    public void killChild(final Actor actor) {
-        // TODO Auto-generated method stub
-    }
-
-    @Override
-    public void onEvent(final ActorContext ctx, final Event event) {
-        try {
-            final IOEvent ioEvent = event.toIOEvent();
-            final FlowActor flow = ensureFlow(ioEvent.getConnection());
-            ctx.replace(flow);
-            ctx.forward(event);
-        } catch (final ClassCastException e) {
-            // no???
-            e.printStackTrace();
-            throw e;
-        }
-    }
-
+    /*
     private FlowActor ensureFlow(final Connection connection) {
         final ConnectionId id = connection.id();
         final FlowActor flow = this.flows.get(id);
@@ -71,11 +43,29 @@ public class TransportSupervisor implements Actor, Supervisor {
         this.flows.put(id, newFlow);
         return newFlow;
     }
+    */
 
     @Override
-    public ActorRef self() {
-        return this.self;
-    }
+    public void onReceive(final Object msg) {
+        if (SipMessageEvent.class.isAssignableFrom(msg.getClass())) {
+            final SipMessageEvent sipEvent = (SipMessageEvent)msg;
+            final ConnectionId id = sipEvent.getConnection().id();
+            final String idStr = id.encodeAsString();
+            final Optional<ActorRef> child = ctx().child(idStr);
+            final ActorRef flow = child.orElseGet(() ->  {
+                final Props props = Props.forActor(FlowActor.class)
+                        .withConstructorArg(sipEvent.getConnection())
+                        .build();
+                return ctx().actorOf(idStr, props);
+            });
 
+            flow.tell(IOReadEvent.create(sipEvent), self());
+
+            // System.err.println("[" + Thread.currentThread().getName() + "] [TransportSupervisor] onRecieve");
+            System.err.println(Thread.currentThread().getName() + " " + this);
+        } else {
+            System.err.println("[TransportSupervisor] No clue what I got!!! ");
+        }
+    }
 
 }

@@ -4,7 +4,6 @@
 package io.sipstack.event;
 
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.actor.Key;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 
@@ -29,18 +28,19 @@ public interface IOReadEvent<T> extends IOEvent {
 
     static IOReadEvent<SipMessage> create(final SipMessageEvent event) {
         final Connection connection = event.getConnection();
-        final Key key = Key.withConnectionId(connection.id());
         final long arrivalTime = event.getArrivalTime();
         final SipMessage msg = event.getMessage();
-        return new IOSipReadEvent(arrivalTime, key, connection, msg);
+        return new IOSipReadEvent(arrivalTime, connection, msg);
     }
 
     static final class IOSipReadEvent extends IOEvent.BaseIOEvent implements IOReadEvent<SipMessage> {
 
         private final SipMessage msg;
 
-        private IOSipReadEvent(final long arrivalTime, final Key key, final Connection connection, final SipMessage msg) {
-            super(arrivalTime, key, connection);
+        // private IOSipReadEvent(final long arrivalTime, final Key key, final Connection connection, final SipMessage msg) {
+        private IOSipReadEvent(final long arrivalTime, final Connection connection, final SipMessage msg) {
+            // super(arrivalTime, key, connection);
+            super(arrivalTime, connection);
             this.msg = msg;
         }
 

@@ -3,7 +3,6 @@
  */
 package io.sipstack.event;
 
-import io.sipstack.actor.Key;
 import io.sipstack.netty.codec.sip.Connection;
 
 /**
@@ -41,18 +40,14 @@ public interface IOEvent extends Event {
     static abstract class BaseIOEvent implements IOEvent {
 
         private final Connection connection;
-        private final Key key;
+        // private final Key key;
         private final long arrivalTime;
 
-        protected BaseIOEvent(final long arrivalTime, final Key key, final Connection connection) {
+        // protected BaseIOEvent(final long arrivalTime, final Key key, final Connection connection) {
+        protected BaseIOEvent(final long arrivalTime, final Connection connection) {
             this.arrivalTime = arrivalTime;
-            this.key = key;
+            // this.key = key;
             this.connection = connection;
-        }
-
-        @Override
-        public final Key key() {
-            return this.key;
         }
 
         @Override

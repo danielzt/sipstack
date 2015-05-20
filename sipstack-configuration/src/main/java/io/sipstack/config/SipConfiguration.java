@@ -3,13 +3,12 @@
  */
 package io.sipstack.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.pkts.packet.sip.impl.PreConditions;
 
 import java.util.Collections;
 import java.util.List;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * The base class for all SIP related configuration options.
@@ -24,32 +23,39 @@ public class SipConfiguration {
     @JsonProperty("interface")
     private List<NetworkInterfaceConfiguration> networkInterfaces;
 
-    @JsonProperty()
+    @JsonProperty
     private final TransactionLayerConfiguration transaction = new TransactionLayerConfiguration();
-    
-    @JsonProperty()
+
+    @JsonProperty
+    private final TransportLayerConfiguration transport = new TransportLayerConfiguration();
+
+    @JsonProperty
     private int workerThreads = 4;
 
     @JsonIgnore
     public List<NetworkInterfaceConfiguration> getNetworkInterfaces() {
-        if (this.networkInterfaces == null) {
+        if (networkInterfaces == null) {
             return Collections.emptyList();
         }
-        return this.networkInterfaces;
+        return networkInterfaces;
     }
 
     /**
      * @return the transaction
      */
     public TransactionLayerConfiguration getTransaction() {
-        return this.transaction;
+        return transaction;
+    }
+
+    public TransportLayerConfiguration getTransport() {
+        return transport;
     }
 
     /**
      * @return the workerThreads
      */
     public int getWorkerThreads() {
-        return this.workerThreads;
+        return workerThreads;
     }
 
     /**

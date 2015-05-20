@@ -1,17 +1,11 @@
-/**
- * 
- */
 package io.sipstack.event;
 
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 /**
- * An event representing a read event.
- * 
  * @author jonas@jonasborjesson.com
  */
-public interface IOReadEvent<T> extends IOEvent<T> {
+public interface IOWriteEvent<T> extends IOEvent<T> {
 
     @Override
     default boolean isIOReadEvent() {
@@ -23,20 +17,19 @@ public interface IOReadEvent<T> extends IOEvent<T> {
      * Typically, the TransportSupervisor will convert the raw sip message event
      * into an IOReadEvent instead, which the rest of the stack is processing.
      *
-     * @param event
      * @return
      */
-    static IOReadEvent<SipMessage> create(final SipMessageEvent event) {
-        final long arrivalTime = event.getArrivalTime();
-        final SipMessage msg = event.getMessage();
-        return new IOSipReadEvent(arrivalTime, msg);
+    static IOWriteEvent<SipMessage> create(final SipMessage msg) {
+        // TODO: do not use System but rather a clock interface
+        final long arrivalTime = System.currentTimeMillis();
+        return new IOSipWriteEvent(arrivalTime, msg);
     }
 
-    static final class IOSipReadEvent extends IOEvent.BaseIOEvent<SipMessage> implements IOReadEvent<SipMessage> {
+    static final class IOSipWriteEvent extends IOEvent.BaseIOEvent<SipMessage> implements IOWriteEvent<SipMessage> {
 
         private final SipMessage msg;
 
-        private IOSipReadEvent(final long arrivalTime, final SipMessage msg) {
+        private IOSipWriteEvent(final long arrivalTime, final SipMessage msg) {
             super(arrivalTime);
             this.msg = msg;
         }
@@ -47,7 +40,7 @@ public interface IOReadEvent<T> extends IOEvent<T> {
         }
 
         @Override
-        public boolean isSipReadEvent() {
+        public boolean isSipWriteEvent() {
             return true;
         }
 
@@ -57,7 +50,7 @@ public interface IOReadEvent<T> extends IOEvent<T> {
         }
 
         @Override
-        public IOReadEvent<SipMessage> toSipIOReadEvent() {
+        public IOWriteEvent<SipMessage> toSipIOWriteEvent() {
             return this;
         }
 
@@ -65,7 +58,5 @@ public interface IOReadEvent<T> extends IOEvent<T> {
         public SipMessage getObject() {
             return msg;
         }
-
     }
-
 }

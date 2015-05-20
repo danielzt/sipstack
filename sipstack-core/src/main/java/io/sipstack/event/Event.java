@@ -3,6 +3,8 @@
  */
 package io.sipstack.event;
 
+import io.pkts.packet.sip.SipMessage;
+
 /**
  * Represents an {@link Event} in the system.
  * 
@@ -30,10 +32,56 @@ public interface Event {
      */
     long getArrivalTime();
 
+    default boolean isInitEvent() {
+        return false;
+    }
+
+    /**
+     * Check whether this is some sort of IO Event or not.
+     * @return
+     */
     default boolean isIOEvent() {
         return false;
     }
 
+    /**
+     * Check whether this is an IO Read event of some sort.
+     *
+     * @return
+     */
+    default boolean isIOReadEvent() {
+        return false;
+    }
+
+
+    /**
+     * Indicates that this message is a SIP read or write IO Event.
+     *
+     * @return
+     */
+    default boolean isSipIOEvent() {
+        return false;
+    }
+
+    /**
+     * Specific method for checking whether this is an IO read event carrying
+     * a SIP message.
+     *
+     * @return
+     */
+    default boolean isSipReadEvent() {
+        return false;
+    }
+
+    default boolean isSipWriteEvent() {
+        return false;
+    }
+
+    /**
+     * TODO: this should perhaps be a SipWriteEvent instead.
+     *
+     * @return
+     */
     default boolean isSipMsgEvent() {
         return false;
     }
@@ -115,6 +163,18 @@ public interface Event {
 
     default SipMsgEvent toSipMsgEvent() {
         throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + SipMsgEvent.class.getName());
+    }
+
+    default IOEvent<SipMessage> toSipIOEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + IOEvent.class.getName());
+    }
+
+    default IOWriteEvent<SipMessage> toSipIOWriteEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + IOEvent.class.getName());
+    }
+
+    default IOReadEvent<SipMessage> toSipIOReadEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + IOEvent.class.getName());
     }
 
     default IOEvent toIOEvent() {

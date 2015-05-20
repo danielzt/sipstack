@@ -3,33 +3,25 @@
  */
 package io.sipstack.event;
 
-import io.sipstack.netty.codec.sip.Connection;
-
 /**
  * Generic class for all events concerning IO events.
  * 
  * @author jonas@jonasborjesson.com
  */
-public interface IOEvent extends Event {
+public interface IOEvent<T> extends Event {
 
     /**
-     * The connection on which this IO event occured.
-     * 
+     * Get the object that triggered this IOEvent to occur. Typically, this
+     * could be a SIP message that was just read off of the network but
+     * could also be an error when trying to write to a network socket.
+     *
      * @return
      */
-    Connection getConnection();
+    T getObject();
 
     @Override
     default boolean isIOEvent() {
         return true;
-    }
-
-    default boolean isReadEvent() {
-        return false;
-    }
-
-    default boolean isSipReadEvent() {
-        return false;
     }
 
     @Override
@@ -37,27 +29,17 @@ public interface IOEvent extends Event {
         return this;
     }
 
-    static abstract class BaseIOEvent implements IOEvent {
+    abstract class BaseIOEvent<T> implements IOEvent<T> {
 
-        private final Connection connection;
-        // private final Key key;
         private final long arrivalTime;
 
-        // protected BaseIOEvent(final long arrivalTime, final Key key, final Connection connection) {
-        protected BaseIOEvent(final long arrivalTime, final Connection connection) {
+        protected BaseIOEvent(final long arrivalTime) {
             this.arrivalTime = arrivalTime;
-            // this.key = key;
-            this.connection = connection;
         }
 
         @Override
         public final long getArrivalTime() {
             return arrivalTime;
-        }
-
-        @Override
-        public final Connection getConnection() {
-            return this.connection;
         }
 
     }

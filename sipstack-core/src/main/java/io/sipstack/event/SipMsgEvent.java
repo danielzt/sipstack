@@ -9,8 +9,10 @@ import io.pkts.packet.sip.SipResponse;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 /**
- * @author jonas@jonasborjesson.com
+ * TODO: I think this may have to change to an IOWriteEvent instead,
+ *       which currently doesnt exist...
  *
+ * @author jonas@jonasborjesson.com
  */
 public class SipMsgEvent implements Event {
 

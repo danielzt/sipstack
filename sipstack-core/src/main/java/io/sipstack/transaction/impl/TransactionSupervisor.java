@@ -4,10 +4,13 @@
 package io.sipstack.transaction.impl;
 
 import io.hektor.core.Actor;
+import io.hektor.core.ActorRef;
+import io.hektor.core.Props;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
-import io.sipstack.event.SipMsgEvent;
+import io.sipstack.event.IOEvent;
+import io.sipstack.event.InitEvent;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import org.slf4j.Logger;
@@ -15,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -27,6 +31,10 @@ public class TransactionSupervisor implements Actor {
     private final Map<TransactionId, TransactionActor> transactions = new HashMap<>(100, 0.75f);
 
     private final TransactionLayerConfiguration config;
+
+    private ActorRef downstreamActor;
+
+    private ActorRef upstreamActor;
 
     /**
      * 
@@ -111,13 +119,34 @@ public class TransactionSupervisor implements Actor {
     @Override
     public void onReceive(final Object msg) {
         final Event event = (Event)msg;
-        if (event.isSipMsgEvent()) {
-            final SipMsgEvent sipEvent = event.toSipMsgEvent();
-            final SipMessage sipMsg = sipEvent.getSipMessage();
-            final TransactionId id = TransactionId.create(sipMsg);
 
-            // final TransactionActor t = ensureTransaction(id, sipEvent);
-            // TODO: forward the message to the next dude
+        if (event.isSipIOEvent()) {
+            final IOEvent<SipMessage> ioEvent = (IOEvent<SipMessage>)event.toIOEvent();
+            final SipMessage sipMsg = ioEvent.getObject();
+            final TransactionId id = TransactionId.create(sipMsg);
+            final String idStr = id.toString();
+            final Optional<ActorRef> child = ctx().child(idStr);
+            final ActorRef transaction = child.orElseGet(() -> {
+
+                // There is also a chance that the transaction is gone and we have
+                // received an inbound event for a response, which then
+                // should have matched a server transaction.
+                // TODO: deal with this.
+                Class<? extends Actor> transactionClass = event.isIOReadEvent() && sipMsg.isRequest() ? InviteServerTransactionActor.class : null;
+                final Props props = Props.forActor(transactionClass)
+                        .withConstructorArg(upstreamActor)
+                        .withConstructorArg(id)
+                        .withConstructorArg(ioEvent)
+                        .withConstructorArg(config)
+                        .build();
+                return ctx().actorOf(idStr, props);
+            });
+
+            // forward the message
+            transaction.tell(event, sender());
+        } else if (event.isInitEvent()) {
+            downstreamActor = ((InitEvent)event).downstreamSupervisor;
+            upstreamActor = ((InitEvent)event).upstreamSupervisor;
         }
     }
 }

@@ -136,7 +136,7 @@ public abstract class Application<T extends Configuration> {
             // configure Hektor
             final HektorConfiguration hektorConfig = config.getHektorConfiguration();
             final Hektor hektor = Hektor.withName("hello").withConfiguration(hektorConfig).build();
-            final ActorRef transportSupervisorRef = configureActorSystem(config, hektor);
+            final ActorRef transportSupervisorRef = ActorSystemBuilder.withConfig(config).withHektor(hektor).build();
 
             final SipBridgeHandler handler = new SipBridgeHandler(transportSupervisorRef);
             networkBuilder.serverHandler(handler);
@@ -186,102 +186,116 @@ public abstract class Application<T extends Configuration> {
     }
 
     /**
-     * Setup the actor chains for everything needed by the container. Primarily, this is to setup
-     * the SIP related chains, going from the transport layer, to transaction,
-     * to dialog, to application etc.
+     * Builder to setup the actor chains for everything needed by the container.
+     * Primarily, this is to setup the SIP related chains, going from the
+     * transport layer, to transaction, to dialog, to application etc.
      *
-     * @param config
-     * @param hektor
-     * @return
-     * @throws NoSuchMethodException
      */
-    private ActorRef configureActorSystem(final T config, final Hektor hektor) throws NoSuchMethodException {
+    public static class ActorSystemBuilder {
 
-        final int noOfRoutees = 4;
+        private final Configuration config;
+        private Hektor hektor;
 
-        // The transport supervisor is responsible for maintaining flows etc.
-        // Hence it is responsible for keeping track of connections and everything
-        // regarding the "last mile".
-        Hektor.RouterBuilder routerBuilder = hektor.routerWithName("transport-router");
-        routerBuilder.withRoutingLogic(new ConnectionRoutingLogic());
-
-
-        Hektor.RouterBuilder transactionRouterBuilder = hektor.routerWithName("transaction-router");
-        transactionRouterBuilder.withRoutingLogic(new SipMessageRoutingLogic());
-
-        // TODO: the routing logic for the application router should be configurable
-        // by the user. Default will be on dialog or something. Currently it will be on
-        // Call-ID.
-        Hektor.RouterBuilder applicationRouterBuilder = hektor.routerWithName("application-router");
-        applicationRouterBuilder.withRoutingLogic(new SipMessageRoutingLogic());
-
-        // this is kind of stupid but the various supervisors
-        // need to know about their "upstream" and "downstream"
-        // partner so that new requests can correctly be established
-        // through the chain which requires to go through each supervisor.
-        // However, since they are all dependent on each other, we cannot
-        // pass it in through the constructor so will have to do it using a
-        // init-message.
-        final ActorRef[] transportActors = new ActorRef[noOfRoutees];
-        final ActorRef[] transactionActors = new ActorRef[noOfRoutees];
-        final ActorRef[] applicationActors = new ActorRef[noOfRoutees];
-
-
-        for (int i = 0; i < noOfRoutees; ++i) {
-            final Props props = Props.forActor(TransportSupervisor.class)
-                    .withConstructorArg(config.getSipConfiguration().getTransport())
-                    .build();
-            final ActorRef transportActor = hektor.actorOf(props, "transport-" + i);
-            transportActors[i] = transportActor;
-            routerBuilder.withRoutee(transportActor);
-
-
-            final TransactionLayerConfiguration transactionConfig = config.getSipConfiguration().getTransaction();
-            final Props transactionProps = Props.forActor(TransactionSupervisor.class)
-                    .withConstructorArg(transactionConfig)
-                    .build();
-            final ActorRef transactionActor = hektor.actorOf(transactionProps, "transaction-" + i);
-            transactionActors[i] = transactionActor;
-            transactionRouterBuilder.withRoutee(transactionActor);
-
-            final Props appProps = Props.forActor(ApplicationSupervisor.class).build();
-            final ActorRef applicationActor = hektor.actorOf(appProps, "application-" + i);
-            applicationActors[i] = applicationActor;
-            applicationRouterBuilder.withRoutee(applicationActor);
+        public static ActorSystemBuilder withConfig(final Configuration config) {
+            return new ActorSystemBuilder(config);
         }
 
-        final ActorRef transportRouter = routerBuilder.build();
-        final ActorRef transactionRouter = transactionRouterBuilder.build();
-        final ActorRef applicationRouter = applicationRouterBuilder.build();
-
-        // Transport Supervisors do not have a downstream element
-        // but the upstream is the transaction router
-        final InitEvent initTransportActors = new InitEvent(null, transactionRouter);
-
-        // Transaction Supervisors are connected to the the transport supervisor
-        // in the downstream direction and the application router in the upstream
-        // direction.
-        final InitEvent initTransactionActors = new InitEvent(transportRouter, applicationRouter);
-
-        // TODO: Want to insert dialog support here as well as the TU layer
-
-        // Application Supervisors are at the end of the line so they do not have
-        // an upstream element but in the opposite direction they will talk
-        // to the transaction supervisors
-        final InitEvent initApplicationActors = new InitEvent(transactionRouter, null);
-
-
-        for (int i = 0; i < noOfRoutees; ++i) {
-            transportActors[i].tellAnonymously(initTransportActors);
-            transactionActors[i].tellAnonymously(initTransactionActors);
-            applicationActors[i].tellAnonymously(initApplicationActors);
+        private ActorSystemBuilder(final Configuration config) {
+            this.config = config;
         }
 
-        // TODO: need to hook up stuff to the TransactionSupervisor
-        // via a router. However, they both need to know about each
-        // other, which is kind of annoying.
+        public ActorSystemBuilder withHektor(final Hektor hektor) {
+            this.hektor = hektor;
+            return this;
+        }
 
-        return transportRouter;
+        public ActorRef build() {
+            final int noOfRoutees = 4;
+
+            // The transport supervisor is responsible for maintaining flows etc.
+            // Hence it is responsible for keeping track of connections and everything
+            // regarding the "last mile".
+            Hektor.RouterBuilder routerBuilder = hektor.routerWithName("transport-router");
+            routerBuilder.withRoutingLogic(new ConnectionRoutingLogic());
+
+
+            Hektor.RouterBuilder transactionRouterBuilder = hektor.routerWithName("transaction-router");
+            transactionRouterBuilder.withRoutingLogic(new SipMessageRoutingLogic());
+
+            // TODO: the routing logic for the application router should be configurable
+            // by the user. Default will be on dialog or something. Currently it will be on
+            // Call-ID.
+            Hektor.RouterBuilder applicationRouterBuilder = hektor.routerWithName("application-router");
+            applicationRouterBuilder.withRoutingLogic(new SipMessageRoutingLogic());
+
+            // this is kind of stupid but the various supervisors
+            // need to know about their "upstream" and "downstream"
+            // partner so that new requests can correctly be established
+            // through the chain which requires to go through each supervisor.
+            // However, since they are all dependent on each other, we cannot
+            // pass it in through the constructor so will have to do it using a
+            // init-message.
+            final ActorRef[] transportActors = new ActorRef[noOfRoutees];
+            final ActorRef[] transactionActors = new ActorRef[noOfRoutees];
+            final ActorRef[] applicationActors = new ActorRef[noOfRoutees];
+
+
+            for (int i = 0; i < noOfRoutees; ++i) {
+                final Props props = Props.forActor(TransportSupervisor.class)
+                        .withConstructorArg(config.getSipConfiguration().getTransport())
+                        .build();
+                final ActorRef transportActor = hektor.actorOf(props, "transport-" + i);
+                transportActors[i] = transportActor;
+                routerBuilder.withRoutee(transportActor);
+
+
+                final TransactionLayerConfiguration transactionConfig = config.getSipConfiguration().getTransaction();
+                final Props transactionProps = Props.forActor(TransactionSupervisor.class)
+                        .withConstructorArg(transactionConfig)
+                        .build();
+                final ActorRef transactionActor = hektor.actorOf(transactionProps, "transaction-" + i);
+                transactionActors[i] = transactionActor;
+                transactionRouterBuilder.withRoutee(transactionActor);
+
+                final Props appProps = Props.forActor(ApplicationSupervisor.class).build();
+                final ActorRef applicationActor = hektor.actorOf(appProps, "application-" + i);
+                applicationActors[i] = applicationActor;
+                applicationRouterBuilder.withRoutee(applicationActor);
+            }
+
+            final ActorRef transportRouter = routerBuilder.build();
+            final ActorRef transactionRouter = transactionRouterBuilder.build();
+            final ActorRef applicationRouter = applicationRouterBuilder.build();
+
+            // Transport Supervisors do not have a downstream element
+            // but the upstream is the transaction router
+            final InitEvent initTransportActors = new InitEvent(null, transactionRouter);
+
+            // Transaction Supervisors are connected to the the transport supervisor
+            // in the downstream direction and the application router in the upstream
+            // direction.
+            final InitEvent initTransactionActors = new InitEvent(transportRouter, applicationRouter);
+
+            // TODO: Want to insert dialog support here as well as the TU layer
+
+            // Application Supervisors are at the end of the line so they do not have
+            // an upstream element but in the opposite direction they will talk
+            // to the transaction supervisors
+            final InitEvent initApplicationActors = new InitEvent(transactionRouter, null);
+
+
+            for (int i = 0; i < noOfRoutees; ++i) {
+                transportActors[i].tellAnonymously(initTransportActors);
+                transactionActors[i].tellAnonymously(initTransactionActors);
+                applicationActors[i].tellAnonymously(initApplicationActors);
+            }
+
+            // TODO: need to hook up stuff to the TransactionSupervisor
+            // via a router. However, they both need to know about each
+            // other, which is kind of annoying.
+
+            return transportRouter;
+        }
     }
 
     private static class ConnectionRoutingLogic implements RoutingLogic {

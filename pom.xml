@@ -270,6 +270,25 @@
    </dependency>
 
     <!-- Test Dependencies -->
+
+    <!-- for loading pcaps we use for driving
+         various test scenarios -->
+    <dependency>
+      <groupId>io.pkts</groupId>
+      <artifactId>pkts-core</artifactId>
+      <version>${pkts.version}</version>
+      <type>jar</type>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>io.pkts</groupId>
+      <artifactId>pkts-streams</artifactId>
+      <version>${pkts.version}</version>
+      <type>jar</type>
+      <scope>test</scope>
+    </dependency>
+
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>

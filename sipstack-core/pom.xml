@@ -81,6 +81,17 @@
    </dependency>
 
     <!-- Test Dependencies -->
+
+    <dependency>
+      <groupId>io.pkts</groupId>
+      <artifactId>pkts-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.pkts</groupId>
+      <artifactId>pkts-streams</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>

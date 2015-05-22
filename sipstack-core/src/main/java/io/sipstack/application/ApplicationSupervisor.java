@@ -36,7 +36,6 @@ public final class ApplicationSupervisor implements Actor {
         final Event event = (Event)msg;
         if (event.isSipIOEvent()) {
             final SipMessage sip = event.toSipIOEvent().getObject();
-            System.err.println("[ApplicationSupervisor] Got msg: " + sip);
             final String appId = getApplicationIdentifier(sip);
 
             final Optional<ActorRef> child = ctx().child(appId);
@@ -52,7 +51,6 @@ public final class ApplicationSupervisor implements Actor {
             app.tell(event, sender());
 
         } else if (event.isInitEvent()) {
-            System.err.println("init event!!!");
             downstreamActor = ((InitEvent)event).downstreamSupervisor;
         } else {
         }

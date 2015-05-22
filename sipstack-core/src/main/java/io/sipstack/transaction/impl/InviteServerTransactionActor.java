@@ -186,11 +186,14 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
      */
     private final Consumer<Event> onEnterProceeding = event -> {
         if (config().isSend100TryingImmediately()) {
-            System.err.println("sending 100 trying right away");
-            final SipResponse response = getInitialInviteEvent().getObject().createResponse(100);
+            System.err.println("Sending 100 trying right away");
+            final SipMessage invite = getInitialInviteEvent().getObject();
+            if (invite.isAck()) {
+                System.err.println("What the fuck, this is an ACK!");
+            }
+            final SipResponse response = invite.createResponse(100);
             downstream.tell(IOWriteEvent.create(response), self());
         } else {
-            System.err.println("Scheduling 100 Trying");
             timer100Trying = ctx().scheduler().schedule(SipTimer.Trying, self(), self(), Duration.ofMillis(200));
         }
     };

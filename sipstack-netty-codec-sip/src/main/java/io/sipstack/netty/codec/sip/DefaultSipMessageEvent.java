@@ -23,6 +23,7 @@ public class DefaultSipMessageEvent implements SipMessageEvent {
         this.arrivalTime = arrivalTime;
     }
 
+
     @Override
     public Connection getConnection() {
         return this.connection;

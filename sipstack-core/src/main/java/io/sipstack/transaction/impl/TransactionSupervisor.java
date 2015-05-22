@@ -126,13 +126,33 @@ public class TransactionSupervisor implements Actor {
             final TransactionId id = TransactionId.create(sipMsg);
             final String idStr = id.toString();
             final Optional<ActorRef> child = ctx().child(idStr);
+
             final ActorRef transaction = child.orElseGet(() -> {
+
+                // if this is an ACK and we didn't find a transaction for this
+                // ACK that can only mean that this is an ACK to a 2xx response
+                // and therefore this ACK doesn't really have a transaction (an
+                // ACK goes in its own transaction for 2xx responses but ACK doesn't
+                // expect a response so therefore we will not actually create a new
+                // transaction for it)
+                if (sipMsg.isAck()) {
+                    return upstreamActor;
+                }
 
                 // There is also a chance that the transaction is gone and we have
                 // received an inbound event for a response, which then
                 // should have matched a server transaction.
                 // TODO: deal with this.
-                Class<? extends Actor> transactionClass = event.isIOReadEvent() && sipMsg.isRequest() ? InviteServerTransactionActor.class : null;
+                Class<? extends Actor> transactionClass = null;
+
+                if (event.isIOReadEvent() && sipMsg.isRequest()) {
+                    if (sipMsg.isInvite()) {
+                        transactionClass = InviteServerTransactionActor.class;
+                    } else {
+                        transactionClass = NonInviteServerTransactionActor.class;
+                    }
+                }
+
                 final Props props = Props.forActor(transactionClass)
                         .withConstructorArg(upstreamActor)
                         .withConstructorArg(id)

@@ -6,6 +6,7 @@ package io.sipstack.transaction.impl;
 import io.hektor.core.Actor;
 import io.hektor.core.ActorRef;
 import io.hektor.core.Props;
+import io.hektor.core.Terminated;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
@@ -115,11 +116,7 @@ public class TransactionSupervisor implements Actor {
     }
      */
 
-
-    @Override
-    public void onReceive(final Object msg) {
-        final Event event = (Event)msg;
-
+    private void processEvent(final Event event) {
         if (event.isSipIOEvent()) {
             final IOEvent<SipMessage> ioEvent = (IOEvent<SipMessage>)event.toIOEvent();
             final SipMessage sipMsg = ioEvent.getObject();
@@ -168,5 +165,16 @@ public class TransactionSupervisor implements Actor {
             downstreamActor = ((InitEvent)event).downstreamSupervisor;
             upstreamActor = ((InitEvent)event).upstreamSupervisor;
         }
+
+    }
+
+    @Override
+    public void onReceive(final Object msg) {
+        if (msg instanceof Event) {
+            processEvent((Event)msg);
+        } else if (msg instanceof Terminated) {
+            final Terminated terminated = (Terminated)msg;
+        }
+
     }
 }

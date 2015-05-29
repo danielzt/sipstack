@@ -33,6 +33,20 @@ public class TransportSupervisor implements Actor {
     @Override
     public void onReceive(final Object msg) {
 
+        /*
+        final SipMessageEvent sipEvent2 = (SipMessageEvent)msg;
+        final Connection connection = sipEvent2.getConnection();
+        final SipMessage sip = sipEvent2.getMessage();
+        if (!sip.isAck()) {
+            connection.send(sip.createResponse(200));
+        }
+
+        if (true) {
+            return;
+        }
+        */
+
+
         // Anything that are raw SipMessageEvent is only coming from
         // the sip support of netty, i.e., they are inbound so find
         // a flow and send the message to it.

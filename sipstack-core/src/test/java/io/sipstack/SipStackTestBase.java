@@ -18,14 +18,22 @@ import io.pkts.streams.StreamListener;
 import io.pkts.streams.impl.DefaultStreamHandler;
 import io.sipstack.config.Configuration;
 import io.sipstack.core.Application;
+import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.timers.SipTimer;
 import org.junit.After;
 import org.junit.Before;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
+
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.*;
 
 
 /**
@@ -41,6 +49,13 @@ public class SipStackTestBase {
      * The actor that is the entry into the entire stack.
      */
     protected ActorRef actor;
+
+    /**
+     * This is the scheduler we will use, which will not actually schedule anything :-)
+     */
+    protected MockScheduler scheduler;
+
+    protected MockConnection connection;
 
     /**
      * Default requests and responses that belongs to the same dialog. These
@@ -70,19 +85,25 @@ public class SipStackTestBase {
         // final HektorConfiguration hektorConfig = config.getHektorConfiguration();
         final HektorConfiguration hektorConfig = loadConfiguration("default_hektor_config.yaml");
 
-        // configure the dispatcher
-        // final WorkerThreadExecutorConfig workerConfig = (new WorkerThreadExecutorConfig.Builder()).withNoOfWorkers(4).build();
-        // final Builder dispatchBuilder =  new Builder();
-        // dispatchBuilder.withExecutor("worker-thread-executor").withThroughput(4).withWorkerThreadExecutor(workerConfig);
-        // final Map<String, DispatcherConfiguration> dispatchers = new HashMap<>();
-        // final DispatcherConfiguration defaultDispatcher = dispatchBuilder.build();
-        // hektorConfig.dispatchers(dispatchers);
-
-
-
-        hektor = Hektor.withName("hello").withConfiguration(hektorConfig).build();
+        scheduler = new MockScheduler(new CountDownLatch(1));
+        hektor = Hektor.withName("hello").withConfiguration(hektorConfig).withScheduler(scheduler).build();
         actor = Application.ActorSystemBuilder.withConfig(config).withHektor(hektor).build();
+
+        final ConnectionId id = createConnectionId(Transport.udp, "10.36.10.100", 5060, "192.168.0.100", 5090);
+        connection = new MockConnection(id);
     }
+
+    /**
+     * Convenience method for creating a new connection id.
+     */
+    public ConnectionId createConnectionId(final Transport protocol, final String localIp, final int localPort,
+                                            final String remoteIp, final int remotePort) {
+        final InetSocketAddress localAddress = new InetSocketAddress(localIp, localPort);
+        final InetSocketAddress remoteAddress = new InetSocketAddress(remoteIp, remotePort);
+        return ConnectionId.create(protocol, localAddress, remoteAddress);
+    }
+
+
 
     public  HektorConfiguration loadConfiguration(final String resource) throws Exception {
         final InputStream stream = SipStackTestBase.class.getResourceAsStream(resource);
@@ -145,5 +166,35 @@ public class SipStackTestBase {
 
     @After
     public void tearDown() throws Exception {
+    }
+
+
+    /**
+     * Check so that the expected response indeed was sent. This method assumes that the default connection
+     * object is being used and that the response that you are expected is the first one in the sent list as stored
+     * in the mock connection.
+     *
+     * @param method
+     * @param status
+     */
+    protected void assertResponse(final String method, int status) throws InterruptedException {
+        // wait until the latch releases which then indicates
+        // that we have received at the expected response(s).
+        connection.latch().await();
+        final SipMessage msg = connection.consume();
+        assertThat(msg.getMethod().toString(), is(method));
+        assertThat(msg.toResponse().getStatus(), is(status));
+    }
+
+    /**
+     * There are a lot of various sip timers that are being scheduled and this
+     * method helps you ensure that a particular timer was indeed scheduled.
+     *
+     * @param timer
+     * @return the cancellable that we just asserted actually exists and is correct.
+     */
+    protected MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
+        scheduler.latch.await();
+        return scheduler.isScheduled(timer).orElseThrow(RuntimeException::new);
     }
 }

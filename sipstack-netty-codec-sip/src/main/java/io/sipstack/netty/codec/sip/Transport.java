@@ -8,5 +8,5 @@ package io.sipstack.netty.codec.sip;
  * Created by jonas@jonasborjesson.com
  */
 public enum Transport {
-    udp, tcp, tls, sctp, ws;
+    udp, tcp, tls, sctp, ws, wss;
 }

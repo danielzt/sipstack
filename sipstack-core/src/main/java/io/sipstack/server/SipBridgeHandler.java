@@ -27,6 +27,12 @@ public class SipBridgeHandler extends SimpleChannelInboundHandler<SipMessageEven
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent msg) throws Exception {
+        /*
+        final SipMessage sip = msg.getMessage();
+        if (!sip.isAck()) {
+            msg.getConnection().send(sip.createResponse(200));
+        }
+        */
         actor.tellAnonymously(msg);
     }
 

@@ -18,6 +18,8 @@ public interface SipTimerEvent extends Event {
         return true;
     }
 
+    SipTimer timer();
+
     static Builder withTimer(final SipTimer timer) {
         PreConditions.ensureNotNull(timer);
         return new Builder(timer);
@@ -88,6 +90,11 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimer100Trying() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.Trying;
+            }
         }
 
 
@@ -100,6 +107,11 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimerA() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.A;
+            }
         }
 
         private static class TimerB extends AbstractEvent implements SipTimerEvent {
@@ -110,6 +122,11 @@ public interface SipTimerEvent extends Event {
             @Override
             public boolean isSipTimerB() {
                 return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.B;
             }
         }
 
@@ -122,6 +139,11 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimerC() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.C;
+            }
         }
 
         private static class TimerD extends AbstractEvent implements SipTimerEvent {
@@ -132,6 +154,11 @@ public interface SipTimerEvent extends Event {
             @Override
             public boolean isSipTimerD() {
                 return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.D;
             }
         }
 
@@ -144,6 +171,11 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimerE() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.E;
+            }
         }
 
         private static class TimerF extends AbstractEvent implements SipTimerEvent {
@@ -154,6 +186,11 @@ public interface SipTimerEvent extends Event {
             @Override
             public boolean isSipTimerF() {
                 return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.F;
             }
         }
 
@@ -166,6 +203,11 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimerG() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.G;
+            }
         }
 
         private static class TimerH extends AbstractEvent implements SipTimerEvent {
@@ -176,6 +218,11 @@ public interface SipTimerEvent extends Event {
             @Override
             public boolean isSipTimerH() {
                 return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.H;
             }
         }
 
@@ -188,6 +235,11 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimerI() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.I;
+            }
         }
 
         private static class TimerJ extends AbstractEvent implements SipTimerEvent {
@@ -198,6 +250,12 @@ public interface SipTimerEvent extends Event {
             @Override
             public boolean isSipTimerJ() {
                 return true;
+            }
+
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.J;
             }
         }
 
@@ -210,6 +268,12 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimerK() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.K;
+            }
+
         }
 
         private static class TimerL extends AbstractEvent implements SipTimerEvent {
@@ -221,6 +285,12 @@ public interface SipTimerEvent extends Event {
             public boolean isSipTimerL() {
                 return true;
             }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.L;
+            }
+
         }
 
     }

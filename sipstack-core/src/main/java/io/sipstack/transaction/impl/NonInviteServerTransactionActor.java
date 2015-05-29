@@ -10,6 +10,7 @@ import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOEvent;
 import io.sipstack.event.IOReadEvent;
+import io.sipstack.event.SipTimerEvent;
 import io.sipstack.timers.SipTimer;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
@@ -241,7 +242,6 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
      * </pre>
      */
     private final Consumer<Event> completed = event -> {
-        System.err.println("Processing event: " + event);
         if (event.isSipIOEvent()) {
             final IOEvent<SipMessage> sipEvent = event.toSipIOEvent();
             final SipMessage msg = sipEvent.getObject();
@@ -273,7 +273,8 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
         // TODO: check if the initial message was sent over a reliable transport.
         // TODO: add a isReliableTransport to the SipMessage
         final Duration duration = timerConfig().getTimerJ();
-        timerJ = ctx().scheduler().schedule(SipTimer.J, self(), self(), duration);
+        final SipTimerEvent timerEvent = SipTimerEvent.withTimer(SipTimer.J).build();
+        timerJ = ctx().scheduler().schedule(timerEvent, self(), self(), duration);
     };
 
 

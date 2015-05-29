@@ -2,6 +2,7 @@ package io.sipstack.application;
 
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.actor.ActorSupport;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOEvent;
@@ -27,11 +28,19 @@ public class ApplicationActor extends ActorSupport<Event,ApplicationState> {
     private final Consumer<Event> init = event -> {
         final IOEvent<SipMessage>  ioEvent = event.toSipIOEvent();
         final SipMessage msg = ioEvent.getObject();
-        if (!msg.isAck()) {
-            final SipResponse response = msg.createResponse(200);
+        if (msg.isRequest() && !msg.isAck()) {
+            final SipResponse response = msg.createResponse(responseCode(msg));
             sender().tell(IOWriteEvent.create(response), self());
         }
     };
+
+    private int responseCode(final SipMessage msg) {
+        final SipHeader header = msg.getHeader("X-Test-Respond");
+        if (header != null) {
+            return Integer.parseInt(header.getValue().toString());
+        }
+        return 200;
+    }
 
     @Override
     protected Logger logger() {

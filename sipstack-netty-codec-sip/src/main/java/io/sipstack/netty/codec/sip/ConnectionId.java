@@ -3,12 +3,13 @@
  */
 package io.sipstack.netty.codec.sip;
 
-import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+
+import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -36,6 +37,30 @@ public interface ConnectionId {
 
     default boolean isReliableTransport() {
         return getProtocol() != Transport.udp;
+    }
+
+    default boolean isUDP() {
+        return getProtocol() == Transport.udp;
+    }
+
+    default boolean isTCP() {
+        return getProtocol() == Transport.tcp;
+    }
+
+    default boolean isTLS() {
+        return getProtocol() == Transport.tls;
+    }
+
+    default boolean isSCTP() {
+        return getProtocol() == Transport.sctp;
+    }
+
+    default boolean isWS() {
+        return getProtocol() == Transport.ws;
+    }
+
+    default boolean isWSS() {
+        return getProtocol() == Transport.wss;
     }
 
     static ConnectionId create(final Transport transport, final InetSocketAddress local, final InetSocketAddress remote) {
@@ -81,6 +106,15 @@ public interface ConnectionId {
                 break;
             case 0x03:
                 protocol = Transport.tls;
+                break;
+            case 0x04:
+                protocol = Transport.ws;
+                break;
+            case 0x05:
+                protocol = Transport.wss;
+                break;
+            case 0x06:
+                protocol = Transport.sctp;
                 break;
         }
         return new IPv4ConnectionId(protocol, localIp, localPort, remoteIp, remotePort);
@@ -195,6 +229,12 @@ public interface ConnectionId {
                 toEncode[16] = 0x02;
             } else if (Transport.tls == this.protocol) {
                 toEncode[16] = 0x03;
+            } else if (Transport.ws == this.protocol) {
+                toEncode[16] = 0x04;
+            } else if (Transport.wss == this.protocol) {
+                toEncode[16] = 0x05;
+            } else if (Transport.sctp == this.protocol) {
+                toEncode[16] = 0x06;
             } else {
                 toEncode[16] = 0x00;
             }

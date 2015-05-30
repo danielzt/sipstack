@@ -4,8 +4,7 @@ import io.hektor.core.ActorRef;
 import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.MockCancellable;
 import io.sipstack.SipStackTestBase;
-import io.sipstack.netty.codec.sip.DefaultSipMessageEvent;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.timers.SipTimer;
 import org.junit.After;
 import org.junit.Before;
@@ -41,7 +40,7 @@ public class InviteServerTransactionActorTest extends SipStackTestBase {
         // instruct our test app to send back a 600...
         defaultInviteRequest.addHeader(SipHeader.create("X-Test-Respond", "600"));
         connection.resetLatch(2); // because we expect 100 and 600
-        final SipMessageEvent invite = new DefaultSipMessageEvent(connection, defaultInviteRequest, 0);
+        final SipMessageEvent invite = new SipMessageEvent(connection, defaultInviteRequest, 0);
         actor.tellAnonymously(invite);
 
         assertResponse("INVITE", 100);
@@ -97,7 +96,7 @@ public class InviteServerTransactionActorTest extends SipStackTestBase {
      */
     @Test(timeout = 500)
     public void testBasicLifeCycle() throws Exception {
-        final SipMessageEvent invite = new DefaultSipMessageEvent(connection, defaultInviteRequest, 0);
+        final SipMessageEvent invite = new SipMessageEvent(connection, defaultInviteRequest, 0);
         connection.resetLatch(2); // because we expect 100 and 600
         actor.tellAnonymously(invite);
 

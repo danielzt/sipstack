@@ -3,7 +3,6 @@
  */
 package io.sipstack.net;
 
-import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -18,10 +17,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.sipstack.config.NetworkInterfaceConfiguration;
+import io.sipstack.netty.codec.sip.InboundOutboundHandlerAdapter;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -30,10 +32,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 /**
  * The {@link NetworkLayer} is the glue between the network (netty) and
@@ -59,6 +61,7 @@ public class NetworkLayer {
 
     private final List<NetworkInterface> interfaces;
 
+
     /**
      * 
      */
@@ -83,6 +86,8 @@ public class NetworkLayer {
 
         private final List<NetworkInterfaceConfiguration> ifs;
 
+        private List<InboundOutboundHandlerAdapter> sipChannels = new ArrayList<>();
+
         private final EventLoopGroup bossGroup = new NioEventLoopGroup();
         private final EventLoopGroup workerGroup = new NioEventLoopGroup();
         private final EventLoopGroup udpGroup = new NioEventLoopGroup();
@@ -101,22 +106,41 @@ public class NetworkLayer {
 
         private SimpleChannelInboundHandler<SipMessageEvent> serverHandler;
 
+        private Optional<InboundOutboundHandlerAdapter> transportLayer = Optional.empty();
+        private Optional<InboundOutboundHandlerAdapter> transactionLayer = Optional.empty();
+        private Optional<InboundOutboundHandlerAdapter> transactionUser = Optional.empty();
+        private Optional<InboundOutboundHandlerAdapter> application = Optional.empty();
+
         private Builder(final List<NetworkInterfaceConfiguration> ifs) {
             this.ifs = ifs;
         }
 
-        /**
-         * The server handler is the glue between Netty and Akka. If you rather
-         * build your own whatever then simply register a different handler
-         * and you are good to go.
-         * 
-         * @param handler
-         * @return
-         */
+        public Builder withTransportLayer(final InboundOutboundHandlerAdapter handler) {
+            transportLayer = Optional.ofNullable(handler);
+            return this;
+        }
+
+        public Builder withTransactionLayer(final InboundOutboundHandlerAdapter handler) {
+            transactionLayer = Optional.ofNullable(handler);
+            return this;
+        }
+
+        public Builder withTransactionUser(final InboundOutboundHandlerAdapter handler) {
+            transactionUser = Optional.ofNullable(handler);
+            return this;
+        }
+
+        public Builder withApplication(final InboundOutboundHandlerAdapter handler) {
+            application = Optional.ofNullable(handler);
+            return this;
+        }
+
+        /*
         public Builder serverHandler(final SimpleChannelInboundHandler<SipMessageEvent> handler) {
             this.serverHandler = handler;
             return this;
         }
+        */
 
         public NetworkLayer build() {
 
@@ -124,7 +148,7 @@ public class NetworkLayer {
             // final. Cant have the final Server implement the final netty interfaces since final the Builder is final setting it final up.
             // Really should create final a NetworkActor etc final to handle final all of this.
 
-            ensureNotNull(this.serverHandler, "You must specify the server handler");
+            // TODO: check that if you e.g. specify dialog layer then you must also specify transaction layer
 
             final List<NetworkInterface.Builder> builders = new ArrayList<NetworkInterface.Builder>();
             if (this.ifs.isEmpty()) {
@@ -158,7 +182,10 @@ public class NetworkLayer {
                         final ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast("decoder", new SipMessageDatagramDecoder());
                         pipeline.addLast("encoder", new SipMessageEncoder());
-                        pipeline.addLast("handler", handler);
+                        transportLayer.ifPresent(handler -> pipeline.addLast("transport", handler));
+                        transactionLayer.ifPresent(handler -> pipeline.addLast("transaction", handler));
+                        transactionUser.ifPresent(handler -> pipeline.addLast("tu", handler));
+                        application.ifPresent(handler -> pipeline.addLast("application", handler));
                     }
                 });
 
@@ -179,7 +206,10 @@ public class NetworkLayer {
                         final ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast("decoder", new SipMessageStreamDecoder());
                         pipeline.addLast("encoder", new SipMessageEncoder());
-                        pipeline.addLast("handler", handler);
+                        transportLayer.ifPresent(handler -> pipeline.addLast("transport", handler));
+                        transactionLayer.ifPresent(handler -> pipeline.addLast("transaction", handler));
+                        transactionUser.ifPresent(handler -> pipeline.addLast("tu", handler));
+                        application.ifPresent(handler -> pipeline.addLast("application", handler));
                     }
                 })
                 .option(ChannelOption.SO_BACKLOG, 128)

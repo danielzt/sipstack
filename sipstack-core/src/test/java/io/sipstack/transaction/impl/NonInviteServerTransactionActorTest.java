@@ -3,8 +3,7 @@ package io.sipstack.transaction.impl;
 import io.hektor.core.ActorRef;
 import io.sipstack.MockCancellable;
 import io.sipstack.SipStackTestBase;
-import io.sipstack.netty.codec.sip.DefaultSipMessageEvent;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.timers.SipTimer;
 import org.junit.After;
 import org.junit.Before;
@@ -38,7 +37,7 @@ public class NonInviteServerTransactionActorTest extends SipStackTestBase {
      */
     @Test(timeout = 500)
     public void testBasicLifeCycle() throws Exception {
-        final SipMessageEvent bye = new DefaultSipMessageEvent(connection, defaultByeRequest, 0);
+        final SipMessageEvent bye = new SipMessageEvent(connection, defaultByeRequest, 0);
         actor.tellAnonymously(bye);
 
         // Our app is sending a 200 OK to the bye so ensure that.
@@ -74,7 +73,7 @@ public class NonInviteServerTransactionActorTest extends SipStackTestBase {
      */
     @Test(timeout = 500)
     public void testRetransmission() throws Exception {
-        final SipMessageEvent bye = new DefaultSipMessageEvent(connection, defaultByeRequest, 0);
+        final SipMessageEvent bye = new SipMessageEvent(connection, defaultByeRequest, 0);
         actor.tellAnonymously(bye);
         assertResponse("BYE", 200);
 

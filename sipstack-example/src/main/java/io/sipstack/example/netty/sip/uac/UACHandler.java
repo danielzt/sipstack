@@ -16,7 +16,7 @@ import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.ToHeader;
 import io.pkts.packet.sip.header.ViaHeader;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -88,7 +88,7 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final SipMessage msg = event.getMessage();
+        final SipMessage msg = event.message();
 
         if (msg.isInvite() && msg.isResponse()) {
             final SipResponse response = msg.toResponse();
@@ -97,10 +97,8 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
                 // actual client you would start playing your favorite
                 // ring tone now.
             } else if (response.isFinal()) {
-                System.err.println("ok, final");
                 final SipRequest ack = generateAck(response);
-                System.err.println(ack);
-                event.getConnection().send(ack);
+                event.connection().send(ack);
             }
         }
 
@@ -112,7 +110,7 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
         // for all requests, just generate a 200 OK response.
         if (msg.isRequest()) {
             final SipResponse response = msg.createResponse(200);
-            event.getConnection().send(response);
+            event.connection().send(response);
         }
     }
 

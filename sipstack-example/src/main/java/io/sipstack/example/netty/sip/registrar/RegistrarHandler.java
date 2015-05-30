@@ -11,7 +11,7 @@ import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.ExpiresHeader;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,8 +32,8 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final Connection connection = event.getConnection();
-        final SipMessage msg = event.getMessage();
+        final Connection connection = event.connection();
+        final SipMessage msg = event.message();
 
         if (msg.isRequest() && msg.isRegister()) {
             final SipResponse response = processRegisterRequest(msg.toRequest());

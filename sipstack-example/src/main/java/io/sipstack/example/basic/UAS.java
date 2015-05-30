@@ -17,7 +17,7 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.net.InetSocketAddress;
 
@@ -40,7 +40,7 @@ public final class UAS extends SimpleChannelInboundHandler<SipMessageEvent> {
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final SipMessage msg = event.getMessage();
+        final SipMessage msg = event.message();
 
         // just consume the ACK
         if (msg.isAck()) {
@@ -50,7 +50,7 @@ public final class UAS extends SimpleChannelInboundHandler<SipMessageEvent> {
         // for all other requests, just generate a 200 OK response.
         if (msg.isRequest()) {
             final SipResponse response = msg.createResponse(200);
-            event.getConnection().send(response);
+            event.connection().send(response);
         }
     }
 

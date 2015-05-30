@@ -12,13 +12,13 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.config.SipConfiguration;
-import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipMsgEvent;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.impl.TransactionSupervisor;
 import org.junit.After;
@@ -266,9 +266,9 @@ public class SipTestBase {
         final SipMessageEvent event = mock(SipMessageEvent.class);
         final Connection connection = mockConnection(this.defaultConnectionId);
         // TODO: should be our internal fake clock
-        when(event.getArrivalTime()).thenReturn(System.currentTimeMillis());
-        when(event.getConnection()).thenReturn(connection);
-        when(event.getMessage()).thenReturn(msg);
+        when(event.arrivalTime()).thenReturn(System.currentTimeMillis());
+        when(event.connection()).thenReturn(connection);
+        when(event.message()).thenReturn(msg);
         return event;
     }
 

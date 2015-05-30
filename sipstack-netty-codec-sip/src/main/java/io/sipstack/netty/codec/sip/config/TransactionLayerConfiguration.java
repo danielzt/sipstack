@@ -1,7 +1,7 @@
 /**
  * 
  */
-package io.sipstack.config;
+package io.sipstack.netty.codec.sip.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

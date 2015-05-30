@@ -7,7 +7,7 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import io.sipstack.annotations.BYE;
 import io.sipstack.annotations.INVITE;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.util.concurrent.CountDownLatch;
 

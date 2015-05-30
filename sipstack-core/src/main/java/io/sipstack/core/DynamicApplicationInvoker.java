@@ -6,7 +6,7 @@ package io.sipstack.core;
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 import io.sipstack.annotations.BYE;
 import io.sipstack.annotations.INVITE;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;

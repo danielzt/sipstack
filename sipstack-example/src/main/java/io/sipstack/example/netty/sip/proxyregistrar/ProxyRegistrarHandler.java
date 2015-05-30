@@ -16,7 +16,7 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.example.netty.sip.SimpleSipStack;
 import io.sipstack.example.netty.sip.registrar.Binding;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.util.List;
 
@@ -38,8 +38,8 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final Connection connection = event.getConnection();
-        final SipMessage msg = event.getMessage();
+        final Connection connection = event.connection();
+        final SipMessage msg = event.message();
 
         if (msg.isRequest() && msg.isOptions()) {
             // many clients will send out an OPTIONS request as a ping mechanism

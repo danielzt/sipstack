@@ -14,6 +14,7 @@ import io.pkts.packet.sip.impl.SipRequestImpl;
 import io.pkts.packet.sip.impl.SipRequestLine;
 import io.pkts.packet.sip.impl.SipResponseImpl;
 import io.pkts.packet.sip.impl.SipResponseLine;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -85,7 +86,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
             final SipMessage msg = toSipMessage(this.message);
             final Channel channel = ctx.channel();
             final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress());
-            out.add(new DefaultSipMessageEvent(connection, msg, arrivalTime));
+            out.add(new SipMessageEvent(connection, msg, arrivalTime));
             reset();
         }
     }

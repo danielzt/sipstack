@@ -4,7 +4,7 @@
 package io.sipstack.event;
 
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 /**
  * An event representing a read event.
@@ -27,8 +27,8 @@ public interface IOReadEvent<T> extends IOEvent<T> {
      * @return
      */
     static IOReadEvent<SipMessage> create(final SipMessageEvent event) {
-        final long arrivalTime = event.getArrivalTime();
-        final SipMessage msg = event.getMessage();
+        final long arrivalTime = event.arrivalTime();
+        final SipMessage msg = event.message();
         return new IOSipReadEvent(arrivalTime, msg);
     }
 

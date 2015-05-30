@@ -1,12 +1,12 @@
 /**
  * 
  */
-package io.sipstack.config;
-
-import java.time.Duration;
+package io.sipstack.netty.codec.sip.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.time.Duration;
 
 /**
  * All timer values as defined by RFC3261.

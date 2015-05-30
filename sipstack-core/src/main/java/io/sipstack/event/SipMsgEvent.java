@@ -6,7 +6,7 @@ package io.sipstack.event;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 /**
  * TODO: I think this may have to change to an IOWriteEvent instead,
@@ -26,10 +26,10 @@ public class SipMsgEvent implements Event {
     }
 
     public static SipMsgEvent create(final SipMessageEvent event) {
-        final SipMessage msg = event.getMessage();
+        final SipMessage msg = event.message();
         // final Key key = Key.withSipMessage(msg);
         // return new SipMsgEvent(key, event.getArrivalTime(), msg);
-        return new SipMsgEvent(event.getArrivalTime(), msg);
+        return new SipMsgEvent(event.arrivalTime(), msg);
     }
 
     // public static SipMsgEvent create(final Key key, final long timeStamp, final SipMessage msg) {

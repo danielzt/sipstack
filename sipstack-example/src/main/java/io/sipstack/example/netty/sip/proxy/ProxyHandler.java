@@ -10,7 +10,7 @@ import io.pkts.packet.sip.header.RouteHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.example.netty.sip.SimpleSipStack;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
 
@@ -26,7 +26,7 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageEv
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final SipMessage msg = event.getMessage();
+        final SipMessage msg = event.message();
 
         try {
             if (msg.isRequest()) {
@@ -50,12 +50,12 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageEv
             // fighting chance to figure out what it did wrong.
             e.printStackTrace();
             final SipResponse response = msg.toRequest().createResponse(400);
-            event.getConnection().send(response);
+            event.connection().send(response);
         } catch (final Exception e) {
             // something went wrong, send a 500 back...
             e.printStackTrace();
             final SipResponse response = msg.toRequest().createResponse(500);
-            event.getConnection().send(response);
+            event.connection().send(response);
         }
     }
 

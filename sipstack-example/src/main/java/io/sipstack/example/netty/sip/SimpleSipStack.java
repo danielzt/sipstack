@@ -20,7 +20,7 @@ import io.pkts.buffer.Buffer;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
 import io.sipstack.netty.codec.sip.UdpConnection;
 

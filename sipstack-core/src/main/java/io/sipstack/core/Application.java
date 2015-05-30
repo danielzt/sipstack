@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
-import io.hektor.config.HektorConfiguration;
 import io.hektor.core.ActorRef;
 import io.hektor.core.Hektor;
 import io.hektor.core.Props;
@@ -17,19 +16,21 @@ import io.hektor.core.RoutingLogic;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
+import io.sipstack.application.ApplicationHandler;
 import io.sipstack.application.ApplicationSupervisor;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.NetworkInterfaceDeserializer;
 import io.sipstack.config.SipConfiguration;
-import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.InitEvent;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
-import io.sipstack.server.SipBridgeHandler;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
+import io.sipstack.netty.codec.sip.transaction.TransactionLayer;
+import io.sipstack.netty.codec.sip.transport.TransportLayer;
 import io.sipstack.transaction.impl.TransactionSupervisor;
 import io.sipstack.transport.TransportSupervisor;
 import io.sipstack.utils.Generics;
@@ -134,12 +135,19 @@ public abstract class Application<T extends Configuration> {
             final NetworkLayer.Builder networkBuilder = NetworkLayer.with(ifs);
 
             // configure Hektor
+            // no longer using Hektor.
+            /*
             final HektorConfiguration hektorConfig = config.getHektorConfiguration();
             final Hektor hektor = Hektor.withName("hello").withConfiguration(hektorConfig).build();
             final ActorRef transportSupervisorRef = ActorSystemBuilder.withConfig(config).withHektor(hektor).build();
-
             final SipBridgeHandler handler = new SipBridgeHandler(transportSupervisorRef);
             networkBuilder.serverHandler(handler);
+            */
+
+
+            networkBuilder.withTransportLayer(new TransportLayer(sipConfig.getTransport()));
+            networkBuilder.withTransactionLayer(new TransactionLayer(sipConfig.getTransaction()));
+            networkBuilder.withApplication(new ApplicationHandler());
 
             final NetworkLayer server = networkBuilder.build();
             server.start();
@@ -303,7 +311,7 @@ public abstract class Application<T extends Configuration> {
         @Override
         public ActorRef select(final Object msg, final List<ActorRef> routees) {
             final SipMessageEvent sipMsgEvent = (SipMessageEvent)msg;
-            final ConnectionId id = sipMsgEvent.getConnection().id();
+            final ConnectionId id = sipMsgEvent.connection().id();
             return routees.get(Math.abs(id.hashCode() % routees.size()));
         }
     }

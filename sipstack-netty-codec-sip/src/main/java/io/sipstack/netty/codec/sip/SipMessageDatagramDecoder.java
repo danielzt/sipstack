@@ -8,6 +8,7 @@ import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.SipParser;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.util.List;
 
@@ -81,7 +82,7 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
         // }
 
         final Connection connection = new UdpConnection(ctx.channel(), msg.sender());
-        final SipMessageEvent event = new DefaultSipMessageEvent(connection, sipMessage, arrivalTime);
+        final SipMessageEvent event = new SipMessageEvent(connection, sipMessage, arrivalTime);
         out.add(event);
     }
 

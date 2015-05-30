@@ -7,7 +7,7 @@ import io.sipstack.annotations.INVITE;
 import io.sipstack.core.Application;
 import io.sipstack.core.Bootstrap;
 import io.sipstack.core.Environment;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

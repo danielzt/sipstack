@@ -4,10 +4,10 @@ import io.hektor.core.Actor;
 import io.hektor.core.ActorRef;
 import io.hektor.core.Cancellable;
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.config.FlowConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.netty.codec.sip.config.FlowConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

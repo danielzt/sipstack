@@ -6,12 +6,12 @@ package io.sipstack.transport;
 import io.hektor.core.Actor;
 import io.hektor.core.ActorRef;
 import io.hektor.core.Props;
-import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.IOReadEvent;
 import io.sipstack.event.InitEvent;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.config.TransportLayerConfiguration;
 
 import java.util.Optional;
 
@@ -52,13 +52,13 @@ public class TransportSupervisor implements Actor {
         // a flow and send the message to it.
         if (SipMessageEvent.class.isAssignableFrom(msg.getClass())) {
             final SipMessageEvent sipEvent = (SipMessageEvent)msg;
-            final ConnectionId id = sipEvent.getConnection().id();
+            final ConnectionId id = sipEvent.connection().id();
             final String idStr = id.encodeAsString();
             final Optional<ActorRef> child = ctx().child(idStr);
             final ActorRef flow = child.orElseGet(() ->  {
                 final Props props = Props.forActor(FlowActor.class)
                         .withConstructorArg(upstreamActor)
-                        .withConstructorArg(sipEvent.getConnection())
+                        .withConstructorArg(sipEvent.connection())
                         .withConstructorArg(config.getFlow())
                         .build();
                 return ctx().actorOf(idStr, props);

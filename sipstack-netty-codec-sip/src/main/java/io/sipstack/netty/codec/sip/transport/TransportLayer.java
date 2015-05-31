@@ -23,7 +23,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("Channel registered");
         ctx.fireChannelRegistered();
     }
     /**
@@ -31,7 +30,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("un Channel registered");
         ctx.fireChannelUnregistered();
 
     }
@@ -40,7 +38,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("Channel active");
         ctx.fireChannelActive();
 
     }
@@ -49,7 +46,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("Channel inactive");
         ctx.fireChannelInactive();
 
     }
@@ -59,7 +55,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("channel write ability changed");
         ctx.fireChannelWritabilityChanged();
     }
 
@@ -68,7 +63,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void bind(ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) throws Exception {
-        System.out.println("bind");
         ctx.bind(localAddress, promise);
     }
 
@@ -77,7 +71,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) throws Exception {
-        System.out.println("connect");
         ctx.connect(remoteAddress, localAddress, promise);
     }
 
@@ -86,7 +79,16 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-        System.out.println("disconnect");
         ctx.disconnect(promise);
+    }
+
+    /**
+     * From ChannelOutboundHandler
+     */
+    @Override
+    public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
+        System.out.println("TransportLayer.write: " + msg);
+        // final DatagramPacket pkt = new DatagramPacket(toByteBuf(msg), getRemoteAddress());
+        ctx.write(msg, promise);
     }
 }

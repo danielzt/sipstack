@@ -1,8 +1,8 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
-import io.netty.channel.socket.DatagramPacket;
 import io.pkts.packet.sip.SipMessage;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.net.InetSocketAddress;
 
@@ -35,8 +35,11 @@ public final class UdpConnection extends AbstractConnection {
      */
     @Override
     public void send(final SipMessage msg) {
-        final DatagramPacket pkt = new DatagramPacket(toByteBuf(msg), getRemoteAddress());
-        channel().writeAndFlush(pkt);
+        // final DatagramPacket pkt = new DatagramPacket(toByteBuf(msg), getRemoteAddress());
+        // channel().writeAndFlush(pkt);
+        System.err.println("UDPConnection: sending");
+        final SipMessageEvent event = new SipMessageEvent(this, msg, System.currentTimeMillis());
+        channel().writeAndFlush(event);
     }
 
     @Override

@@ -1,7 +1,5 @@
 package io.sipstack.netty.codec.sip.actor;
 
-import io.sipstack.netty.codec.sip.event.Event;
-
 /**
  * Well, this is not really an actor framework but the properties of the various
  * SIP statemachines, such as the invite server transaction, is that of an actor.
@@ -67,5 +65,5 @@ public interface Actor {
      * @param ctx
      * @param event
      */
-    void onEvent(ActorContext ctx, Event event);
+    void onReceive(ActorContext ctx, Object msg);
 }

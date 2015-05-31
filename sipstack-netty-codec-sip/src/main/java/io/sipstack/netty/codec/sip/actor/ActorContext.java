@@ -1,5 +1,7 @@
 package io.sipstack.netty.codec.sip.actor;
 
+import io.sipstack.netty.codec.sip.event.Event;
+
 /**
  * Very specialized actor context fitting the Netty pipeline model
  * which is why you don't talk to other actors but just fires event
@@ -9,5 +11,19 @@ package io.sipstack.netty.codec.sip.actor;
  * @author jonas@jonasborjesson.com
  */
 public interface ActorContext {
+
+    /**
+     * Like a ChannelHandler in Netty, an "actor" in this sip codec project
+     * always knows which direction events should be sent. E.g. a
+     * {@link InviteServerTransaction} will always forward requests
+     * upstream and responses downstream.
+     *
+     * @param event
+     */
+    void forwardUpstream(Event event);
+
+    void forwardDownstream(Event event);
+
+    Scheduler scheduler();
 
 }

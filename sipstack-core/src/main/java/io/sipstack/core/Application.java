@@ -27,8 +27,9 @@ import io.sipstack.event.Event;
 import io.sipstack.event.InitEvent;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.actor.Scheduler;
 import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.transaction.TransactionLayer;
 import io.sipstack.netty.codec.sip.transport.TransportLayer;
 import io.sipstack.transaction.impl.TransactionSupervisor;
@@ -143,10 +144,9 @@ public abstract class Application<T extends Configuration> {
             final SipBridgeHandler handler = new SipBridgeHandler(transportSupervisorRef);
             networkBuilder.serverHandler(handler);
             */
-
-
+            final Scheduler scheduler = null;
             networkBuilder.withTransportLayer(new TransportLayer(sipConfig.getTransport()));
-            networkBuilder.withTransactionLayer(new TransactionLayer(sipConfig.getTransaction()));
+            networkBuilder.withTransactionLayer(new TransactionLayer(scheduler, sipConfig.getTransaction()));
             networkBuilder.withApplication(new ApplicationHandler());
 
             final NetworkLayer server = networkBuilder.build();

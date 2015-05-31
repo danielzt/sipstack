@@ -51,7 +51,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        System.out.println("Channel read: " + msg);
         ctx.fireChannelRead(msg);
     }
 
@@ -60,7 +59,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("Channel read compolete");
         ctx.fireChannelReadComplete();
     }
 
@@ -69,7 +67,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        System.out.println("user even triggered");
         ctx.fireUserEventTriggered(evt);
     }
 
@@ -86,7 +83,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.out.println("exception caught " + cause);
         ctx.fireExceptionCaught(cause);
     }
 
@@ -95,7 +91,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("handler added");
     }
 
     /**
@@ -103,7 +98,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("handler removed");
     }
 
     /**
@@ -135,7 +129,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void close(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-        System.out.println("close");
         ctx.close(promise);
     }
 
@@ -144,7 +137,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void deregister(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
-        System.out.println("deregister");
         ctx.deregister(promise);
     }
 
@@ -153,7 +145,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void read(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("read");
         ctx.read();
     }
 
@@ -161,8 +152,8 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      * From ChannelOutboundHandler
      */
     @Override
-    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        System.out.println("write " + msg);
+    public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
+        System.out.println("Generic write " + msg);
         ctx.write(msg, promise);
     }
 
@@ -171,7 +162,6 @@ public class InboundOutboundHandlerAdapter implements ChannelInboundHandler, Cha
      */
     @Override
     public void flush(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("flush it down!");
         ctx.flush();
     }
 }

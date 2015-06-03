@@ -53,6 +53,28 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
         processEvent(ctx, msg);
     }
 
+    /**
+     * Timers end up here and if we get one, process it and do not pass it up the pipeline. The reason is
+     * that the timer that is fired belong the transaction layer otherwise it would have ended up
+     * elsewhere.
+     *
+     * @param ctx
+     * @param evt
+     * @throws Exception
+     */
+    @Override
+    public void userEventTriggered(final ChannelHandlerContext ctx, final Object msg) throws Exception {
+        if (msg instanceof Event && ((Event)msg).isSipTimerEvent()) {
+            processSipTimerEvent(ctx, (Event)msg);
+        } else {
+            ctx.fireUserEventTriggered(msg);
+        }
+    }
+
+    private void processSipTimerEvent(final ChannelHandlerContext ctx, final Event event) {
+
+    }
+
     private void processEvent(final ChannelHandlerContext ctx, final Object msg) {
         try {
             final Event event = (Event)msg;

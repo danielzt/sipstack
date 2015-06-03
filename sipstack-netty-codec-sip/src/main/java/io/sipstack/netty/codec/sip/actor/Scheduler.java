@@ -1,5 +1,7 @@
 package io.sipstack.netty.codec.sip.actor;
 
+import io.sipstack.netty.codec.sip.SipTimer;
+
 import java.time.Duration;
 
 /**
@@ -15,5 +17,15 @@ public interface Scheduler {
      * @param sender the sending actor.
      * @param delay the delay before sending off the msg.
      */
-    Cancellable schedule(Object msg, Runnable execute, Duration delay);
+    // Cancellable schedule(Object msg, Runnable execute, Duration delay);
+
+    /**
+     * Schedule a SIP Timer which will be "delivered" back to the Actor that scheduled
+     * it when it fires.
+     *
+     * @param timer
+     * @param delay
+     * @return
+     */
+    Cancellable schedule(SipTimer timer, Duration delay);
 }

@@ -3,6 +3,7 @@ package io.sipstack.netty.codec.sip.transaction;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.netty.codec.sip.actor.ActorSupport;
 import io.sipstack.netty.codec.sip.actor.Cancellable;
 import io.sipstack.netty.codec.sip.config.TimersConfiguration;
@@ -12,6 +13,7 @@ import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.function.Consumer;
 
 /**
@@ -129,9 +131,24 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
 
         when(TransactionState.INIT, init);
 
-        // when(TransactionState.PROCEEDING, proceeding);
-        // onEnter(TransactionState.PROCEEDING, onEnterProceeding);
-        // onExit(TransactionState.PROCEEDING, onExitProceeding);
+        when(TransactionState.PROCEEDING, proceeding);
+        onEnter(TransactionState.PROCEEDING, onEnterProceeding);
+        onExit(TransactionState.PROCEEDING, onExitProceeding);
+
+        when(TransactionState.ACCEPTED, accepted);
+        onEnter(TransactionState.ACCEPTED, onEnterAccepted);
+        onExit(TransactionState.ACCEPTED, onExitAccepted);
+
+        // when(TransactionState.COMPLETED, completed);
+        // onEnter(TransactionState.COMPLETED, onEnterCompleted);
+        // onExit(TransactionState.COMPLETED, onExitCompleted);
+
+        // when(TransactionState.CONFIRMED, confirmed);
+        // onEnter(TransactionState.CONFIRMED, onEnterConfirmed);
+
+        // no exit from terminated. You are dead
+        // when(TransactionState.TERMINATED, terminated);
+        // onEnter(TransactionState.TERMINATED, onEnterTerminated);
     }
 
     /**
@@ -227,6 +244,66 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
         }
     };
 
+    /**
+     * Implements the accepted state as follows:
+     *
+     * <pre>
+     *
+     *
+     *    INVITE     Transport Err.
+     *    -          Inform TU
+     *    +-----+    +---+
+     *    |     |    |   v
+     *    |  +------------+
+     *    |  |            |---+ ACK
+     *    +->|  Accepted  |   | to TU
+     *       |            |<--+
+     *       +------------+
+     *          |  ^     |
+     *          |  |     |
+     *          |  +-----+
+     *          |  2xx from TU
+     *          |  send response
+     *          |
+     *          |
+     *          | Timer L fires
+     *          | -
+     *          V
+     *   +------------+
+     *   | Terminated |
+     *   +------------+
+     *
+     * </pre>
+     */
+    private final Consumer<Event> accepted = event -> {
+        if (event.isSipMessageEvent()) {
+            final SipMessageEvent sipMsgEvent = event.toSipMessageEvent();
+            final SipMessage msg = sipMsgEvent.message();
+            if (msg.isResponse() && msg.toResponse().isSuccess()) {
+                // only 2xx responses are forwarded. The rest are consumed.
+                // see above state machine
+                relayResponse(sipMsgEvent);
+            } else if (isRetransmittedInvite(msg)) {
+                // absorb. According to rfc6026, don't
+                // event forward it to TU...
+            }
+        } else if (event.isSipTimerL()) {
+            become(TransactionState.TERMINATED);
+        }
+    };
+
+    /**
+     *
+     */
+    private final Consumer<Event> onEnterAccepted = event -> {
+        final Duration duration = timersConfig().getTimerL();
+        timerL = scheduleTimer(SipTimer.L, duration);
+    };
+
+    private final Consumer<Event> onExitAccepted = event -> {
+        timerL.cancel();
+    };
+
     private void relayResponse(final SipMessageEvent event) {
         if (lastResponse == null
                 || lastResponse.getStatus() < event.message().toResponse().getStatus()) {
@@ -248,8 +325,16 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
         return false;
     }
 
+    private final Cancellable scheduleTimer(final SipTimer timer, final Duration duration) {
+        return ctx().scheduler().schedule(SipTimer.L, duration);
+    }
+
     private TransactionLayerConfiguration config() {
         return config;
+    }
+
+    private TimersConfiguration timersConfig() {
+        return timersConfig;
     }
 
     private SipRequest originalInvite() {

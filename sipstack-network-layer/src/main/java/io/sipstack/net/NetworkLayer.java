@@ -20,8 +20,8 @@ import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.netty.codec.sip.InboundOutboundHandlerAdapter;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,9 +88,9 @@ public class NetworkLayer {
 
         private List<InboundOutboundHandlerAdapter> sipChannels = new ArrayList<>();
 
-        private final EventLoopGroup bossGroup = new NioEventLoopGroup();
-        private final EventLoopGroup workerGroup = new NioEventLoopGroup();
-        private final EventLoopGroup udpGroup = new NioEventLoopGroup();
+        private EventLoopGroup bossGroup;
+        private EventLoopGroup workerGroup;
+        private EventLoopGroup udpGroup;
 
         /**
          * The TCP based bootstrap.
@@ -117,6 +117,21 @@ public class NetworkLayer {
 
         public Builder withTransportLayer(final InboundOutboundHandlerAdapter handler) {
             transportLayer = Optional.ofNullable(handler);
+            return this;
+        }
+
+        public Builder withBossEventLoopGroup(final EventLoopGroup group) {
+            this.bossGroup = group;
+            return this;
+        }
+
+        public Builder withTCPEventLoopGroup(final EventLoopGroup group) {
+            this.workerGroup = group;
+            return this;
+        }
+
+        public Builder withUDPEventLoopGroup(final EventLoopGroup group) {
+            this.udpGroup = group;
             return this;
         }
 
@@ -150,6 +165,19 @@ public class NetworkLayer {
 
             // TODO: check that if you e.g. specify dialog layer then you must also specify transaction layer
 
+            if (bossGroup == null) {
+                bossGroup = new NioEventLoopGroup();
+            }
+
+            if (workerGroup == null && udpGroup == null) {
+                workerGroup = new NioEventLoopGroup();
+                udpGroup = workerGroup;
+            } else if (workerGroup != null && udpGroup == null) {
+                udpGroup = workerGroup;
+            } else if (udpGroup != null && workerGroup != null) {
+                workerGroup = udpGroup;
+            }
+
             final List<NetworkInterface.Builder> builders = new ArrayList<NetworkInterface.Builder>();
             if (this.ifs.isEmpty()) {
                 final Inet4Address address = findPrimaryAddress();
@@ -169,7 +197,6 @@ public class NetworkLayer {
             builders.forEach(ifBuilder -> ifs.add(ifBuilder.latch(latch).build()));
             return new NetworkLayer(latch, Collections.unmodifiableList(ifs));
         }
-
 
         private Bootstrap ensureUDPBootstrap(final SimpleChannelInboundHandler<SipMessageEvent> handler) {
             if (this.bootstrap == null) {

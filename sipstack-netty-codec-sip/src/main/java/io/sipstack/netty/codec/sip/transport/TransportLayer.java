@@ -87,7 +87,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
-        System.out.println("TransportLayer.write: " + msg);
+        // System.out.println("TransportLayer.write: " + msg);
         // final DatagramPacket pkt = new DatagramPacket(toByteBuf(msg), getRemoteAddress());
         ctx.write(msg, promise);
     }

@@ -3,16 +3,19 @@ package io.sipstack.netty.codec.sip.transaction;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.pkts.packet.sip.SipMessage;
+import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.InboundOutboundHandlerAdapter;
-import io.sipstack.netty.codec.sip.actor.Scheduler;
+import io.sipstack.netty.codec.sip.actor.InternalScheduler;
 import io.sipstack.netty.codec.sip.actor.SingleContext;
 import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
 import io.sipstack.netty.codec.sip.event.Event;
 import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.SipTimerEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -27,11 +30,14 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
     // TODO: This need to be configurable. Also, the JDK map implementation may
     // not be the fastest around either so do some performance tests regarding
     // that...
-    private final Map<TransactionId, Transaction> transactions = new ConcurrentHashMap<>(1000, 0.75f);
+    private final Map<TransactionId, TransactionActor> transactions = new ConcurrentHashMap<>(500000, 0.75f);
 
-    private final Scheduler scheduler;
+    private final InternalScheduler scheduler;
 
-    public TransactionLayer(final Scheduler scheduler, final TransactionLayerConfiguration config) {
+    private final Clock clock;
+
+    public TransactionLayer(final Clock clock, final InternalScheduler scheduler, final TransactionLayerConfiguration config) {
+        this.clock = clock;
         this.scheduler = scheduler;
         this.config = config;
     }
@@ -64,14 +70,49 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void userEventTriggered(final ChannelHandlerContext ctx, final Object msg) throws Exception {
-        if (msg instanceof Event && ((Event)msg).isSipTimerEvent()) {
-            processSipTimerEvent(ctx, (Event)msg);
-        } else {
+        try {
+            processSipTimerEvent(ctx, ((Event) msg).toSipTimerEvent());
+        } catch(final ClassCastException e) {
             ctx.fireUserEventTriggered(msg);
         }
     }
 
-    private void processSipTimerEvent(final ChannelHandlerContext ctx, final Event event) {
+    private void processSipTimerEvent(final ChannelHandlerContext ctx, final SipTimerEvent event) {
+        try {
+            final TransactionId id = (TransactionId) event.key();
+            final TransactionActor transaction = transactions.get(id);
+            if (transaction != null) {
+                invoke(ctx, event, transaction);
+                checkIfTerminated(transaction);
+            }
+
+        } catch (final ClassCastException e) {
+            // TODO
+            e.printStackTrace();
+        }
+    }
+
+    public Optional<Transaction> getTransaction(final TransactionId id) {
+        final TransactionActor actor = transactions.get(id);
+        if (actor != null) {
+            return Optional.of(actor.transaction());
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * If an actor has been terminated then we will clean it up.
+     *
+     * @param actor
+     */
+    private void checkIfTerminated(final TransactionActor actor) {
+        if (actor != null && actor.isTerminated()) {
+            transactions.remove(actor.id());
+            // TODO: an actor can emit more events here.
+            actor.stop();
+            actor.postStop();
+        }
 
     }
 
@@ -79,19 +120,30 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
         try {
             final Event event = (Event)msg;
             final SipMessage sipMsg = event.toSipMessageEvent().message();
-            final Transaction transaction = ensureTransaction(sipMsg);
-
-            final SingleContext actorCtx = invokeTransaction(event, transaction);
-            actorCtx.downstream().ifPresent(e -> ctx.write(msg));
-            actorCtx.upstream().ifPresent(e -> ctx.fireChannelRead(msg));
-
+            final TransactionActor transaction = ensureTransaction(sipMsg);
+            invoke(ctx, event, transaction);
+            checkIfTerminated(transaction);
         } catch (final ClassCastException e) {
             // strange...
             logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
         }
     }
 
-    private Transaction ensureTransaction(final SipMessage sipMsg) {
+    private void invoke(final ChannelHandlerContext ctx, final Event msg, final TransactionActor transaction) {
+        if (transaction == null) {
+            return;
+        }
+
+        try {
+            final SingleContext actorCtx = invokeTransaction(ctx, msg, transaction);
+            actorCtx.downstream().ifPresent(e -> ctx.write(e));
+            actorCtx.upstream().ifPresent(e -> ctx.fireChannelRead(e));
+        } catch (final Throwable t) {
+            t.printStackTrace();
+        }
+    }
+
+    private TransactionActor ensureTransaction(final SipMessage sipMsg) {
         final TransactionId id = TransactionId.create(sipMsg);
         return transactions.computeIfAbsent(id, obj -> {
 
@@ -101,7 +153,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
             }
 
             if (sipMsg.isInvite()) {
-                return new InviteServerTransaction(id, sipMsg.toRequest(), config);
+                return new InviteServerTransactionActor(id, sipMsg.toRequest(), config);
             }
 
             // if ack doesn't match an existing transaction then this ack must have been to a 2xx and
@@ -111,7 +163,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
                 return null;
             }
 
-            return new NonInviteServerTransaction();
+            return new NonInviteServerTransactionActor(id, sipMsg.toRequest(), config);
         });
     }
 
@@ -121,9 +173,11 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
      * @param transaction
      * @return
      */
-    private SingleContext invokeTransaction(final Event event, final Transaction transaction) {
+    private SingleContext invokeTransaction(final ChannelHandlerContext channelCtx,
+                                            final Event event,
+                                            final TransactionActor transaction) {
 
-        final SingleContext ctx = new SingleContext(scheduler);
+        final SingleContext ctx = new SingleContext(clock, scheduler, channelCtx, transaction != null ? transaction.id() : null, this);
         if (transaction != null) {
             // Note, the synchronization model for everything within the core
             // sip stack is that you can ONLY hold one lock at a time and

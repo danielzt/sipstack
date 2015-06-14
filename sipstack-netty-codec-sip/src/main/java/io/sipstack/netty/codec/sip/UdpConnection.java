@@ -37,7 +37,7 @@ public final class UdpConnection extends AbstractConnection {
     public void send(final SipMessage msg) {
         // final DatagramPacket pkt = new DatagramPacket(toByteBuf(msg), getRemoteAddress());
         // channel().writeAndFlush(pkt);
-        System.err.println("UDPConnection: sending");
+        // System.err.println("UDPConnection: sending");
         final SipMessageEvent event = new SipMessageEvent(this, msg, System.currentTimeMillis());
         channel().writeAndFlush(event);
     }

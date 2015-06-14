@@ -13,6 +13,8 @@ import io.hektor.core.ActorRef;
 import io.hektor.core.Hektor;
 import io.hektor.core.Props;
 import io.hektor.core.RoutingLogic;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
@@ -26,8 +28,11 @@ import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.event.InitEvent;
 import io.sipstack.net.NetworkLayer;
+import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.actor.Scheduler;
+import io.sipstack.netty.codec.sip.SystemClock;
+import io.sipstack.netty.codec.sip.actor.DefaultInternalScheduler;
+import io.sipstack.netty.codec.sip.actor.InternalScheduler;
 import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
 import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.transaction.TransactionLayer;
@@ -144,9 +149,17 @@ public abstract class Application<T extends Configuration> {
             final SipBridgeHandler handler = new SipBridgeHandler(transportSupervisorRef);
             networkBuilder.serverHandler(handler);
             */
-            final Scheduler scheduler = null;
+
+            final EventLoopGroup boosGroup = new NioEventLoopGroup();
+            final EventLoopGroup udpTcpGroup = new NioEventLoopGroup();
+            networkBuilder.withBossEventLoopGroup(boosGroup);
+            networkBuilder.withUDPEventLoopGroup(udpTcpGroup);
+            networkBuilder.withTCPEventLoopGroup(udpTcpGroup);
+
+            final InternalScheduler scheduler = new DefaultInternalScheduler(udpTcpGroup);
+            final Clock clock = new SystemClock();
             networkBuilder.withTransportLayer(new TransportLayer(sipConfig.getTransport()));
-            networkBuilder.withTransactionLayer(new TransactionLayer(scheduler, sipConfig.getTransaction()));
+            networkBuilder.withTransactionLayer(new TransactionLayer(clock, scheduler, sipConfig.getTransaction()));
             networkBuilder.withApplication(new ApplicationHandler());
 
             final NetworkLayer server = networkBuilder.build();

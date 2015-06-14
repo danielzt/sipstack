@@ -69,9 +69,9 @@ import java.util.function.Consumer;
  *
  * @author jonas@jonasborjesson.com
  */
-public class InviteServerTransaction extends ActorSupport<Event, TransactionState> implements Transaction {
+public class InviteServerTransactionActor extends ActorSupport<Event, TransactionState> implements TransactionActor {
 
-    private static final Logger logger = LoggerFactory.getLogger(InviteServerTransaction.class);
+    private static final Logger logger = LoggerFactory.getLogger(InviteServerTransactionActor.class);
 
     private final TransactionId id;
 
@@ -120,10 +120,10 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
      * @param initialState
      * @param values
      */
-    protected InviteServerTransaction(final TransactionId id,
-                                      final SipRequest invite,
-                                      final TransactionLayerConfiguration config) {
-        super(id.toString(), TransactionState.INIT, TransactionState.values());
+    protected InviteServerTransactionActor(final TransactionId id,
+                                           final SipRequest invite,
+                                           final TransactionLayerConfiguration config) {
+        super(id.toString(), TransactionState.INIT, TransactionState.TERMINATED, TransactionState.values());
         this.id = id;
         this.originalInvite = invite;
         this.config = config;
@@ -146,7 +146,9 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
         // when(TransactionState.CONFIRMED, confirmed);
         // onEnter(TransactionState.CONFIRMED, onEnterConfirmed);
 
-        // no exit from terminated. You are dead
+        // there is really nothing for us to do when we are terminated
+        // so therefore no actual implementation of that state. We
+        // are simply dead.
         // when(TransactionState.TERMINATED, terminated);
         // onEnter(TransactionState.TERMINATED, onEnterTerminated);
     }
@@ -199,6 +201,7 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
 
             if (isRetransmittedInvite(msg)) {
                 if (lastResponse != null) {
+                    // isn't this wrong?
                     relayResponse(event.toSipMessageEvent());
                 }
                 return;
@@ -304,6 +307,10 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
         timerL.cancel();
     };
 
+    public Transaction transaction() {
+        return new DefaultTransaction(id, currentState);
+    }
+
     private void relayResponse(final SipMessageEvent event) {
         if (lastResponse == null
                 || lastResponse.getStatus() < event.message().toResponse().getStatus()) {
@@ -326,7 +333,13 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
     }
 
     private final Cancellable scheduleTimer(final SipTimer timer, final Duration duration) {
-        return ctx().scheduler().schedule(SipTimer.L, duration);
+        return ctx().scheduler().schedule(timer, duration);
+    }
+
+    public void stop() {
+    }
+
+    public void postStop() {
     }
 
     private TransactionLayerConfiguration config() {
@@ -344,5 +357,10 @@ public class InviteServerTransaction extends ActorSupport<Event, TransactionStat
     @Override
     protected final Logger logger() {
         return logger;
+    }
+
+    @Override
+    public TransactionId id() {
+        return id;
     }
 }

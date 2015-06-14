@@ -37,14 +37,17 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
 
     private T currentEvent;
 
+    private final S terminalState;
+
     private ActorContext currentContext;
 
     /**
      * @param values
      */
-    protected ActorSupport(final String id, final S initialState, final S[] values) {
+    protected ActorSupport(final String id, final S initialState, final S terminalState, final S[] values) {
         this.id = id;
         currentState = initialState;
+        this.terminalState = terminalState;
 
         states = new Consumer[values.length];
         onEnterActions = new Consumer[values.length];
@@ -103,7 +106,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     protected final void become(final S newState) {
-        logger().info("{} {} -> {}", this.id, currentState, newState);
+        // logger().info("{} {} -> {}", this.id, currentState, newState);
 
         if (currentState != newState) {
             final Consumer<T> exitAction = onExitActions[currentState.ordinal()];
@@ -126,6 +129,11 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
 
     protected final S state() {
         return currentState;
+    }
+
+    @Override
+    public final boolean isTerminated() {
+        return currentState == terminalState;
     }
 
     protected abstract Logger logger();

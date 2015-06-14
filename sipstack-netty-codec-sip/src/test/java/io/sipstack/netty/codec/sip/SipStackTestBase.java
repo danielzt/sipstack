@@ -11,15 +11,13 @@ import io.pkts.streams.Stream;
 import io.pkts.streams.StreamHandler;
 import io.pkts.streams.StreamListener;
 import io.pkts.streams.impl.DefaultStreamHandler;
-import io.sipstack.netty.codec.sip.actor.Scheduler;
 import org.junit.Before;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
 
 
@@ -46,16 +44,13 @@ public class SipStackTestBase {
      * A mock implementation of the netty {@link ChannelHandlerContext}
      *
      */
-    @Mock
-    protected ChannelHandlerContext defaultChannelCtx;
+    protected MockChannelHandlerContext defaultChannelCtx;
 
-    @Mock
-    protected Scheduler scheduler;
+    protected MockScheduler defaultScheduler;
 
 
     @Before
     public void setUp() throws Exception {
-        MockitoAnnotations.initMocks(this);
 
         // load a basic call and store the individual messages
         // for later use within tests...
@@ -68,6 +63,16 @@ public class SipStackTestBase {
 
         final ConnectionId id = createConnectionId(Transport.udp, "10.36.10.100", 5060, "192.168.0.100", 5090);
         defaultConnection = new MockConnection(id);
+        defaultScheduler = new MockScheduler(new CountDownLatch(1));
+    }
+
+    /**
+     * it is quite often easier to e.g. send one message through the pipe, assert
+     * that message was handled as it should and then reset the context
+     * again so we start over.
+     */
+    public void resetChannelHandlerContext(final InboundOutboundHandlerAdapter handler) {
+        defaultChannelCtx = new MockChannelHandlerContext(handler);
     }
 
     /**
@@ -133,5 +138,16 @@ public class SipStackTestBase {
         throw new RuntimeException("Only expected a single stream in the pcap");
     }
 
+    /**
+     * There are a lot of various sip timers that are being scheduled and this
+     * method helps you ensure that a particular timer was indeed scheduled.
+     *
+     * @param timer
+     * @return the cancellable that we just asserted actually exists and is correct.
+     */
+    public MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
+        defaultScheduler.latch.await();
+        return defaultScheduler.isScheduled(timer).orElseThrow(RuntimeException::new);
+    }
 
 }

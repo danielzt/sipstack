@@ -5,6 +5,7 @@ package io.sipstack.netty.codec.sip.event;
 
 import io.netty.channel.ChannelPipeline;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.Connection;
 
 /**
@@ -30,6 +31,38 @@ public class SipMessageEvent extends Event {
         super(arrivalTime);
         this.connection = connection;
         this.msg = msg;
+    }
+
+    /**
+     * Two SipMessageEvents are considered equal if they contain similar sip messages.
+     * Similar because comparing the full sip message is expensive so we only care
+     * about both being requests/responses, their method, cseq, transaction, call-id.
+     *
+     * @param other
+     * @return
+     */
+    public boolean equals(final Object other) {
+        if (this == other) {
+            return true;
+        }
+
+        try {
+            final SipMessage otherMsg = ((SipMessageEvent)other).msg;
+            if (msg.isRequest() != otherMsg.isRequest() && msg.getMethod().equals(otherMsg.getMethod())) {
+                if (!msg.getCallIDHeader().equals(otherMsg.getCallIDHeader())) {
+                    return false;
+                }
+
+                final ViaHeader via1 = msg.getViaHeader();
+                final ViaHeader via2 = otherMsg.getViaHeader();
+                return via1.getBranch().equals(via2.getBranch());
+            } else {
+                return false;
+            }
+
+        } catch (final NullPointerException | ClassCastException e) {
+            return false;
+        }
     }
 
 

@@ -24,7 +24,7 @@ public class ApplicationHandler extends InboundOutboundHandlerAdapter {
         final SipMessageEvent sipMessageEvent = (SipMessageEvent)msg;
         final Connection connection = sipMessageEvent.connection();
         final SipMessage sip = sipMessageEvent.message();
-        System.err.println("Application: " + sip);
+        // System.err.println("Application: " + sip);
         if (!sip.isAck()) {
             connection.send(sip.createResponse(200));
         }
@@ -35,7 +35,7 @@ public class ApplicationHandler extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
-        System.out.println("Application.write");
+        // System.out.println("Application.write");
         ctx.write(msg, promise);
     }
 

@@ -32,6 +32,13 @@ public interface Actor {
     }
 
     /**
+     * Check whether this actor has reached is terminal state.
+     *
+     * @return
+     */
+    boolean isTerminated();
+
+    /**
      * Will be invoked whenever this Actor receives a message.
      *
      * Note that any messages emitted by this Actor as a result of this invocation

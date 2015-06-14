@@ -25,12 +25,26 @@ public abstract class SipTimerEvent extends Event {
     public abstract SipTimer timer();
 
     @Override
+    public boolean equals(final Object other) {
+        try {
+            final SipTimerEvent otherTimer = (SipTimerEvent)other;
+            return timer() == otherTimer.timer();
+        } catch (final ClassCastException e) {
+            return false;
+        }
+    }
+
+    @Override
     public final boolean isSipTimerEvent() {
         return true;
     }
 
     public Object key() {
         return key;
+    }
+
+    public SipTimerEvent toSipTimerEvent() {
+        return this;
     }
 
     public static Builder withTimer(final SipTimer timer) {

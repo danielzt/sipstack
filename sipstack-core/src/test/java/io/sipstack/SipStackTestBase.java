@@ -51,7 +51,7 @@ public class SipStackTestBase {
     protected ActorRef actor;
 
     /**
-     * This is the scheduler we will use, which will not actually schedule anything :-)
+     * This is the defaultScheduler we will use, which will not actually schedule anything :-)
      */
     protected MockScheduler scheduler;
 

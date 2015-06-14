@@ -30,6 +30,15 @@ public abstract class Event {
         return false;
     }
 
+    public SipTimerEvent toSipTimerEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + SipTimerEvent.class.getName());
+    }
+
+    @Override
+    public boolean equals(final Object other) {
+        return this == other;
+    }
+
     /**
      * There isn't an official "100 Trying" timer but if you look in the state machine for an Invite
      * Server Transaction it states that it should send a 100 Trying after 200 ms unless the TU does

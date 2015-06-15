@@ -1,6 +1,7 @@
 package io.sipstack.netty.codec.sip.actor;
 
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandler;
 import io.sipstack.netty.codec.sip.event.Event;
 
 import java.time.Duration;
@@ -21,4 +22,6 @@ public interface InternalScheduler {
      * @return a cancellable representing the task
      */
     Cancellable schedule(ChannelHandlerContext ctx, Event event, Duration delay);
+
+    Cancellable schedule(ChannelInboundHandler layer, ChannelHandlerContext ctx, Event event, Duration delay);
 }

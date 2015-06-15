@@ -48,7 +48,7 @@ public class SipMessageEvent extends Event {
 
         try {
             final SipMessage otherMsg = ((SipMessageEvent)other).msg;
-            if (msg.isRequest() != otherMsg.isRequest() && msg.getMethod().equals(otherMsg.getMethod())) {
+            if ((msg.isRequest() && otherMsg.isRequest() || msg.isResponse() && otherMsg.isResponse()) && msg.getMethod().equals(otherMsg.getMethod())) {
                 if (!msg.getCallIDHeader().equals(otherMsg.getCallIDHeader())) {
                     return false;
                 }

@@ -1,6 +1,7 @@
 package io.sipstack.netty.codec.sip.actor;
 
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandler;
 import io.sipstack.netty.codec.sip.event.Event;
 
 import java.time.Duration;
@@ -33,6 +34,11 @@ public class DefaultInternalScheduler implements InternalScheduler {
         }, delay.toMillis(), TimeUnit.MILLISECONDS);
 
         return new CancellableImpl(future);
+    }
+
+    @Override
+    public Cancellable schedule(ChannelInboundHandler layer, ChannelHandlerContext ctx, Event event, Duration delay) {
+        throw new RuntimeException("not implemented just yet");
     }
 
     private static class CancellableImpl implements Cancellable {

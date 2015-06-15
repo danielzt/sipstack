@@ -101,7 +101,15 @@ public class SingleContext implements ActorContext, Scheduler {
                 .build();
 
         // handlerCtx.executor().sc
-        // return scheduler.schedule(handlerCtx, event, delay);
+
+        if (true) {
+            return scheduler.schedule(transactionLayer, handlerCtx, event, delay);
+        }
+
+        // using the executor service associated with the handler itself
+        // makes it better in that when the event is fired, it is being
+        // executed on the correct threadpool. Otherwise it may have to
+        // do a context switch.
         final ScheduledFuture<?> future = handlerCtx.executor().schedule(new Runnable() {
             @Override
             public void run() {

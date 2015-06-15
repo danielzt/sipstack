@@ -31,7 +31,7 @@ import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SystemClock;
-import io.sipstack.netty.codec.sip.actor.DefaultInternalScheduler;
+import io.sipstack.netty.codec.sip.actor.HashWheelScheduler;
 import io.sipstack.netty.codec.sip.actor.InternalScheduler;
 import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
 import io.sipstack.netty.codec.sip.event.SipMessageEvent;
@@ -156,7 +156,8 @@ public abstract class Application<T extends Configuration> {
             networkBuilder.withUDPEventLoopGroup(udpTcpGroup);
             networkBuilder.withTCPEventLoopGroup(udpTcpGroup);
 
-            final InternalScheduler scheduler = new DefaultInternalScheduler(udpTcpGroup);
+            // final InternalScheduler scheduler = new DefaultInternalScheduler(udpTcpGroup);
+            final InternalScheduler scheduler = new HashWheelScheduler();
             final Clock clock = new SystemClock();
             networkBuilder.withTransportLayer(new TransportLayer(sipConfig.getTransport()));
             networkBuilder.withTransactionLayer(new TransactionLayer(clock, scheduler, sipConfig.getTransaction()));

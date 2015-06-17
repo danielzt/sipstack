@@ -161,8 +161,8 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
                 if (response.isProvisional()) {
                     become(TransactionState.PROCEEDING);
                 } else {
-                    become(TransactionState.COMPLETED);
-                    // become(TransactionState.TERMINATED);
+                    // become(TransactionState.COMPLETED);
+                    become(TransactionState.TERMINATED);
                 }
             }
             // note that any request is simply absorbed.

@@ -4,6 +4,7 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.netty.codec.sip.SipTimer;
+import io.sipstack.netty.codec.sip.Utils;
 import io.sipstack.netty.codec.sip.actor.ActorSupport;
 import io.sipstack.netty.codec.sip.actor.Cancellable;
 import io.sipstack.netty.codec.sip.config.TimersConfiguration;
@@ -81,7 +82,7 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
 
     private final TimersConfiguration timersConfig;
 
-    private SipResponse lastResponse;
+    private SipMessageEvent lastResponse;
 
     private Cancellable timer100Trying;
 
@@ -139,9 +140,9 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
         onEnter(TransactionState.ACCEPTED, onEnterAccepted);
         onExit(TransactionState.ACCEPTED, onExitAccepted);
 
-        // when(TransactionState.COMPLETED, completed);
-        // onEnter(TransactionState.COMPLETED, onEnterCompleted);
-        // onExit(TransactionState.COMPLETED, onExitCompleted);
+        when(TransactionState.COMPLETED, completed);
+        onEnter(TransactionState.COMPLETED, onEnterCompleted);
+        onExit(TransactionState.COMPLETED, onExitCompleted);
 
         // when(TransactionState.CONFIRMED, confirmed);
         // onEnter(TransactionState.CONFIRMED, onEnterConfirmed);
@@ -200,18 +201,15 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
             final SipMessage msg = sipMsgEvent.message();
 
             if (isRetransmittedInvite(msg)) {
-                if (lastResponse != null) {
-                    // isn't this wrong?
-                    relayResponse(event.toSipMessageEvent());
-                }
+                relayResponse(lastResponse);
                 return;
             }
 
             final SipResponse response = msg.toResponse();
             relayResponse(sipMsgEvent);
             if (response.isSuccess()) {
-                become(TransactionState.ACCEPTED);
-                // become(TransactionState.TERMINATED);
+                // become(TransactionState.ACCEPTED);
+                become(TransactionState.TERMINATED);
             } else if (response.isFinal()) {
                 become(TransactionState.COMPLETED);
             }
@@ -307,15 +305,93 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
         timerL.cancel();
     };
 
+    /**
+     * Implements the completed state, which is:
+     *
+     * <pre>
+     *
+     * INVITE                      Timer G fires
+     * send response +-----------+ send response         |
+     *      +--------|           |--------+
+     *      |        |           |        |
+     *      +------->| Completed |<-------+
+     *               |           |
+     *      +--------|           |----+
+     *      |        +-----------+    | ACK
+     *      |          ^   |          | -
+     *      |          |   |          |
+     *      +----------+   |          |
+     *      Transport Err. |          |
+     *      Inform TU      |          V
+     *                     |      +-----------+
+     *                     |      |           |
+     *                     |      | Confirmed |
+     *                     |      |           |
+     *       Timer H fires |      +-----------+
+     *       -             v
+     *              +------------+
+     *              |            |
+     *              | Terminated |
+     *              |            |
+     *              +------------+
+     * </pre>
+     */
+    private final Consumer<Event> completed = event -> {
+        if (event.isSipMessageEvent()) {
+            final SipMessageEvent sipMsgEvent = event.toSipMessageEvent();
+            final SipMessage msg = sipMsgEvent.message();
+
+            if (msg.isAck()) {
+                become(TransactionState.CONFIRMED);
+            } else if (isRetransmittedInvite(msg)) {
+                relayResponse(lastResponse);
+            }
+        } else if (event.isSipTimerG()) {
+            ++timerGCount;
+            timerG = scheduleTimer(SipTimer.G, calculateNextTimerG());
+            relayResponse(lastResponse);
+        } else if (event.isSipTimerH()) {
+            become(TransactionState.TERMINATED);
+        }
+    };
+
+    private final Consumer<Event> onEnterCompleted = event -> {
+        timerG = scheduleTimer(SipTimer.G, calculateNextTimerG());
+        timerH = scheduleTimer(SipTimer.H, timersConfig().getTimerH());
+    };
+
+    private final Consumer<Event> onExitCompleted = event -> {
+        timerG.cancel();
+        timerH.cancel();
+    };
+
+    /**
+     * While in the completed state we will re-transmit the final response (which then must be a
+     * error response only otherwise we wouldn't be in the completed state to begin with) every time
+     * this timer fires.
+     *
+     * @return
+     */
+    private Duration calculateNextTimerG() {
+        final long defaultTimerG = timersConfig().getTimerG().toMillis();
+        final long t2 = timersConfig().getT2().toMillis();
+        return Utils.calculateBackoffTimer(timerGCount, defaultTimerG, t2);
+    }
+
     public Transaction transaction() {
         return new DefaultTransaction(id, currentState);
     }
 
     private void relayResponse(final SipMessageEvent event) {
-        if (lastResponse == null
-                || lastResponse.getStatus() < event.message().toResponse().getStatus()) {
-            lastResponse = event.message().toResponse();
+        if (event == null) {
+            return;
         }
+
+        if (lastResponse == null || lastResponse.toSipMessageEvent().message().toResponse().getStatus()
+                < event.message().toResponse().getStatus()) {
+            lastResponse = event;
+        }
+
         ctx().forwardDownstream(event);
     }
 

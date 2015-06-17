@@ -141,9 +141,14 @@ public final class TimersConfiguration {
         this.timerG = Duration.ofMillis(this.t1.toMillis());
         this.timerH = Duration.ofMillis(64 * this.t1.toMillis());
         this.timerI = Duration.ofMillis(this.t4.toMillis());
+
         this.timerJ = Duration.ofMillis(64 * this.t1.toMillis());
+        // this.timerJ = Duration.ofMillis(1 * this.t1.toMillis());
+
         this.timerK = Duration.ofMillis(this.t4.toMillis());
+
         this.timerL = Duration.ofMillis(64 * this.t1.toMillis());
+        // this.timerL = Duration.ofMillis(1 * this.t1.toMillis());
     }
 
     public Duration getT1() {

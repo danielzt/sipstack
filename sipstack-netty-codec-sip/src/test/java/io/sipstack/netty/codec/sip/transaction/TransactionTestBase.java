@@ -27,6 +27,12 @@ public class TransactionTestBase extends SipStackTestBase {
     public void setUp() throws Exception {
         super.setUp();
         config = new TransactionLayerConfiguration();
+        // no need to consume a tonnes of memory for our unit tests
+        config.setDefaultStorageSize(100);
+        resetTransactionLayer();
+    }
+
+    public void resetTransactionLayer() {
         transactionLayer = new TransactionLayer(clock, defaultScheduler, config);
     }
 

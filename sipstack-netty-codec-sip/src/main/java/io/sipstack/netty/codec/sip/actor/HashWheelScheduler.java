@@ -8,6 +8,7 @@ import io.netty.util.TimerTask;
 import io.sipstack.netty.codec.sip.event.Event;
 
 import java.time.Duration;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -20,6 +21,7 @@ public class HashWheelScheduler implements InternalScheduler {
     private HashedWheelTimer timer;
 
     public HashWheelScheduler() {
+        Executors.newCachedThreadPool();
         timer = new HashedWheelTimer(1, TimeUnit.SECONDS, 512);
     }
 

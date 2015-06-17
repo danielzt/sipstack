@@ -27,6 +27,12 @@ public final class TransactionLayerConfiguration {
     private TimersConfiguration timers = new TimersConfiguration();
 
     /**
+     * The size of the internal transaction storage. Default is 500k
+     */
+    @JsonProperty
+    private int defaultStorageSize = 500000;
+
+    /**
      * @return the timers
      */
     public TimersConfiguration getTimers() {
@@ -51,4 +57,11 @@ public final class TransactionLayerConfiguration {
         this.send100TryingImmediately = value;
     }
 
+    public int getDefaultStorageSize() {
+        return defaultStorageSize;
+    }
+
+    public void setDefaultStorageSize(int defaultStorageSize) {
+        this.defaultStorageSize = defaultStorageSize;
+    }
 }

@@ -30,7 +30,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
     // TODO: This need to be configurable. Also, the JDK map implementation may
     // not be the fastest around either so do some performance tests regarding
     // that...
-    private final Map<TransactionId, TransactionActor> transactions = new ConcurrentHashMap<>(500000, 0.75f);
+    private final Map<TransactionId, TransactionActor> transactions;
 
     private final InternalScheduler scheduler;
 
@@ -40,6 +40,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
         this.clock = clock;
         this.scheduler = scheduler;
         this.config = config;
+        transactions = new ConcurrentHashMap<>(config.getDefaultStorageSize(), 0.75f);
     }
 
     /**

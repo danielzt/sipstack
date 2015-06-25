@@ -102,14 +102,14 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
 
         when(TransactionState.TRYING, trying);
 
-        // when(TransactionState.PROCEEDING, proceeding);
+        when(TransactionState.PROCEEDING, proceeding);
 
         when(TransactionState.COMPLETED, completed);
         onEnter(TransactionState.COMPLETED, onEnterCompleted);
 
-        // no exit from terminated. You are dead
-        // when(TransactionState.TERMINATED, terminated);
-        // onEnter(TransactionState.TERMINATED, onEnterTerminated);
+        // NOTE: no code needed for the terminated state.
+        // once we get there we are simply dead and no messages
+        // should be processed anyway.
     }
 
     /**
@@ -161,14 +161,65 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
                 if (response.isProvisional()) {
                     become(TransactionState.PROCEEDING);
                 } else {
-                    // become(TransactionState.COMPLETED);
-                    become(TransactionState.TERMINATED);
+                    become(TransactionState.COMPLETED);
+                    // become(TransactionState.TERMINATED);
                 }
             }
             // note that any request is simply absorbed.
             // unless we actually want to have a retransmited
             // hook as well, which we probably do want.
 
+        } else {
+            throw new RuntimeException("Currently not handling the event: " + event);
+        }
+    };
+
+    /**
+     * Implements the proceeding state as follows:
+     *
+     * <pre>
+     *                                |
+     *                                |1xx from TU
+     *                                |send response
+     *                                |
+     *             Request            V      1xx from TU
+     *             send response+-----------+send response
+     *                 +--------|           |--------+
+     *                 |        | Proceeding|        |
+     *                 +------->|           |<-------+
+     *          +<--------------|           |
+     *          |Trnsprt Err    +-----------+
+     *          |Inform TU            |
+     *          |                     |
+     *          |                     |200-699 from TU
+     *          |                     |send response
+     *          |                     V
+     *    +-------------+       +-----------+
+     *    | Terminated  |       | Completed |
+     *    +-------------+       +-----------+
+     *
+     * </pre>
+     */
+    private final Consumer<Event> proceeding = event -> {
+        if (event.isSipMessageEvent()) {
+            final SipMessageEvent sipMsgEvent = event.toSipMessageEvent();
+            final SipMessage msg = sipMsgEvent.message();
+
+            // any request is treated as a retransmission
+            // at this point since is must belong to the same
+            // transaction if it ends up here. However, perhaps
+            // we should actually check that it is the same method
+            // etc...
+            if (msg.isRequest()) {
+                relayResponse(lastResponse);
+                return;
+            }
+
+            final SipResponse response = msg.toResponse();
+            relayResponse(sipMsgEvent);
+            if (response.isFinal()) {
+                become(TransactionState.COMPLETED);
+            }
         } else {
             throw new RuntimeException("Currently not handling the event: " + event);
         }

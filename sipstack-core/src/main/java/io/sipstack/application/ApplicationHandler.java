@@ -28,6 +28,7 @@ public class ApplicationHandler extends InboundOutboundHandlerAdapter {
         if (!sip.isAck()) {
             connection.send(sip.createResponse(200));
         }
+
     }
 
     /**

@@ -45,8 +45,7 @@ public class InviteServerTransactionTest extends TransactionTestBase {
      *
      * @throws Exception
      */
-    // @Test(timeout = 500)
-    @Test
+    @Test(timeout = 500)
     public void testTimerG() throws Exception {
         final SipResponse response = defaultInviteRequest.createResponse(500);
         transitionToCompleted(response);
@@ -76,7 +75,7 @@ public class InviteServerTransactionTest extends TransactionTestBase {
         assertTransactionState(defaultInviteRequest, TransactionState.PROCEEDING);
 
         // and no downstream events at all...
-        assertNothingWritten();
+        defaultChannelCtx.assertNothingWritten();
 
         // reset the context so all latches etc start
         // over at 1 since it is easier to test that way
@@ -88,7 +87,7 @@ public class InviteServerTransactionTest extends TransactionTestBase {
 
         assertTransactionState(defaultInviteRequest, TransactionState.COMPLETED);
 
-        // and verify that that 200 OK was actually written to the context
+        // and verify that that final response was actually written to the context
         // and as such also written out the socket (well, eventually, at least
         // it is correctly being handed off to the next handler)
         waitAndAssertMessageWritten(responseEvent);
@@ -116,7 +115,7 @@ public class InviteServerTransactionTest extends TransactionTestBase {
         assertTransactionState(defaultInviteRequest, TransactionState.PROCEEDING);
 
         // and no downstream events at all...
-        assertNothingWritten();
+        defaultChannelCtx.assertNothingWritten();
 
         // reset the context so all latches etc start
         // over at 1 since it is easier to test that way

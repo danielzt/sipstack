@@ -72,7 +72,11 @@ public class SipStackTestBase {
      * again so we start over.
      */
     public void resetChannelHandlerContext(final InboundOutboundHandlerAdapter handler) {
-        defaultChannelCtx = new MockChannelHandlerContext(handler);
+        defaultChannelCtx.reset(handler);
+    }
+
+    public void resetChannelHandlerContext() {
+        defaultChannelCtx.reset();
     }
 
     /**

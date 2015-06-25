@@ -18,15 +18,18 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.*;
+
 /**
  * @author jonas@jonasborjesson.com
  */
 public class MockChannelHandlerContext implements ChannelHandlerContext {
 
-    private InboundOutboundHandlerAdapter handler;
+    private AtomicReference<InboundOutboundHandlerAdapter> handler = new AtomicReference<>();
 
     public MockChannelHandlerContext(final InboundOutboundHandlerAdapter handler) {
-        this.handler = handler;
+        this.handler.set(handler);
     }
 
     /**
@@ -34,24 +37,38 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
      * By default the latch is set to 1 but you may want to change it if you
      * expect something else.
      */
-    public AtomicReference<CountDownLatch> fireChannelReadLatch = new AtomicReference<>(new CountDownLatch(1));
+    private AtomicReference<CountDownLatch> fireChannelReadLatch = new AtomicReference<>(new CountDownLatch(1));
 
     /**
      * List for keeping track of all the messages that has been pushed
      * through the context. These are the ones stored on the "fireChannelRead"
      */
-    public List<Object> channelReadObjects = new CopyOnWriteArrayList<>();
+    private List<Object> channelReadObjects = new CopyOnWriteArrayList<>();
 
     /**
      * Latch for keeping track of writes.
      */
-    public AtomicReference<CountDownLatch> writeLatch = new AtomicReference<>(new CountDownLatch(1));
+    private AtomicReference<CountDownLatch> writeLatch = new AtomicReference<>(new CountDownLatch(1));
 
     /**
      * List for keeping track of all the messages that have been written to
      * this context.
      */
-    public List<Object> writeObjects = new CopyOnWriteArrayList<>();
+    private List<Object> writeObjects = new CopyOnWriteArrayList<>();
+
+    public void reset() {
+        reset(handler.get());
+    }
+
+    public void reset(final InboundOutboundHandlerAdapter adapter) {
+        this.handler.set(adapter);
+
+        channelReadObjects.clear();
+        writeObjects.clear();
+        fireChannelReadLatch.set(new CountDownLatch(1));
+        writeLatch.set(new CountDownLatch(1));
+    }
+
 
     @Override
     public Channel channel() {
@@ -106,11 +123,44 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
     @Override
     public ChannelHandlerContext fireUserEventTriggered(final Object event) {
         try {
-            handler.userEventTriggered(this, event);
+            handler.get().userEventTriggered(this, event);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return this;
+    }
+
+    /**
+     * Convenience method for making sure that nothing was written out to the context
+     * and as such, we didn't actually try and send something across the socket.
+     */
+    public void assertNothingWritten() {
+        assertThat(writeObjects.isEmpty(), is(true));
+    }
+
+    /**
+     * Convenience method for making sure that nothing was forwarded in the
+     * handler chain and as such the next one should not have gotten another
+     * read event.
+     */
+    public void assertNothingRead() {
+        assertThat(channelReadObjects.isEmpty(), is(true));
+    }
+
+    /**
+     * When a channel handler processes a message (such as the invite server transaction)
+     * it can choose to forward the message to the next handler in the pipeline. This
+     * is a helper method to ensure that a particular message was indeed forwarded.
+     * @param msg
+     */
+    public void assertMessageForwarded(final Object msg) {
+        assertThat(channelReadObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(), is(true));
+    }
+
+
+    public void assertMessageWritten(final Object msg) {
+        assertThat(writeObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(),
+                is(true));
     }
 
     @Override
@@ -118,6 +168,10 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
         channelReadObjects.add(msg);
         fireChannelReadLatch.get().countDown();
         return this;
+    }
+
+    public CountDownLatch fireChannelReadLatch() {
+        return fireChannelReadLatch.get();
     }
 
     @Override
@@ -204,6 +258,10 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
         // write futures but if we ever do we need
         // to return something useful.
         return null;
+    }
+
+    public CountDownLatch writeLatch() {
+        return writeLatch.get();
     }
 
     @Override

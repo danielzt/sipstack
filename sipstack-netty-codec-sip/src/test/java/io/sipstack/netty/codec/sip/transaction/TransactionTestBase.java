@@ -2,6 +2,7 @@ package io.sipstack.netty.codec.sip.transaction;
 
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.netty.codec.sip.MockChannelHandlerContext;
 import io.sipstack.netty.codec.sip.SipStackTestBase;
 import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
@@ -30,6 +31,7 @@ public class TransactionTestBase extends SipStackTestBase {
         // no need to consume a tonnes of memory for our unit tests
         config.setDefaultStorageSize(100);
         resetTransactionLayer();
+        defaultChannelCtx = new MockChannelHandlerContext(transactionLayer);
     }
 
     public void resetTransactionLayer() {
@@ -62,22 +64,6 @@ public class TransactionTestBase extends SipStackTestBase {
         return new SipMessageEvent(defaultConnection, msg, 0);
     }
 
-    /**
-     * Convenience method for making sure that nothing was written out to the context
-     * and as such, we didn't actually try and send something across the socket.
-     */
-    protected void assertNothingWritten() {
-        assertThat(defaultChannelCtx.writeObjects.isEmpty(), is(true));
-    }
-
-    /**
-     * Convenience method for making sure that nothing was forwarded in the
-     * handler chain and as such the next one should not have gotten another
-     * read event.
-     */
-    protected void assertNothingRead() {
-        assertThat(defaultChannelCtx.channelReadObjects.isEmpty(), is(true));
-    }
 
     /**
      * Convenience method for first hanging on the write latch and then
@@ -87,24 +73,14 @@ public class TransactionTestBase extends SipStackTestBase {
      * @throws InterruptedException
      */
     protected void waitAndAssertMessageWritten(final Object msg) throws InterruptedException {
-        defaultChannelCtx.writeLatch.get().await();
+        defaultChannelCtx.writeLatch().await();
         if (msg instanceof SipMessage) {
             // convenience method since internally we will
             // always only write events
-            assertMessageWritten(new SipMessageEvent(null, (SipMessage)msg, 0));
+            defaultChannelCtx.assertMessageWritten(new SipMessageEvent(null, (SipMessage)msg, 0));
         } else {
-            assertMessageWritten(msg);
+            defaultChannelCtx.assertMessageWritten(msg);
         }
-    }
-
-    /**
-     * Ensure that a particular object was indeed written to the context.
-     *
-     * @param msg
-     */
-    protected void assertMessageWritten(final Object msg) {
-        assertThat(defaultChannelCtx.writeObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(),
-                is(true));
     }
 
     /**
@@ -115,19 +91,8 @@ public class TransactionTestBase extends SipStackTestBase {
      * @param msg
      */
     protected void waitAndAssertMessageForwarded(final Object msg) throws InterruptedException {
-        defaultChannelCtx.fireChannelReadLatch.get().await();
-        assertMessageForwarded(msg);
-    }
-
-    /**
-     * When a channel handler processes a message (such as the invite server transaction)
-     * it can choose to forward the message to the next handler in the pipeline. This
-     * is a helper method to ensure that a particular message was indeed forwarded.
-     * @param msg
-     */
-    protected void assertMessageForwarded(final Object msg) {
-        assertThat(defaultChannelCtx.channelReadObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(),
-                is(true));
+        defaultChannelCtx.fireChannelReadLatch().await();
+        defaultChannelCtx.assertMessageForwarded(msg);
     }
 
 

@@ -30,6 +30,21 @@ public final class MySipApplication extends Application<MyConfiguration> {
     @INVITE
     public void processInvite(final SipMessageEvent event) {
         logger.info("Recevied a new sip event");
+
+        ctx().proxy(event).withXXX().withYYY().start();
+        ctx().doProxy(event).withXXX().onBranchFailure(b->);
+        proxy().cancel(); // does it nicely and let's the app know whats going on
+        proxy().terminate(); // does it nicely but doesn't let the app know.
+        proxy().die(); // just fucking kills it. Cleans out all memory. Its gone.
+
+        ctx().invite("sip:xxxx.om"); // will create a new UA instance builder.
+        ctx().subscribe("sip:xxxx.om"); // will create a new UA instance builder.
+        ctx().method(); // new UA instance.
+        ctx().get("http://whatever.com").accept("application/json").onFailure(f -> do something);
+
+        ua().invite("sip:xxxxx.com").withCSeq().withVia().send();
+        ua(); // will return the current UA instance associated with the current event.
+        ua().onRetransmit();
     }
 
     @Override

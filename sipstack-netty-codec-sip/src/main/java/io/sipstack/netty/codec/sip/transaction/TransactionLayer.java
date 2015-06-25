@@ -14,9 +14,7 @@ import io.sipstack.netty.codec.sip.event.SipTimerEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -27,20 +25,17 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
 
     private final TransactionLayerConfiguration config;
 
-    // TODO: This need to be configurable. Also, the JDK map implementation may
-    // not be the fastest around either so do some performance tests regarding
-    // that...
-    private final Map<TransactionId, TransactionActor> transactions;
-
     private final InternalScheduler scheduler;
 
     private final Clock clock;
+
+    private final TransactionStore transactionStore;
 
     public TransactionLayer(final Clock clock, final InternalScheduler scheduler, final TransactionLayerConfiguration config) {
         this.clock = clock;
         this.scheduler = scheduler;
         this.config = config;
-        transactions = new ConcurrentHashMap<>(config.getDefaultStorageSize(), 0.75f);
+        transactionStore = new DefaultTransactionStore(config);
     }
 
     /**
@@ -81,7 +76,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
     private void processSipTimerEvent(final ChannelHandlerContext ctx, final SipTimerEvent event) {
         try {
             final TransactionId id = (TransactionId) event.key();
-            final TransactionActor transaction = transactions.get(id);
+            final TransactionActor transaction = transactionStore.get(id);
             if (transaction != null) {
                 invoke(ctx, event, transaction);
                 checkIfTerminated(transaction);
@@ -94,7 +89,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
     }
 
     public Optional<Transaction> getTransaction(final TransactionId id) {
-        final TransactionActor actor = transactions.get(id);
+        final TransactionActor actor = transactionStore.get(id);
         if (actor != null) {
             return Optional.of(actor.transaction());
         }
@@ -109,7 +104,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
      */
     private void checkIfTerminated(final TransactionActor actor) {
         if (actor != null && actor.isTerminated()) {
-            transactions.remove(actor.id());
+            transactionStore.remove(actor.id());
             // TODO: an actor can emit more events here.
             actor.stop();
             actor.postStop();
@@ -121,7 +116,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
         try {
             final Event event = (Event)msg;
             final SipMessage sipMsg = event.toSipMessageEvent().message();
-            final TransactionActor transaction = ensureTransaction(sipMsg);
+            final TransactionActor transaction = transactionStore.ensureTransaction(sipMsg);
             invoke(ctx, event, transaction);
             checkIfTerminated(transaction);
         } catch (final ClassCastException e) {
@@ -144,6 +139,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
         }
     }
 
+    /*
     private TransactionActor ensureTransaction(final SipMessage sipMsg) {
         final TransactionId id = TransactionId.create(sipMsg);
         return transactions.computeIfAbsent(id, obj -> {
@@ -167,6 +163,7 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
             return new NonInviteServerTransactionActor(id, sipMsg.toRequest(), config);
         });
     }
+    */
 
     /**
      *

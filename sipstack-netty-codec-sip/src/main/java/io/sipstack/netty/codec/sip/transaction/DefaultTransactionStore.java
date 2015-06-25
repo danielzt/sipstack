@@ -12,17 +12,22 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultTransactionStore implements TransactionStore {
 
     private final TransactionLayerConfiguration config;
-    private final Map<TransactionId, TransactionActor> transactions;
+    private final int stores = 10;
+    private final Map<TransactionId, TransactionActor>[] transactions;
 
     public DefaultTransactionStore(final TransactionLayerConfiguration config) {
         this.config = config;
-        transactions = new ConcurrentHashMap<>(config.getDefaultStorageSize(), 0.75f);
+        transactions = new Map[stores];
+        for (int i = 0; i < stores; ++i) {
+            transactions[i] = new ConcurrentHashMap<>(config.getDefaultStorageSize() / stores, 0.75f);
+        }
     }
+
 
     @Override
     public TransactionActor ensureTransaction(final SipMessage sipMsg) {
         final TransactionId id = TransactionId.create(sipMsg);
-        return transactions.computeIfAbsent(id, obj -> {
+        return transactions[Math.abs(id.hashCode() % stores)].computeIfAbsent(id, obj -> {
 
             if (sipMsg.isResponse()) {
                 // wtf. Stray response, deal with it
@@ -46,11 +51,11 @@ public class DefaultTransactionStore implements TransactionStore {
 
     @Override
     public TransactionActor get(final TransactionId id) {
-        return transactions.get(id);
+        return transactions[Math.abs(id.hashCode() % stores)].get(id);
     }
 
     @Override
     public void remove(TransactionId id) {
-        transactions.remove(id);
+        transactions[Math.abs(id.hashCode() % stores)].remove(id);
     }
 }

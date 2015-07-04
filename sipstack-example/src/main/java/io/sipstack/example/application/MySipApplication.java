@@ -3,12 +3,15 @@
  */
 package io.sipstack.example.application;
 
+import io.pkts.buffer.Buffer;
+import io.pkts.packet.sip.SipMessage;
 import io.sipstack.annotations.INVITE;
 import io.sipstack.core.Application;
 import io.sipstack.core.Bootstrap;
 import io.sipstack.core.Environment;
+import io.sipstack.netty.codec.sip.application.ApplicationInstance;
+import io.sipstack.netty.codec.sip.application.ApplicationInstanceCreator;
 import io.sipstack.netty.codec.sip.event.SipMessageEvent;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,20 +34,21 @@ public final class MySipApplication extends Application<MyConfiguration> {
     public void processInvite(final SipMessageEvent event) {
         logger.info("Recevied a new sip event");
 
-        ctx().proxy(event).withXXX().withYYY().start();
-        ctx().doProxy(event).withXXX().onBranchFailure(b->);
-        proxy().cancel(); // does it nicely and let's the app know whats going on
-        proxy().terminate(); // does it nicely but doesn't let the app know.
-        proxy().die(); // just fucking kills it. Cleans out all memory. Its gone.
+        // ProxyBranch branch = ProxyBranch.withTarget("sip:hello.com").withRoute().withRoute().withHeader(header).build();
+        // ctx().proxyRequest(event).withXXX().withYYY().withBranch(branch).start();
+        // ctx().doProxy(event).withXXX().onBranchFailure(b ->);
+        // proxy().cancel(); // does it nicely and let's the app know whats going on
+        // proxy().terminate(); // does it nicely but doesn't let the app know.
+        // proxy().die(); // just fucking kills it. Cleans out all memory. Its gone.
 
-        ctx().invite("sip:xxxx.om"); // will create a new UA instance builder.
-        ctx().subscribe("sip:xxxx.om"); // will create a new UA instance builder.
-        ctx().method(); // new UA instance.
-        ctx().get("http://whatever.com").accept("application/json").onFailure(f -> do something);
+        // ctx().invite("sip:xxxx.om"); // will create a new UA instance builder.
+        // ctx().subscribe("sip:xxxx.om"); // will create a new UA instance builder.
+        // ctx().method(); // new UA instance.
+        // ctx().get("http://whatever.com").accept("application/json").onFailure(f -> do something);
 
-        ua().invite("sip:xxxxx.com").withCSeq().withVia().send();
-        ua(); // will return the current UA instance associated with the current event.
-        ua().onRetransmit();
+        // ua().invite("sip:xxxxx.com").withCSeq().withVia().send();
+        // ua(); // will return the current UA instance associated with the current event.
+        // ua().onRetransmit();
     }
 
     @Override
@@ -59,6 +63,25 @@ public final class MySipApplication extends Application<MyConfiguration> {
     public void run(final MyConfiguration configuration, final Environment environment) throws Exception {
         System.err.println("I'm running");
         environment.addResource(this);
+    }
+
+    @Override
+    public ApplicationInstanceCreator applicationCreator() {
+        return new DefaultApplicationInstanceCreator();
+    }
+
+    private static class DefaultApplicationInstanceCreator implements ApplicationInstanceCreator {
+
+        @Override
+        public Buffer getId(final SipMessage message) {
+            return message.getCallIDHeader().getCallId();
+        }
+
+        @Override
+        public ApplicationInstance createInstance(final Buffer id, final SipMessage message) {
+            return new MyApplicationInstance(id);
+        }
+
     }
 
     public static void main(final String ... args) throws Exception {

@@ -1,7 +1,5 @@
 package io.sipstack.net;
 
-import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
-import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -10,6 +8,8 @@ import io.netty.channel.ChannelFutureListener;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.netty.codec.sip.Transport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -18,8 +18,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
+import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 /**
  *
@@ -210,7 +210,7 @@ public final class NetworkInterface implements ChannelFutureListener {
             final SipURI vipAddress = this.config.getVipAddress();
             final List<ListeningPoint> lps = new ArrayList<>();
             this.config.getTransports().forEach(t -> {
-                final SipURI listen = SipURI.with(listenAddress).transport(t.toString()).build();
+                final SipURI listen = SipURI.withTemplate(listenAddress).withTransport(t.toString()).build();
                 final SipURI vipClone = vipAddress != null ? vipAddress.clone() : null;
                 lps.add(ListeningPoint.create(listen, vipClone));
             });

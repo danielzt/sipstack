@@ -71,7 +71,7 @@ public class NetworkLayer {
     }
 
     public void start() {
-        this.interfaces.forEach(i -> i.up());
+        this.interfaces.forEach(NetworkInterface::up);
     }
 
     public void sync() throws InterruptedException {

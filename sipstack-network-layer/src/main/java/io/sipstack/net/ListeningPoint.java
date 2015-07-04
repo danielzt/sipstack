@@ -3,14 +3,15 @@
  */
 package io.sipstack.net;
 
-import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
 import io.netty.channel.Channel;
 import io.pkts.packet.sip.address.SipURI;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
+
 /**
- * Simple wrapper around the actual listen address and the optional
+ * Simple wrapper around the actual listening address and the optional
  * vip address.
  * 
  * @author jonas@jonasborjesson.com

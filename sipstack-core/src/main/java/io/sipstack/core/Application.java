@@ -18,7 +18,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.application.ApplicationHandler;
 import io.sipstack.application.ApplicationSupervisor;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
@@ -33,6 +32,8 @@ import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.netty.codec.sip.actor.HashWheelScheduler;
 import io.sipstack.netty.codec.sip.actor.InternalScheduler;
+import io.sipstack.netty.codec.sip.application.ApplicationInstanceCreator;
+import io.sipstack.netty.codec.sip.application.ApplicationController;
 import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
 import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.transaction.TransactionLayer;
@@ -104,6 +105,12 @@ public abstract class Application<T extends Configuration> {
     public abstract void run(T configuration, Environment environment) throws Exception;
 
     /**
+     *
+     * @return
+     */
+    public abstract ApplicationInstanceCreator applicationCreator();
+
+    /**
      * Parses command-line arguments and runs the application. Call this method from a {@code public
      * static void main} entry point in your application.
      *
@@ -161,7 +168,7 @@ public abstract class Application<T extends Configuration> {
             final Clock clock = new SystemClock();
             networkBuilder.withTransportLayer(new TransportLayer(sipConfig.getTransport()));
             networkBuilder.withTransactionLayer(new TransactionLayer(clock, scheduler, sipConfig.getTransaction()));
-            networkBuilder.withApplication(new ApplicationHandler());
+            networkBuilder.withApplication(new ApplicationController(clock, scheduler, applicationCreator()));
 
             final NetworkLayer server = networkBuilder.build();
             server.start();

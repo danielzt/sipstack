@@ -60,11 +60,6 @@ public class TransactionTestBase extends SipStackTestBase {
         assertThat(transaction.get().state(), is(expectedState));
     }
 
-    public SipMessageEvent createEvent(final SipMessage msg) {
-        return new SipMessageEvent(defaultConnection, msg, 0);
-    }
-
-
     /**
      * Convenience method for first hanging on the write latch and then
      * verify that a particular message was indeed written to the context.

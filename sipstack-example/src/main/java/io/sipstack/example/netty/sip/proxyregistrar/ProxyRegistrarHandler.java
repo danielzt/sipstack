@@ -68,7 +68,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
 
     private SipURI lookupLocation(final SipRequest request) {
         final SipURI requestURI = (SipURI) request.getRequestUri();
-        final SipURI aor = SipURI.with().user(requestURI.getUser()).host(requestURI.getHost()).build();
+        final SipURI aor = SipURI.withUser(requestURI.getUser()).withHost(requestURI.getHost()).build();
         final List<Binding> bindings = this.locationService.getBindings(aor);
 
         // if there are no bindings for this AOR then return
@@ -255,7 +255,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
      */
     private SipURI getAOR(final SipRequest request) {
         final SipURI sipURI = (SipURI) request.getToHeader().getAddress().getURI();
-        return SipURI.with().user(sipURI.getUser()).host(sipURI.getHost()).build();
+        return SipURI.withUser(sipURI.getUser()).withHost(sipURI.getHost()).build();
     }
 
 }

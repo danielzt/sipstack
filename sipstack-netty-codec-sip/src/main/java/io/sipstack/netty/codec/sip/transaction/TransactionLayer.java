@@ -132,38 +132,12 @@ public class TransactionLayer extends InboundOutboundHandlerAdapter {
 
         try {
             final SingleContext actorCtx = invokeTransaction(ctx, msg, transaction);
-            actorCtx.downstream().ifPresent(e -> ctx.write(e));
-            actorCtx.upstream().ifPresent(e -> ctx.fireChannelRead(e));
+            actorCtx.downstream().ifPresent(ctx::write);
+            actorCtx.upstream().ifPresent(ctx::fireChannelRead);
         } catch (final Throwable t) {
             t.printStackTrace();
         }
     }
-
-    /*
-    private TransactionActor ensureTransaction(final SipMessage sipMsg) {
-        final TransactionId id = TransactionId.create(sipMsg);
-        return transactions.computeIfAbsent(id, obj -> {
-
-            if (sipMsg.isResponse()) {
-                // wtf. Stray response, deal with it
-                throw new RuntimeException("Sorry, not dealing with stray responses right now");
-            }
-
-            if (sipMsg.isInvite()) {
-                return new InviteServerTransactionActor(id, sipMsg.toRequest(), config);
-            }
-
-            // if ack doesn't match an existing transaction then this ack must have been to a 2xx and
-            // therefore goes in its own transaction but then ACKs doesn't actually have a real
-            // transaction so therefore, screw it...
-            if (sipMsg.isAck()) {
-                return null;
-            }
-
-            return new NonInviteServerTransactionActor(id, sipMsg.toRequest(), config);
-        });
-    }
-    */
 
     /**
      *

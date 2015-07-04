@@ -11,6 +11,7 @@ import io.pkts.streams.Stream;
 import io.pkts.streams.StreamHandler;
 import io.pkts.streams.StreamListener;
 import io.pkts.streams.impl.DefaultStreamHandler;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import org.junit.Before;
 
 import java.io.IOException;
@@ -87,6 +88,10 @@ public class SipStackTestBase {
         final InetSocketAddress localAddress = new InetSocketAddress(localIp, localPort);
         final InetSocketAddress remoteAddress = new InetSocketAddress(remoteIp, remotePort);
         return ConnectionId.create(protocol, localAddress, remoteAddress);
+    }
+
+    public SipMessageEvent createEvent(final SipMessage msg) {
+        return new SipMessageEvent(defaultConnection, msg, 0);
     }
 
 

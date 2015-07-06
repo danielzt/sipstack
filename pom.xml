@@ -70,7 +70,7 @@
     <module>sipstack-network-layer</module>
     <module>sipstack-core</module>
 <!--
-    <module>sipstack-transaction</module>
+    <module>sipstack-io.sipstack.transaction.transaction</module>
 -->
     <module>sipstack-example</module>
   </modules>
@@ -105,7 +105,7 @@
 <!--
     <dependency>
       <groupId>io.sipstack</groupId>
-      <artifactId>sipstack-transaction</artifactId>
+      <artifactId>sipstack-io.sipstack.transaction.transaction</artifactId>
       <version>${project.version}</version>
       <type>jar</type>
       <scope>compile</scope>

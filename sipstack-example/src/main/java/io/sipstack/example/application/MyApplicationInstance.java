@@ -3,10 +3,10 @@ package io.sipstack.example.application;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.netty.codec.sip.application.ApplicationInstance;
-import io.sipstack.netty.codec.sip.event.Event;
-import io.sipstack.netty.codec.sip.tu.Proxy;
-import io.sipstack.netty.codec.sip.tu.ProxyBranch;
+import io.sipstack.application.application.ApplicationInstance;
+import io.sipstack.event.Event;
+import io.sipstack.transactionuser.Proxy;
+import io.sipstack.transactionuser.ProxyBranch;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -18,7 +18,7 @@ public class MyApplicationInstance extends ApplicationInstance {
     }
 
     public void onRequest(final SipRequest request) {
-        System.err.println("yeah! My application instance got the request!");
+        System.err.println("yeah! My io.sipstack.application.application instance got the request!");
         final SipURI to = SipURI.withUser("hello").withHost("127.0.0.1").withPort(5090).build();
         Proxy.Builder builder = proxy(to);
         builder.onBranchFailure(this::onBranchFailure);

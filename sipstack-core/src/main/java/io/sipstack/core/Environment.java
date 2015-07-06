@@ -1,15 +1,12 @@
 package io.sipstack.core;
 
+import com.codahale.metrics.MetricRegistry;
+
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotEmpty;
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import com.codahale.metrics.MetricRegistry;
-
 /**
- * The execution environment for an application.
+ * The execution environment for an io.sipstack.application.application.
  * 
  * @author jonas@jonasborjesson.com
  */
@@ -18,7 +15,7 @@ public class Environment {
     private final String name;
     private final MetricRegistry metricRegistry;
 
-    private final List<DynamicApplicationInvoker> sipHandlers = new ArrayList<>();
+    // private final List<DynamicApplicationInvoker> sipHandlers = new ArrayList<>();
 
 
     private Environment(final String name, final MetricRegistry registry) {
@@ -27,14 +24,17 @@ public class Environment {
     }
 
     public Environment addResource(final Object resource) {
+        /*
         final DynamicApplicationInvoker sip = wrapSipHandler(resource);
         if (sip != null) {
             this.sipHandlers.add(sip);
         }
+        */
 
         return this;
     }
 
+    /*
     private DynamicApplicationInvoker wrapSipHandler(final Object resource) {
         try {
             return DynamicApplicationInvoker.wrap(resource);
@@ -44,6 +44,7 @@ public class Environment {
             return null;
         }
     }
+    */
 
     public static Builder withName(final String name) throws IllegalArgumentException {
         return new Builder(ensureNotEmpty(name, "Name cannot be null or the empty string"));

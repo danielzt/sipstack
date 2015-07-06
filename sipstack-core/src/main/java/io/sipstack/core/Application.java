@@ -11,35 +11,24 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import io.hektor.core.ActorRef;
 import io.hektor.core.Hektor;
-import io.hektor.core.Props;
 import io.hektor.core.RoutingLogic;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.pkts.buffer.Buffer;
-import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.application.ApplicationSupervisor;
+import io.sipstack.actor.HashWheelScheduler;
+import io.sipstack.actor.InternalScheduler;
+import io.sipstack.application.application.ApplicationInstanceCreator;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.NetworkInterfaceDeserializer;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
-import io.sipstack.event.InitEvent;
-import io.sipstack.net.NetworkLayer;
+import io.sipstack.net.NettyNetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 import io.sipstack.netty.codec.sip.SystemClock;
-import io.sipstack.netty.codec.sip.actor.HashWheelScheduler;
-import io.sipstack.netty.codec.sip.actor.InternalScheduler;
-import io.sipstack.netty.codec.sip.application.ApplicationInstanceCreator;
-import io.sipstack.netty.codec.sip.application.ApplicationController;
-import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
-import io.sipstack.netty.codec.sip.transaction.TransactionLayer;
-import io.sipstack.netty.codec.sip.transport.TransportLayer;
-import io.sipstack.transaction.impl.TransactionSupervisor;
-import io.sipstack.transport.TransportSupervisor;
 import io.sipstack.utils.Generics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,9 +63,9 @@ public abstract class Application<T extends Configuration> {
 
 
     /**
-     * Initializes the application bootstrap.
+     * Initializes the io.sipstack.application.application bootstrap.
      *
-     * @param bootstrap the application bootstrap
+     * @param bootstrap the io.sipstack.application.application bootstrap
      */
     public void initialize(final Bootstrap<T> bootstrap) {
         // sub-classes should override
@@ -87,12 +76,12 @@ public abstract class Application<T extends Configuration> {
     }
 
     /**
-     * Will be called when the application runs. Override it to add
-     * resources etc for your application.
+     * Will be called when the io.sipstack.application.application runs. Override it to add
+     * resources etc for your io.sipstack.application.application.
      * 
      * Note that any exception that escapes this method will cause 
-     * the application to halt. Typically this is what you want since
-     * you do not ever want to run your application in a 
+     * the io.sipstack.application.application to halt. Typically this is what you want since
+     * you do not ever want to run your io.sipstack.application.application in a
      * half-initialized/unknown stage. Hence, make sure that you do
      * handle all the exceptions that you can indeed handle but if
      * you do not have a sane default behavior for dealing with a 
@@ -100,7 +89,7 @@ public abstract class Application<T extends Configuration> {
      * that the server shuts down.
      * 
      * @param configuration the parsed {@link Configuration} object
-     * @throws Exception if anything goes wrong. The application will halt.
+     * @throws Exception if anything goes wrong. The io.sipstack.application.application will halt.
      */
     public abstract void run(T configuration, Environment environment) throws Exception;
 
@@ -111,11 +100,11 @@ public abstract class Application<T extends Configuration> {
     public abstract ApplicationInstanceCreator applicationCreator();
 
     /**
-     * Parses command-line arguments and runs the application. Call this method from a {@code public
-     * static void main} entry point in your application.
+     * Parses command-line arguments and runs the io.sipstack.application.application. Call this method from a {@code public
+     * static void main} entry point in your io.sipstack.application.application.
      *
      * @param arguments the command-line arguments
-     * @throws Exception if anything goes wrong. The application will halt.
+     * @throws Exception if anything goes wrong. The io.sipstack.application.application will halt.
      */
     public final void run(final String... arguments) throws Exception {
 
@@ -139,23 +128,13 @@ public abstract class Application<T extends Configuration> {
             builder.withMetricRegistry(bootstrap.getMetricRegistry());
             final Environment environment = builder.build();
 
-            // start the application
+            // start the io.sipstack.application.application
             run(config, environment);
 
             // Create and initialize the actual Sip server
             final SipConfiguration sipConfig = config.getSipConfiguration();
             final List<NetworkInterfaceConfiguration> ifs = sipConfig.getNetworkInterfaces();
-            final NetworkLayer.Builder networkBuilder = NetworkLayer.with(ifs);
-
-            // configure Hektor
-            // no longer using Hektor.
-            /*
-            final HektorConfiguration hektorConfig = config.getHektorConfiguration();
-            final Hektor hektor = Hektor.withName("hello").withConfiguration(hektorConfig).build();
-            final ActorRef transportSupervisorRef = ActorSystemBuilder.withConfig(config).withHektor(hektor).build();
-            final SipBridgeHandler handler = new SipBridgeHandler(transportSupervisorRef);
-            networkBuilder.serverHandler(handler);
-            */
+            final NettyNetworkLayer.Builder networkBuilder = NettyNetworkLayer.with(ifs);
 
             final EventLoopGroup boosGroup = new NioEventLoopGroup();
             final EventLoopGroup udpTcpGroup = new NioEventLoopGroup();
@@ -166,11 +145,13 @@ public abstract class Application<T extends Configuration> {
             // final InternalScheduler scheduler = new DefaultInternalScheduler(udpTcpGroup);
             final InternalScheduler scheduler = new HashWheelScheduler();
             final Clock clock = new SystemClock();
-            networkBuilder.withTransportLayer(new TransportLayer(sipConfig.getTransport()));
-            networkBuilder.withTransactionLayer(new TransactionLayer(clock, scheduler, sipConfig.getTransaction()));
-            networkBuilder.withApplication(new ApplicationController(clock, scheduler, applicationCreator()));
 
-            final NetworkLayer server = networkBuilder.build();
+            // catch 22. The sipstack needs a reference to the network layer
+            // and the network layer needs the handler to pass messages to.
+            final SipStack stack = SipStack.withConfiguration(sipConfig).withClock(clock).withScheduler(scheduler).build();
+            networkBuilder.withHandler(stack.handler());
+
+            final NettyNetworkLayer server = networkBuilder.build();
             server.start();
 
             // will wait until server shuts down again.
@@ -199,15 +180,15 @@ public abstract class Application<T extends Configuration> {
         // 3. Runs a EnvironmentCommand that will:
         // 3a. Create a new Environment
         // 3a. Call ootsrap.run(configuration, environment)
-        // 3a. Call application.run(configuration, environment);
+        // 3a. Call io.sipstack.application.application.run(configuration, environment);
         // 3a. call run(configuration, environment) on itself.
 
         // Bootstrap.run will:
         // 1. For each Bundle call bundle.run(environment)
         //        AssetBundle
-        //        HelloWorldApplication$2 - guess this must be a bundlefied version of my application
+        //        HelloWorldApplication$2 - guess this must be a bundlefied version of my io.sipstack.application.application
         // 2. For each ConfigureBundle call bundle.run(environment)
-        //        HelloWorldApplication$1 - guess this must be a bundlefied version of my application
+        //        HelloWorldApplication$1 - guess this must be a bundlefied version of my io.sipstack.application.application
 
         // ServerCommand.run will:
         // Create a new Jetty Server and will then start it, which is what starts the Jetty Server.
@@ -217,7 +198,7 @@ public abstract class Application<T extends Configuration> {
     /**
      * Builder to setup the actor chains for everything needed by the container.
      * Primarily, this is to setup the SIP related chains, going from the
-     * transport layer, to transaction, to dialog, to application etc.
+     * transport layer, to io.sipstack.transaction.transaction, to dialog, to io.sipstack.application.application etc.
      *
      */
     public static class ActorSystemBuilder {
@@ -248,13 +229,13 @@ public abstract class Application<T extends Configuration> {
             routerBuilder.withRoutingLogic(new ConnectionRoutingLogic());
 
 
-            Hektor.RouterBuilder transactionRouterBuilder = hektor.routerWithName("transaction-router");
+            Hektor.RouterBuilder transactionRouterBuilder = hektor.routerWithName("io.sipstack.transaction.transaction-router");
             transactionRouterBuilder.withRoutingLogic(new SipMessageRoutingLogic());
 
-            // TODO: the routing logic for the application router should be configurable
+            // TODO: the routing logic for the io.sipstack.application.application router should be configurable
             // by the user. Default will be on dialog or something. Currently it will be on
             // Call-ID.
-            Hektor.RouterBuilder applicationRouterBuilder = hektor.routerWithName("application-router");
+            Hektor.RouterBuilder applicationRouterBuilder = hektor.routerWithName("io.sipstack.application.application-router");
             applicationRouterBuilder.withRoutingLogic(new SipMessageRoutingLogic());
 
             // this is kind of stupid but the various supervisors
@@ -264,11 +245,12 @@ public abstract class Application<T extends Configuration> {
             // However, since they are all dependent on each other, we cannot
             // pass it in through the constructor so will have to do it using a
             // init-message.
-            final ActorRef[] transportActors = new ActorRef[noOfRoutees];
-            final ActorRef[] transactionActors = new ActorRef[noOfRoutees];
-            final ActorRef[] applicationActors = new ActorRef[noOfRoutees];
+            // final ActorRef[] transportActors = new ActorRef[noOfRoutees];
+            // final ActorRef[] transactionActors = new ActorRef[noOfRoutees];
+            // final ActorRef[] applicationActors = new ActorRef[noOfRoutees];
 
 
+            /*
             for (int i = 0; i < noOfRoutees; ++i) {
                 final Props props = Props.forActor(TransportSupervisor.class)
                         .withConstructorArg(config.getSipConfiguration().getTransport())
@@ -282,48 +264,50 @@ public abstract class Application<T extends Configuration> {
                 final Props transactionProps = Props.forActor(TransactionSupervisor.class)
                         .withConstructorArg(transactionConfig)
                         .build();
-                final ActorRef transactionActor = hektor.actorOf(transactionProps, "transaction-" + i);
+                final ActorRef transactionActor = hektor.actorOf(transactionProps, "io.sipstack.transaction.transaction-" + i);
                 transactionActors[i] = transactionActor;
                 transactionRouterBuilder.withRoutee(transactionActor);
 
                 final Props appProps = Props.forActor(ApplicationSupervisor.class).build();
-                final ActorRef applicationActor = hektor.actorOf(appProps, "application-" + i);
+                final ActorRef applicationActor = hektor.actorOf(appProps, "io.sipstack.application.application-" + i);
                 applicationActors[i] = applicationActor;
                 applicationRouterBuilder.withRoutee(applicationActor);
             }
+            */
 
-            final ActorRef transportRouter = routerBuilder.build();
-            final ActorRef transactionRouter = transactionRouterBuilder.build();
-            final ActorRef applicationRouter = applicationRouterBuilder.build();
+            // final ActorRef transportRouter = routerBuilder.build();
+            // final ActorRef transactionRouter = transactionRouterBuilder.build();
+            // final ActorRef applicationRouter = applicationRouterBuilder.build();
 
             // Transport Supervisors do not have a downstream element
-            // but the upstream is the transaction router
-            final InitEvent initTransportActors = new InitEvent(null, transactionRouter);
+            // but the upstream is the io.sipstack.transaction.transaction router
+            // final InitEvent initTransportActors = new InitEvent(null, transactionRouter);
 
             // Transaction Supervisors are connected to the the transport supervisor
-            // in the downstream direction and the application router in the upstream
+            // in the downstream direction and the io.sipstack.application.application router in the upstream
             // direction.
-            final InitEvent initTransactionActors = new InitEvent(transportRouter, applicationRouter);
+            // final InitEvent initTransactionActors = new InitEvent(transportRouter, applicationRouter);
 
             // TODO: Want to insert dialog support here as well as the TU layer
 
             // Application Supervisors are at the end of the line so they do not have
             // an upstream element but in the opposite direction they will talk
-            // to the transaction supervisors
-            final InitEvent initApplicationActors = new InitEvent(transactionRouter, null);
+            // to the io.sipstack.transaction.transaction supervisors
+            // final InitEvent initApplicationActors = new InitEvent(transactionRouter, null);
 
 
-            for (int i = 0; i < noOfRoutees; ++i) {
-                transportActors[i].tellAnonymously(initTransportActors);
-                transactionActors[i].tellAnonymously(initTransactionActors);
-                applicationActors[i].tellAnonymously(initApplicationActors);
-            }
+            // for (int i = 0; i < noOfRoutees; ++i) {
+                // transportActors[i].tellAnonymously(initTransportActors);
+                // transactionActors[i].tellAnonymously(initTransactionActors);
+                // applicationActors[i].tellAnonymously(initApplicationActors);
+            // }
 
             // TODO: need to hook up stuff to the TransactionSupervisor
             // via a router. However, they both need to know about each
             // other, which is kind of annoying.
 
-            return transportRouter;
+            // return transportRouter;
+            return null;
         }
     }
 
@@ -346,11 +330,13 @@ public abstract class Application<T extends Configuration> {
         @Override
         public ActorRef select(final Object msg, final List<ActorRef> routees) {
             final Event event = (Event)msg;
+            /*
             if (event.isSipIOEvent()) {
                 final SipMessage sip = (SipMessage)event.toIOEvent().getObject();
                 final Buffer callId = sip.getCallIDHeader().getCallId();
                 return routees.get(Math.abs(callId.hashCode() % routees.size()));
             }
+            */
             throw new RuntimeException("[SipMessageRoutingLogic] It wasn't a SIP event so not sure what to do.");
         }
     }

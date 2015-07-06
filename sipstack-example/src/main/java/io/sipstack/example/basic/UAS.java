@@ -17,7 +17,7 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 import java.net.InetSocketAddress;
 

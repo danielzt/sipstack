@@ -1,11 +1,6 @@
 package io.sipstack;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.hektor.config.HektorConfiguration;
-import io.hektor.core.ActorRef;
-import io.hektor.core.Hektor;
+import io.netty.channel.ChannelHandlerContext;
 import io.pkts.Pcap;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipPacket;
@@ -16,24 +11,19 @@ import io.pkts.streams.Stream;
 import io.pkts.streams.StreamHandler;
 import io.pkts.streams.StreamListener;
 import io.pkts.streams.impl.DefaultStreamHandler;
-import io.sipstack.config.Configuration;
-import io.sipstack.core.Application;
 import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.net.InboundOutboundHandlerAdapter;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.netty.codec.sip.Transport;
-import io.sipstack.timers.SipTimer;
-import org.junit.After;
 import org.junit.Before;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
-
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.*;
 
 
 /**
@@ -42,20 +32,6 @@ import static org.junit.Assert.*;
  * @author jonas@jonasborjesson.com
  */
 public class SipStackTestBase {
-
-    protected Hektor hektor;
-
-    /**
-     * The actor that is the entry into the entire stack.
-     */
-    protected ActorRef actor;
-
-    /**
-     * This is the defaultScheduler we will use, which will not actually schedule anything :-)
-     */
-    protected MockScheduler scheduler;
-
-    protected MockConnection connection;
 
     /**
      * Default requests and responses that belongs to the same dialog. These
@@ -66,6 +42,17 @@ public class SipStackTestBase {
     protected SipRequest defaultAckRequest;
     protected SipRequest defaultByeRequest;
     protected SipResponse defaultBye200Response;
+
+    protected MockConnection defaultConnection;
+
+    /**
+     * A mock implementation of the netty {@link ChannelHandlerContext}
+     *
+     */
+    protected MockChannelHandlerContext defaultChannelCtx;
+
+    protected MockScheduler defaultScheduler;
+
 
     @Before
     public void setUp() throws Exception {
@@ -79,18 +66,22 @@ public class SipStackTestBase {
         defaultAckRequest = findRequest(stream, pkt -> pkt.isRequest() && pkt.isAck());
         defaultBye200Response = findResponse(stream, pkt -> pkt.isResponse() && pkt.isBye() && pkt.toResponse().getStatus() / 100 == 2);
 
-
-        // configure the default actor system.
-        final Configuration config = new Configuration();
-        // final HektorConfiguration hektorConfig = config.getHektorConfiguration();
-        final HektorConfiguration hektorConfig = loadConfiguration("default_hektor_config.yaml");
-
-        scheduler = new MockScheduler(new CountDownLatch(1));
-        hektor = Hektor.withName("hello").withConfiguration(hektorConfig).withScheduler(scheduler).build();
-        actor = Application.ActorSystemBuilder.withConfig(config).withHektor(hektor).build();
-
         final ConnectionId id = createConnectionId(Transport.udp, "10.36.10.100", 5060, "192.168.0.100", 5090);
-        connection = new MockConnection(id);
+        defaultConnection = new MockConnection(id);
+        defaultScheduler = new MockScheduler(new CountDownLatch(1));
+    }
+
+    /**
+     * it is quite often easier to e.g. send one message through the pipe, assert
+     * that message was handled as it should and then reset the context
+     * again so we start over.
+     */
+    public void resetChannelHandlerContext(final InboundOutboundHandlerAdapter handler) {
+        defaultChannelCtx.reset(handler);
+    }
+
+    public void resetChannelHandlerContext() {
+        defaultChannelCtx.reset();
     }
 
     /**
@@ -103,14 +94,10 @@ public class SipStackTestBase {
         return ConnectionId.create(protocol, localAddress, remoteAddress);
     }
 
-
-
-    public  HektorConfiguration loadConfiguration(final String resource) throws Exception {
-        final InputStream stream = SipStackTestBase.class.getResourceAsStream(resource);
-        final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        final SimpleModule module = new SimpleModule();
-        return mapper.readValue(stream, HektorConfiguration.class);
+    public SipMessageEvent createEvent(final SipMessage msg) {
+        return new SipMessageEvent(defaultConnection, msg, 0);
     }
+
 
     protected SipRequest findRequest(final SipStream stream, final Predicate<SipPacket> predicate) {
         return findMessage(stream, predicate).toRequest();
@@ -164,28 +151,6 @@ public class SipStackTestBase {
         throw new RuntimeException("Only expected a single stream in the pcap");
     }
 
-    @After
-    public void tearDown() throws Exception {
-    }
-
-
-    /**
-     * Check so that the expected response indeed was sent. This method assumes that the default connection
-     * object is being used and that the response that you are expected is the first one in the sent list as stored
-     * in the mock connection.
-     *
-     * @param method
-     * @param status
-     */
-    protected void assertResponse(final String method, int status) throws InterruptedException {
-        // wait until the latch releases which then indicates
-        // that we have received at the expected response(s).
-        connection.latch().await();
-        final SipMessage msg = connection.consume();
-        assertThat(msg.getMethod().toString(), is(method));
-        assertThat(msg.toResponse().getStatus(), is(status));
-    }
-
     /**
      * There are a lot of various sip timers that are being scheduled and this
      * method helps you ensure that a particular timer was indeed scheduled.
@@ -193,8 +158,9 @@ public class SipStackTestBase {
      * @param timer
      * @return the cancellable that we just asserted actually exists and is correct.
      */
-    protected MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
-        scheduler.latch.await();
-        return scheduler.isScheduled(timer).orElseThrow(RuntimeException::new);
+    public MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
+        defaultScheduler.latch.await();
+        return defaultScheduler.isScheduled(timer).orElseThrow(RuntimeException::new);
     }
+
 }

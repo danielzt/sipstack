@@ -1,6 +1,5 @@
 package io.sipstack.actor;
 
-import io.hektor.core.Actor;
 import org.slf4j.Logger;
 
 import java.util.function.Consumer;
@@ -38,16 +37,25 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
 
     private T currentEvent;
 
+    private final S terminalState;
+
+    private ActorContext currentContext;
+
     /**
      * @param values
      */
-    protected ActorSupport(final String id, final S initialState, final S[] values) {
+    protected ActorSupport(final String id, final S initialState, final S terminalState, final S[] values) {
         this.id = id;
         currentState = initialState;
+        this.terminalState = terminalState;
 
         states = new Consumer[values.length];
         onEnterActions = new Consumer[values.length];
         onExitActions = new Consumer[values.length];
+    }
+
+    protected ActorContext ctx() {
+        return currentContext;
     }
 
     /**
@@ -80,9 +88,10 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     @Override
-    public final void onReceive(final Object msg) {
+    public final void onReceive(final ActorContext ctx, final Object msg) {
         try {
             currentEvent = (T) msg;
+            currentContext = ctx;
             if (states[currentState.ordinal()] != null) {
                 states[currentState.ordinal()].accept(currentEvent);
             } else {
@@ -97,7 +106,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     protected final void become(final S newState) {
-        // logger().info("{} {} -> {}", this.id, currentState, newState);
+        logger().info("{} {} -> {}", this.id, currentState, newState);
 
         if (currentState != newState) {
             final Consumer<T> exitAction = onExitActions[currentState.ordinal()];
@@ -120,6 +129,11 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
 
     protected final S state() {
         return currentState;
+    }
+
+    @Override
+    public final boolean isTerminated() {
+        return currentState == terminalState;
     }
 
     protected abstract Logger logger();

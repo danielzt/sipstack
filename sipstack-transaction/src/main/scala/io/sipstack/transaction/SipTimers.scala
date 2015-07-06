@@ -26,16 +26,16 @@ package io.sipstack.transaction
  *                                                remain in the network
  * Timer A  initially T1     Section 17.1.1.2     INVITE request retransmit
  *                                             interval, for UDP only
- * Timer B  64*T1            Section 17.1.1.2     INVITE transaction
+ * Timer B  64*T1            Section 17.1.1.2     INVITE io.sipstack.transaction.transaction
  *                                             timeout timer
- * Timer C  > 3min           Section 16.6         proxy INVITE transaction
+ * Timer C  > 3min           Section 16.6         proxy INVITE io.sipstack.transaction.transaction
  *                         bullet 11            timeout
  * Timer D  > 32s for UDP    Section 17.1.1.2     Wait time for response
  *       0s for TCP/SCTP                       retransmits
  * Timer E  initially T1     Section 17.1.2.2     non-INVITE request
  *                                                retransmit interval,
  *                                                UDP only
- * Timer F  64*T1            Section 17.1.2.2     non-INVITE transaction
+ * Timer F  64*T1            Section 17.1.2.2     non-INVITE io.sipstack.transaction.transaction
  *                                                timeout timer
  * Timer G  initially T1     Section 17.2.1       INVITE response
  *                                                retransmit interval

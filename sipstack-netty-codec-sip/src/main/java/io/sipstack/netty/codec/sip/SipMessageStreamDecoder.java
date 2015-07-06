@@ -14,7 +14,6 @@ import io.pkts.packet.sip.impl.SipRequestImpl;
 import io.pkts.packet.sip.impl.SipRequestLine;
 import io.pkts.packet.sip.impl.SipResponseImpl;
 import io.pkts.packet.sip.impl.SipResponseLine;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

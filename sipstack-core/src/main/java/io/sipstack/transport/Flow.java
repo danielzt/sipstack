@@ -1,8 +1,7 @@
-/**
- * 
- */
 package io.sipstack.transport;
 
+import io.pkts.packet.sip.SipMessage;
+import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.ConnectionId;
 
 /**
@@ -10,6 +9,15 @@ import io.sipstack.netty.codec.sip.ConnectionId;
  */
 public interface Flow {
 
-    ConnectionId getConnectionId();
+    /**
+     * Ok, perhaps this should be called FlowId but it is
+     * exactly the same thing so it felt silly...
+     *
+     * @return
+     */
+    ConnectionId id();
 
+    void write(Event event);
+
+    void write(SipMessage msg);
 }

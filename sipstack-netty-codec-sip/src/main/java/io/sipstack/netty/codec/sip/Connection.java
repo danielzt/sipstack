@@ -7,6 +7,7 @@ import io.netty.channel.Channel;
 import io.pkts.packet.sip.SipMessage;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
 /**
  * Represents a connection between two end-points and its primary purpose is to
@@ -18,6 +19,10 @@ import java.net.InetSocketAddress;
 public interface Connection {
 
     ConnectionId id();
+
+    void storeObject(Object o);
+
+    Optional<Object> fetchObject();
 
     /**
      * Get the local port to which this {@link Connection} is listening to.

@@ -6,6 +6,7 @@ package io.sipstack.netty.codec.sip;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.AttributeKey;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.SipParser;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Optional;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -23,6 +25,7 @@ public abstract class AbstractConnection implements Connection {
     private final ConnectionId id;
     private final Channel channel;
     private final InetSocketAddress remote;
+    private final static AttributeKey<Object> key = AttributeKey.newInstance("generic_object");
 
     /*
      * protected AbstractConnection(final ChannelHandlerContext ctx, final InetSocketAddress remote)
@@ -33,6 +36,14 @@ public abstract class AbstractConnection implements Connection {
         this.id = ConnectionId.create(transport, (InetSocketAddress)channel.localAddress(), remote);
         this.channel = channel;
         this.remote = remote;
+    }
+
+    public final void storeObject(final Object o) {
+        this.channel.attr(key).set(o);
+    }
+
+    public final Optional<Object> fetchObject() {
+        return Optional.ofNullable(this.channel.attr(key).get());
     }
 
     protected Channel channel() {

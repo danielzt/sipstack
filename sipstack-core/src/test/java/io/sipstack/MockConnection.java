@@ -7,6 +7,7 @@ import io.sipstack.netty.codec.sip.Transport;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -85,6 +86,16 @@ public class MockConnection implements Connection {
     @Override
     public ConnectionId id() {
         return id;
+    }
+
+    @Override
+    public void storeObject(Object o) {
+
+    }
+
+    @Override
+    public Optional<Object> fetchObject() {
+        return null;
     }
 
     @Override

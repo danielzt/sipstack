@@ -10,8 +10,8 @@
     <version>0.1.1-SNAPSHOT</version>
   </parent>
 
-  <name>sipstack.io transaction layer</name>
-  <artifactId>sipstack-transaction</artifactId>
+  <name>sipstack.io io.sipstack.transaction.transaction layer</name>
+  <artifactId>sipstack-io.sipstack.transaction.transaction</artifactId>
   <packaging>jar</packaging>
   <description />
 

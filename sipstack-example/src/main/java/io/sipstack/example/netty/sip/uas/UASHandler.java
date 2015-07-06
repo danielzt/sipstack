@@ -8,7 +8,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 /**
  * A super simple UAS implementation.

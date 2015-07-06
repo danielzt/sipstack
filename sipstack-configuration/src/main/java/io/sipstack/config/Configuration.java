@@ -19,7 +19,7 @@ import javax.validation.constraints.NotNull;
 public class Configuration {
 
     /**
-     * The name of the application.
+     * The name of the io.sipstack.application.application.
      */
     @Valid
     @NotNull

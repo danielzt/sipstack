@@ -16,7 +16,7 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.example.netty.sip.SimpleSipStack;
 import io.sipstack.example.netty.sip.registrar.Binding;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 import java.util.List;
 
@@ -143,7 +143,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
         final Connection connection = this.stack.connect(destination.getHost(), port == -1 ? 5060 : port);
 
         // SIP is pretty powerful but there are a lot of little details to get things working.
-        // E.g., this sample application is acting as a stateless proxy and in order to
+        // E.g., this sample io.sipstack.application.application is acting as a stateless proxy and in order to
         // correctly relay re-transmissions or e.g. CANCELs we have to make sure to always
         // generate the same branch-id of the same request. Since a CANCEL will have the same
         // branch-id as the request it cancels, we must ensure we generate the same branch-id as

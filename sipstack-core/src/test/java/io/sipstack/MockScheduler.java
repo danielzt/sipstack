@@ -1,10 +1,11 @@
 package io.sipstack;
 
-import io.hektor.core.ActorRef;
-import io.hektor.core.Cancellable;
-import io.hektor.core.Scheduler;
-import io.sipstack.event.SipTimerEvent;
-import io.sipstack.timers.SipTimer;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandler;
+import io.sipstack.actor.Cancellable;
+import io.sipstack.actor.InternalScheduler;
+import io.sipstack.event.Event;
+import io.sipstack.netty.codec.sip.SipTimer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +18,7 @@ import java.util.concurrent.CountDownLatch;
 /**
  * @author jonas@jonasborjesson.com
  */
-public class MockScheduler implements Scheduler {
+public class MockScheduler implements InternalScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(MockScheduler.class);
 
@@ -34,9 +35,9 @@ public class MockScheduler implements Scheduler {
      *
      * @param index
      */
-    public void fire(final int index) {
-        final MockCancellable event = scheduledTasks.remove(index);
-        event.receiver.tell(event.msg, event.sender);
+    public void fire(final int index) throws Exception {
+        final MockCancellable task = scheduledTasks.remove(index);
+        task.handler.userEventTriggered(task.ctx, task.event);
     }
 
     /**
@@ -47,7 +48,7 @@ public class MockScheduler implements Scheduler {
      *
      * @param timer
      */
-    public void fire(final SipTimer timer) {
+    public void fire(final SipTimer timer) throws Exception {
         try {
             fire(find(timer));
         } catch (final ArrayIndexOutOfBoundsException e) {
@@ -59,7 +60,7 @@ public class MockScheduler implements Scheduler {
         int index = -1;
         for (final MockCancellable c : scheduledTasks) {
             ++index;
-            if (c.msg instanceof SipTimerEvent && ((SipTimerEvent)c.msg).timer() == timer) {
+            if (c.event.isSipTimerEvent() && c.event.toSipTimerEvent().timer() == timer) {
                 break;
             }
         }
@@ -78,18 +79,18 @@ public class MockScheduler implements Scheduler {
      */
     public Optional<MockCancellable> isScheduled(final SipTimer timer) {
         return scheduledTasks.stream()
-                .filter(c -> c.msg instanceof SipTimerEvent && ((SipTimerEvent)c.msg).timer() == timer)
+                .filter(c -> c.event.isSipTimerEvent() && c.event.toSipTimerEvent().timer() == timer)
                 .findFirst();
     }
 
     @Override
-    public Cancellable schedule(final Object msg, final ActorRef receiver, final ActorRef sender, final Duration delay) {
-        if (msg instanceof SipTimerEvent) {
-            final SipTimerEvent sipTimer = (SipTimerEvent)msg;
-            logger.info("SIP Timer \"{}\" was scheduled", sipTimer.timer());
-        }
+    public Cancellable schedule(final ChannelHandlerContext ctx, final Event event, final Duration delay) {
+        throw new RuntimeException("Not sure we should use this one anymore");
+    }
 
-        final MockCancellable cancellable = new MockCancellable(msg, receiver, sender, delay);
+    @Override
+    public Cancellable schedule(ChannelInboundHandler handler, ChannelHandlerContext ctx, Event event, Duration delay) {
+        final MockCancellable cancellable = new MockCancellable(handler, ctx, event, delay);
         scheduledTasks.add(cancellable);
         latch.countDown();
         return cancellable;

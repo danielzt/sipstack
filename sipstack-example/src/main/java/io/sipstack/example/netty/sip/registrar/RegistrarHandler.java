@@ -11,7 +11,7 @@ import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.ExpiresHeader;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;

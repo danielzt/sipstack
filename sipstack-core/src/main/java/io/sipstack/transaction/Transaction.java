@@ -1,42 +1,22 @@
-/**
- * 
- */
 package io.sipstack.transaction;
 
+import io.pkts.packet.sip.SipMessage;
 
 /**
  * @author jonas@jonasborjesson.com
  */
 public interface Transaction {
 
-    default boolean isClientTransaction() {
-        return false;
-    }
-
-    default boolean isServerTransaction() {
-        return false;
-    }
-
-    default ServerTransaction toServerTransaction() throws ClassCastException {
-        throw new ClassCastException("Cannot cast object " + ClientTransaction.class.getName() + "into "
-                + ServerTransaction.class.getName());
-    }
-
-    default ClientTransaction toClientTransaction() throws ClassCastException {
-        throw new ClassCastException("Cannot cast object " + ServerTransaction.class.getName() + "into "
-                + ClientTransaction.class.getName());
-    }
-
-    TransactionId getTransactionId();
-
-    TransactionState getState();
+    TransactionId id();
 
     /**
-     * Cancel this transaction, which only applies to an INVITE client transaction. In all other
-     * cases this is the same as a no-op.
+     * Send the message in the context of this transaction.
+     *
+     * The message will be sent asynchronously so when this method
+     * returns the state of the {@link Transaction} has not changed
+     * yet.
+     *
+     * @param msg
      */
-    default void cancel() {
-        // do nothing
-    }
-
+    void send(SipMessage msg);
 }

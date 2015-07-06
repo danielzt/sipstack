@@ -2,7 +2,6 @@ package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.net.InetSocketAddress;
 

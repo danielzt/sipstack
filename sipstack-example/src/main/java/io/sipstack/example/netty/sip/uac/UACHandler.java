@@ -16,7 +16,7 @@ import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.ToHeader;
 import io.pkts.packet.sip.header.ViaHeader;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 
 /**
  * @author jonas@jonasborjesson.com

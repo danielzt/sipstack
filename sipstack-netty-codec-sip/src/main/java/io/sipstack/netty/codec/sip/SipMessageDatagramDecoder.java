@@ -8,7 +8,6 @@ import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.SipParser;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 
 import java.util.List;
 

@@ -6,8 +6,6 @@ package io.sipstack.config;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.netty.codec.sip.config.TransactionLayerConfiguration;
-import io.sipstack.netty.codec.sip.config.TransportLayerConfiguration;
 
 import java.util.Collections;
 import java.util.List;
@@ -43,7 +41,7 @@ public class SipConfiguration {
     }
 
     /**
-     * @return the transaction
+     * @return the io.sipstack.transaction.transaction
      */
     public TransactionLayerConfiguration getTransaction() {
         return transaction;

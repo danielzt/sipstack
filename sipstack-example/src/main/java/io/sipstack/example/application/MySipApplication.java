@@ -5,13 +5,12 @@ package io.sipstack.example.application;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.annotations.INVITE;
+import io.sipstack.application.application.ApplicationInstance;
+import io.sipstack.application.application.ApplicationInstanceCreator;
 import io.sipstack.core.Application;
 import io.sipstack.core.Bootstrap;
 import io.sipstack.core.Environment;
-import io.sipstack.netty.codec.sip.application.ApplicationInstance;
-import io.sipstack.netty.codec.sip.application.ApplicationInstanceCreator;
-import io.sipstack.netty.codec.sip.event.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipMessageEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,10 +26,9 @@ public final class MySipApplication extends Application<MyConfiguration> {
      * 
      */
     public MySipApplication() {
-        super("My cool SIP application");
+        super("My cool SIP io.sipstack.application.application");
     }
 
-    @INVITE
     public void processInvite(final SipMessageEvent event) {
         logger.info("Recevied a new sip event");
 
@@ -44,7 +42,7 @@ public final class MySipApplication extends Application<MyConfiguration> {
         // ctx().invite("sip:xxxx.om"); // will create a new UA instance builder.
         // ctx().subscribe("sip:xxxx.om"); // will create a new UA instance builder.
         // ctx().method(); // new UA instance.
-        // ctx().get("http://whatever.com").accept("application/json").onFailure(f -> do something);
+        // ctx().get("http://whatever.com").accept("io.sipstack.application.application/json").onFailure(f -> do something);
 
         // ua().invite("sip:xxxxx.com").withCSeq().withVia().send();
         // ua(); // will return the current UA instance associated with the current event.

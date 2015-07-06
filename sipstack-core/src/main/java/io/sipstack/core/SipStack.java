@@ -69,6 +69,7 @@ public interface SipStack {
             tu.start(transaction);
 
             final TransportLayer transport = new TransportLayer(config.getTransport(), transaction);
+            transaction.start(transport);
 
             return new DefaultSipStack(transport, transaction, tu);
         }

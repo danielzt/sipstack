@@ -209,7 +209,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
                 try {
 
                     // the flow may change so keep it up to date
-                    if (holder.flow != flow) {
+                    if (holder.flow != flow && flow != null) {
                         holder.flow = flow;
                     }
 
@@ -249,7 +249,15 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
 
     @Override
     public Transaction send(SipMessage msg) {
-        throw new RuntimeException("TODO");
+        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(msg);
+        try {
+            invoke(null, msg, holder);
+            checkIfTerminated(holder);
+        } catch (final ClassCastException e) {
+            // strange...
+            logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
+        }
+        return holder;
     }
 
     /**
@@ -276,13 +284,6 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         @Override
         public TransactionId id() {
             return actor.id();
-        }
-
-        @Override
-        public void send(final SipMessage msg) {
-            // TODO: may want to delay the writing here...
-            // flow.write(msg);
-            onDownstream(this, msg);
         }
 
         @Override

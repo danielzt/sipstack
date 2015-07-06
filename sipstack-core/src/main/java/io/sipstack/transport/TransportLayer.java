@@ -151,7 +151,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
 
     @Override
     public void write(final Flow flow, final SipMessage msg) {
-        throw new RuntimeException("TODO");
+        ((DefaultFlow)flow).connection.send(msg);
     }
 
 

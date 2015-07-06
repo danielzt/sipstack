@@ -159,6 +159,7 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
                     become(TransactionState.PROCEEDING);
                 } else {
                     become(TransactionState.COMPLETED);
+                    // become(TransactionState.TERMINATED);
                 }
             }
             // note that any request is simply absorbed.

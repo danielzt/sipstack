@@ -97,7 +97,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     protected final void become(final S newState) {
-        // logger().info("{} {} -> {}", this.id, currentState, newState);
+        logger().info("{} {} -> {}", this.id, currentState, newState);
 
         if (currentState != newState) {
             final Consumer<T> exitAction = onExitActions[currentState.ordinal()];

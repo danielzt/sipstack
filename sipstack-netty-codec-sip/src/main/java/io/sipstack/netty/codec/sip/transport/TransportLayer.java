@@ -20,13 +20,11 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
 
     @Override
     public void read(ChannelHandlerContext ctx) throws Exception {
-        System.err.println("Ok, so this is the TransportLayer read");
         ctx.read();
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        System.err.println("Channel Read in transport layer " + msg);
         ctx.fireChannelRead(msg);
     }
 

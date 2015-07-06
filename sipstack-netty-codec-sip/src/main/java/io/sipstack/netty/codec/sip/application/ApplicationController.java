@@ -4,9 +4,11 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.InboundOutboundHandlerAdapter;
 import io.sipstack.netty.codec.sip.actor.InternalScheduler;
 import io.sipstack.netty.codec.sip.event.Event;
+import io.sipstack.netty.codec.sip.event.SipMessageEvent;
 import io.sipstack.netty.codec.sip.transaction.TransactionLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +41,18 @@ public class ApplicationController extends InboundOutboundHandlerAdapter {
      */
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
-        processEvent(ctx, msg);
+        // processEvent(ctx, msg);
+        final Event event = (Event)msg;
+        if (event.isSipMessageEvent()) {
+            final SipMessageEvent sipMsgEvent = event.toSipMessageEvent();
+            final SipMessage message = sipMsgEvent.message();
+            final Connection connection = sipMsgEvent.connection();
+            if (message.isRequest() && !message.isAck()) {
+                ctx.writeAndFlush(new SipMessageEvent(connection, message.createResponse(200), 0));
+            } else if (message.isAck()) {
+                System.err.println("Ok, I did get the ACK");
+            }
+        }
     }
 
     /**

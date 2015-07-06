@@ -1,5 +1,6 @@
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
+import io.sipstack.transaction.Transaction;
 import io.sipstack.transport.Flow;
 
 import java.util.Optional;

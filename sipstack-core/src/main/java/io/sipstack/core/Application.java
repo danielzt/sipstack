@@ -17,7 +17,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.HashWheelScheduler;
 import io.sipstack.actor.InternalScheduler;
-import io.sipstack.application.application.ApplicationInstanceCreator;
+import io.sipstack.application.ApplicationInstanceCreator;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
 import io.sipstack.config.NetworkInterfaceConfiguration;

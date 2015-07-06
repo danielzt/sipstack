@@ -1,7 +1,8 @@
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
 
 import io.sipstack.actor.Actor;
+import io.sipstack.transaction.TransactionId;
 
 /**
  * @author jonas@jonasborjesson.com

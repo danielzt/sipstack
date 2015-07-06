@@ -3,7 +3,7 @@ package io.sipstack.example.application;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.application.application.ApplicationInstance;
+import io.sipstack.application.ApplicationInstance;
 import io.sipstack.event.Event;
 import io.sipstack.transactionuser.Proxy;
 import io.sipstack.transactionuser.ProxyBranch;

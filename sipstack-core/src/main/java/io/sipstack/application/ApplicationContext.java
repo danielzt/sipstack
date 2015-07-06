@@ -1,4 +1,4 @@
-package io.sipstack.application.application;
+package io.sipstack.application;
 
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.transactionuser.Proxy;

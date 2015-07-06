@@ -7,7 +7,7 @@ import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
-import io.sipstack.transaction.TransactionLayer;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transactionuser.DefaultTransactionUser;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
@@ -68,7 +68,7 @@ public interface SipStack {
             final Clock clock = this.clock != null ? this.clock : new SystemClock();
 
             final TransportLayer transport = new TransportLayer(config.getTransport());
-            final TransactionLayer transaction = new TransactionLayer(clock, scheduler, config.getTransaction());
+            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler, config.getTransaction());
             final DefaultTransactionUser tu = new DefaultTransactionUser(transaction);
 
             transaction.useTransportLayer(transport);

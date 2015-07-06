@@ -1,6 +1,7 @@
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
+import io.sipstack.transaction.TransactionId;
 
 /**
  * @author jonas@jonasborjesson.com

@@ -5,7 +5,7 @@ import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.transaction.TransactionId;
-import io.sipstack.transaction.TransactionLayer;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -34,12 +34,12 @@ public class SingleContext implements ActorContext, Scheduler {
 
     private final Clock clock;
 
-    private final TransactionLayer transactionLayer;
+    private final DefaultTransactionLayer transactionLayer;
 
     public SingleContext(final Clock clock,
                          final InternalScheduler scheduler,
                          final TransactionId transactionId,
-                         final TransactionLayer transactionLayer) {
+                         final DefaultTransactionLayer transactionLayer) {
         this.clock = clock;
         this.scheduler = scheduler;
         this.transactionId = transactionId;

@@ -1,6 +1,8 @@
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
+import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.impl.TransactionActor;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
 

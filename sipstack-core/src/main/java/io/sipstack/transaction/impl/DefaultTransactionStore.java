@@ -1,7 +1,8 @@
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.config.TransactionLayerConfiguration;
+import io.sipstack.transaction.TransactionId;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

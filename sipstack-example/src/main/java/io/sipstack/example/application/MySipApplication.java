@@ -5,8 +5,8 @@ package io.sipstack.example.application;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
-import io.sipstack.application.application.ApplicationInstance;
-import io.sipstack.application.application.ApplicationInstanceCreator;
+import io.sipstack.application.ApplicationInstance;
+import io.sipstack.application.ApplicationInstanceCreator;
 import io.sipstack.core.Application;
 import io.sipstack.core.Bootstrap;
 import io.sipstack.core.Environment;

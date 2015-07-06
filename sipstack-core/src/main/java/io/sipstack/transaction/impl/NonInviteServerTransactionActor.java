@@ -1,4 +1,4 @@
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
@@ -9,6 +9,8 @@ import io.sipstack.config.TimersConfiguration;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.SipTimer;
+import io.sipstack.transaction.TransactionId;
+import io.sipstack.transaction.TransactionState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

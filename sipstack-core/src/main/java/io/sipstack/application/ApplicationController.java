@@ -1,4 +1,4 @@
-package io.sipstack.application.application;
+package io.sipstack.application;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -7,7 +7,7 @@ import io.sipstack.actor.InternalScheduler;
 import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
-import io.sipstack.transaction.TransactionLayer;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ApplicationController extends InboundOutboundHandlerAdapter {
 
-    private static final Logger logger = LoggerFactory.getLogger(TransactionLayer.class);
+    private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
     private final InternalScheduler scheduler;
 

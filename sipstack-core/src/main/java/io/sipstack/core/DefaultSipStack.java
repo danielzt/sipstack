@@ -3,7 +3,7 @@ package io.sipstack.core;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
-import io.sipstack.transaction.TransactionLayer;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transactionuser.DefaultTransactionUser;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
@@ -17,11 +17,11 @@ public class DefaultSipStack implements SipStack {
 
     private final TransportLayer transportLayer;
 
-    private final TransactionLayer transactionLayer;
+    private final DefaultTransactionLayer transactionLayer;
 
     private final DefaultTransactionUser tu;
 
-    DefaultSipStack(final TransportLayer transportLayer, final TransactionLayer transactionLayer, final DefaultTransactionUser tu) {
+    DefaultSipStack(final TransportLayer transportLayer, final DefaultTransactionLayer transactionLayer, final DefaultTransactionUser tu) {
 
         // not that great since we cannot guarantee immutability since
         // we are leaking the SipStack to an external entity before

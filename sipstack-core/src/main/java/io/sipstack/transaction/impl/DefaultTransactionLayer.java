@@ -1,4 +1,4 @@
-package io.sipstack.transaction;
+package io.sipstack.transaction.impl;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.pkts.packet.sip.SipMessage;
@@ -10,6 +10,10 @@ import io.sipstack.core.SipLayer;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.TransactionId;
+import io.sipstack.transaction.TransactionUser;
+import io.sipstack.transaction.Transactions;
 import io.sipstack.transactionuser.DefaultTransactionUser;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
@@ -21,9 +25,9 @@ import java.util.Optional;
 /**
  * @author jonas@jonasborjesson.com
  */
-public class TransactionLayer implements SipLayer, TransactionFactory {
+public class DefaultTransactionLayer implements SipLayer, Transactions, TransactionFactory {
 
-    private static final Logger logger = LoggerFactory.getLogger(TransactionLayer.class);
+    private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
     private final TransactionLayerConfiguration config;
 
@@ -41,7 +45,7 @@ public class TransactionLayer implements SipLayer, TransactionFactory {
 
     private TransportLayer transportLayer;
 
-    public TransactionLayer(final Clock clock, final InternalScheduler scheduler, final TransactionLayerConfiguration config) {
+    public DefaultTransactionLayer(final Clock clock, final InternalScheduler scheduler, final TransactionLayerConfiguration config) {
         this.clock = clock;
         this.scheduler = scheduler;
         this.config = config;
@@ -230,18 +234,15 @@ public class TransactionLayer implements SipLayer, TransactionFactory {
         return new DefaultTransactionHolder(defaultTransactionListener, actor);
     }
 
-    // nah...
-    /*
-    private static class WriteBuffer {
-        private final TransactionHolder holder;
-        private final SipMessage message;
-
-        WriteBuffer(final TransactionHolder holder, final SipMessage message) {
-            this.holder = holder;
-            this.message = message;
-        }
+    @Override
+    public Transaction send(Flow flow, SipMessage msg) {
+        return null;
     }
-    */
+
+    @Override
+    public Transaction send(SipMessage msg) {
+        return null;
+    }
 
     /**
      *
@@ -286,7 +287,6 @@ public class TransactionLayer implements SipLayer, TransactionFactory {
             return Optional.ofNullable(flow);
         }
     }
-
 
 
 }

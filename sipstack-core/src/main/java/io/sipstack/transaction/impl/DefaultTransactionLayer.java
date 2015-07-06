@@ -6,7 +6,6 @@ import io.pkts.packet.sip.SipRequest;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.actor.SingleContext;
 import io.sipstack.config.TransactionLayerConfiguration;
-import io.sipstack.core.SipLayer;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.Clock;
@@ -16,7 +15,8 @@ import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
 import io.sipstack.transactionuser.DefaultTransactionUser;
 import io.sipstack.transport.Flow;
-import io.sipstack.transport.TransportLayer;
+import io.sipstack.transport.TransportUser;
+import io.sipstack.transport.Transports;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +25,7 @@ import java.util.Optional;
 /**
  * @author jonas@jonasborjesson.com
  */
-public class DefaultTransactionLayer implements SipLayer, Transactions, TransactionFactory {
+public class DefaultTransactionLayer implements TransportUser, Transactions, TransactionFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
@@ -43,26 +43,22 @@ public class DefaultTransactionLayer implements SipLayer, Transactions, Transact
      */
     private TransactionUser defaultTransactionListener;
 
-    private TransportLayer transportLayer;
+    private Transports transports;
 
-    public DefaultTransactionLayer(final Clock clock, final InternalScheduler scheduler, final TransactionLayerConfiguration config) {
+    public DefaultTransactionLayer(final Clock clock, final InternalScheduler scheduler, final TransactionUser tu, final TransactionLayerConfiguration config) {
         this.clock = clock;
         this.scheduler = scheduler;
         this.config = config;
         transactionStore = new DefaultTransactionStore(this, config);
-    }
-
-    public void useTransportLayer(final TransportLayer transportLayer) {
-        this.transportLayer = transportLayer;
-    }
-
-    public void defaultTransactionUser(final TransactionUser tu) {
         this.defaultTransactionListener = tu;
     }
 
+    public void start(final Transports transports) {
+        this.transports = transports;
+    }
 
     @Override
-    public void onUpstream(final Flow flow, final SipMessage msg) {
+    public void onMessage(final Flow flow, final SipMessage msg) {
         final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(msg);
         try {
             invoke(flow, msg, holder);
@@ -72,6 +68,18 @@ public class DefaultTransactionLayer implements SipLayer, Transactions, Transact
             logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
         }
     }
+
+    @Override
+    public void onWriteCompleted(Flow flow, SipMessage msg) {
+        System.err.println("Yay, the write completed for message " + msg);
+
+    }
+
+    @Override
+    public void onWriteFailed(Flow flow, SipMessage msg) {
+        System.err.println("Nooooo, the write failed for message " + msg);
+    }
+
 
     private void onDownstream(final DefaultTransactionHolder holder, final SipMessage msg) {
         try {
@@ -103,9 +111,9 @@ public class DefaultTransactionLayer implements SipLayer, Transactions, Transact
             final SingleContext actorCtx = invokeTransaction(flow, msg, holder);
             actorCtx.downstream().ifPresent(e -> {
                 if (holder.flow().isPresent()) {
-                    holder.flow().get().write(e);
+                    transports.write(holder.flow().get(), e.getSipMessage());
                 } else {
-                    throw new RuntimeException("TODO: need to create a flow here or something");
+                    transports.write(e.getSipMessage());
                 }
             });
 
@@ -236,12 +244,12 @@ public class DefaultTransactionLayer implements SipLayer, Transactions, Transact
 
     @Override
     public Transaction send(Flow flow, SipMessage msg) {
-        return null;
+        throw new RuntimeException("TODO");
     }
 
     @Override
     public Transaction send(SipMessage msg) {
-        return null;
+        throw new RuntimeException("TODO");
     }
 
     /**

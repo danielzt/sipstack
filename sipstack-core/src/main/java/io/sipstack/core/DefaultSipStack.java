@@ -1,11 +1,9 @@
 package io.sipstack.core;
 
-import io.pkts.packet.sip.SipMessage;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transactionuser.DefaultTransactionUser;
-import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
 
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
@@ -28,15 +26,8 @@ public class DefaultSipStack implements SipStack {
         // the stack is fully initialized. Got to re-structure some of
         // this to avoid this silliness.
         this.transportLayer = transportLayer;
-        this.transportLayer.useSipStack(this);
-
         this.transactionLayer = transactionLayer;
         this.tu = tu;
-    }
-
-    @Override
-    public void onUpstream(final Flow flow, final SipMessage message) {
-        transactionLayer.onUpstream(flow, message);
     }
 
     @Override

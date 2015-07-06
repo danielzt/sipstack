@@ -1,5 +1,6 @@
 package io.sipstack.event;
 
+import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 
 /**
@@ -30,6 +31,11 @@ public class SipResponseEvent extends Event {
 
     @Override
     public SipResponse response() {
+        return response;
+    }
+
+    @Override
+    public SipMessage getSipMessage() {
         return response;
     }
 }

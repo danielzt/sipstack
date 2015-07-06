@@ -5,7 +5,6 @@ import io.netty.channel.ChannelPromise;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.core.SipStack;
-import io.sipstack.event.Event;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Connection;
@@ -23,9 +22,11 @@ import java.util.Optional;
  *
  * @author jonas@jonasborjesson.com
  */
-public class TransportLayer extends InboundOutboundHandlerAdapter {
+public class TransportLayer extends InboundOutboundHandlerAdapter implements Transports {
 
     private final TransportLayerConfiguration config;
+
+    private final TransportUser transportUser;
 
     /**
      * The {@link TransportLayer} is the only one that actually
@@ -37,14 +38,9 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
      */
     private NetworkLayer network;
 
-    private SipStack stack;
-
-    public TransportLayer(final TransportLayerConfiguration config) {
+    public TransportLayer(final TransportLayerConfiguration config, final TransportUser transportUser) {
         this.config = config;
-    }
-
-    public void useSipStack(final SipStack stack) {
-        this.stack = stack;
+        this.transportUser = transportUser;
     }
 
     public void useNetworkLayer(final NetworkLayer network) {
@@ -69,7 +65,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
                 flow = new DefaultFlow(connection, ctx);
                 connection.storeObject(flow);
             }
-            stack.onUpstream(flow, ((SipMessageEvent)msg).message());
+            transportUser.onMessage(flow, ((SipMessageEvent) msg).message());
         } catch (final ClassCastException e) {
             e.printStackTrace();;
         }
@@ -148,6 +144,17 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
         ctx.write(msg, promise);
     }
 
+    @Override
+    public void write(final SipMessage msg) {
+        throw new RuntimeException("TODO");
+    }
+
+    @Override
+    public void write(final Flow flow, final SipMessage msg) {
+        throw new RuntimeException("TODO");
+    }
+
+
     private class DefaultFlow implements Flow {
         private final ChannelHandlerContext ctx;
         private final Connection connection;
@@ -162,18 +169,5 @@ public class TransportLayer extends InboundOutboundHandlerAdapter {
             return connection.id();
         }
 
-        @Override
-        public void write(final Event event) {
-            if (event.isSipResponseEvent()) {
-                write(event.response());
-            } else if (event.isSipRequestEvent()) {
-                write(event.request());
-            }
-        }
-
-        @Override
-        public void write(final SipMessage msg) {
-            this.ctx.writeAndFlush(new SipMessageEvent(connection, msg, 0), ctx.voidPromise());
-        }
     }
 }

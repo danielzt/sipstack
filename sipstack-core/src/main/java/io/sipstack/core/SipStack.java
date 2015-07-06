@@ -1,6 +1,5 @@
 package io.sipstack.core;
 
-import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
@@ -9,7 +8,6 @@ import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transactionuser.DefaultTransactionUser;
-import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
 
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
@@ -18,8 +16,6 @@ import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
  * @author jonas@jonasborjesson.com
  */
 public interface SipStack {
-
-    void onUpstream(Flow flow, SipMessage message);
 
     /**
      * Get the handler, which is the entry way into the stack.
@@ -67,12 +63,12 @@ public interface SipStack {
             ensureNotNull(scheduler, "You must specify the scheduler");
             final Clock clock = this.clock != null ? this.clock : new SystemClock();
 
-            final TransportLayer transport = new TransportLayer(config.getTransport());
-            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler, config.getTransaction());
-            final DefaultTransactionUser tu = new DefaultTransactionUser(transaction);
+            final DefaultTransactionUser tu = new DefaultTransactionUser();
 
-            transaction.useTransportLayer(transport);
-            transaction.defaultTransactionUser(tu);
+            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler, tu, config.getTransaction());
+            tu.start(transaction);
+
+            final TransportLayer transport = new TransportLayer(config.getTransport(), transaction);
 
             return new DefaultSipStack(transport, transaction, tu);
         }

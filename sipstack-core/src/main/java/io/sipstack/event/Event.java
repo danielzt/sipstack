@@ -51,6 +51,10 @@ public abstract class Event {
         return false;
     }
 
+    public SipMessage getSipMessage() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + SipResponseEvent.class.getName());
+    }
+
     /**
      * Convenience method for converting the event to a {@link SipResponseEvent} and
      * then grab the response from it.

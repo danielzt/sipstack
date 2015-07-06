@@ -12,9 +12,13 @@ import io.sipstack.transaction.Transactions;
  */
 public class DefaultTransactionUser implements TransactionUser {
 
-    private final Transactions transactions;
+    private Transactions transactions;
 
-    public DefaultTransactionUser(final Transactions transactions) {
+    public DefaultTransactionUser() {
+
+    }
+
+    public void start(final Transactions transactions) {
         this.transactions = transactions;
     }
 
@@ -23,9 +27,6 @@ public class DefaultTransactionUser implements TransactionUser {
         if (!request.isAck()) {
             // transaction.send(request.createResponse(200));
             transactions.send(request.createResponse(200));
-
-            Transaction t2 = transactions.send(request.clone());
-            // tie together in a UA object
         }
     }
 

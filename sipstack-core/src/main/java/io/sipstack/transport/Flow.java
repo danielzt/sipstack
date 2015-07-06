@@ -1,7 +1,5 @@
 package io.sipstack.transport;
 
-import io.pkts.packet.sip.SipMessage;
-import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.ConnectionId;
 
 /**
@@ -17,7 +15,15 @@ public interface Flow {
      */
     ConnectionId id();
 
-    void write(Event event);
+    default boolean isValid() {
+        return true;
+    }
 
-    void write(SipMessage msg);
+    default boolean isFailed() {
+        return !isValid();
+    }
+
+    default String failedReason() {
+        return "bajs";
+    }
 }

@@ -1,0 +1,50 @@
+
+sip:
+    interface:
+         - name: local
+           listen: 127.0.0.1
+           transport: [udp, tcp]
+           vipAddress: 64.92.13.45:5060
+hektor:
+    dispatchers:
+        my-dispatcher:
+            executor: worker-thread-executor
+            workerThreadExecutor:
+                noOfWorkers: 6
+            throughput: 75
+
+    # io.sipstack.transaction.transaction:
+     #     timers:
+      #        t1: PT0.5
+       #       t2: PT4
+        #      t4: PT5 
+
+         # - name: eth0
+           # listen: 10.0.1.34
+           # transport: [udp, tcp]
+           # vipAddress: 64.92.13.45:5060
+
+    # listen: 
+        # - 127.0.0.1:5060;transport=tcp as 64.92.13.45:5090 
+        # - 127.0.0.1:5060;transport=udp as 64.92.13.45:5090
+        # - 192.168.0.100:5060;transport=udp 
+
+     # dns:
+         # naptr: true
+         # srv: true
+         # cache: true
+
+     # transportLayer - perhaps implicit
+     
+     # The Transaction Layer
+     # transactions:
+          # enabled: true
+          # timers:
+               # t1: 50ms
+               # t2: 50ms
+
+     # The Transaction User Layer
+     # transactionUserLayer:
+          # enabled: true   # If this is enabled, the Transaction Layer must be enabled too
+      
+

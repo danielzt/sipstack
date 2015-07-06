@@ -156,8 +156,8 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
             if (response.isProvisional()) {
                 become(TransactionState.PROCEEDING);
             } else {
-                become(TransactionState.COMPLETED);
-                // become(TransactionState.TERMINATED);
+                // become(TransactionState.COMPLETED);
+                become(TransactionState.TERMINATED);
             }
         } else if (event.isSipRequestEvent()) {
             // note that any request is simply absorbed.
@@ -273,8 +273,7 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
         if (lastResponse == null || lastResponse.getStatus() < response.getStatus()) {
             lastResponse = response;
         }
-        throw new RuntimeException("TODO: implement me");
-        // ctx().forwardDownstream(event);
+        ctx().forwardDownstream(Event.create(lastResponse));
     }
 
     private final Cancellable scheduleTimer(final SipTimer timer, final Duration duration) {

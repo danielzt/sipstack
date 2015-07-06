@@ -69,6 +69,16 @@ public class TransactionLayer implements SipLayer, TransactionFactory {
         }
     }
 
+    private void onDownstream(final DefaultTransactionHolder holder, final SipMessage msg) {
+        try {
+            invoke(holder.flow, msg, holder);
+            checkIfTerminated(holder);
+        } catch (final ClassCastException e) {
+            // strange...
+            logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
+        }
+    }
+
     /*
     public Optional<Transaction> getTransaction(final TransactionId id) {
         final TransactionActor actor = transactionStore.get(id);
@@ -150,6 +160,10 @@ public class TransactionLayer implements SipLayer, TransactionFactory {
 
         final TransactionActor actor = holder.actor;
         if (actor.isTerminated()) {
+            // TODO: because the response is sent out
+            // before the onUpstream has returned this will
+            // be called twice now... not great. Do a
+            // throw new RuntimeException() and you'll see where it is coming from
             transactionStore.remove(actor.id());
             // TODO: an actor can emit more events here.
             actor.stop();
@@ -216,6 +230,19 @@ public class TransactionLayer implements SipLayer, TransactionFactory {
         return new DefaultTransactionHolder(defaultTransactionListener, actor);
     }
 
+    // nah...
+    /*
+    private static class WriteBuffer {
+        private final TransactionHolder holder;
+        private final SipMessage message;
+
+        WriteBuffer(final TransactionHolder holder, final SipMessage message) {
+            this.holder = holder;
+            this.message = message;
+        }
+    }
+    */
+
     /**
      *
      */
@@ -245,7 +272,8 @@ public class TransactionLayer implements SipLayer, TransactionFactory {
         @Override
         public void send(final SipMessage msg) {
             // TODO: may want to delay the writing here...
-            flow.write(msg);
+            // flow.write(msg);
+            onDownstream(this, msg);
         }
 
         @Override

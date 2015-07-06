@@ -203,8 +203,8 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
             final SipResponse response = event.response();
             relayResponse(response);
             if (response.isSuccess()) {
-                become(TransactionState.ACCEPTED);
-                // become(TransactionState.TERMINATED);
+                // become(TransactionState.ACCEPTED);
+                become(TransactionState.TERMINATED);
             } else if (response.isFinal()) {
                 become(TransactionState.COMPLETED);
             }
@@ -221,13 +221,13 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
      * delay it with 200 ms and send it later unless TU already have sent some kind of response (any kind really)
      */
     private final Consumer<Event> onEnterProceeding = event -> {
-        final SipMessage invite = originalInvite();
-        final SipResponse response = invite.createResponse(100);
-        relayResponse(response);
         if (config().isSend100TryingImmediately()) {
+            final SipMessage invite = originalInvite();
             if (invite.isAck()) {
                 System.err.println("What the fuck, this is an ACK!");
             }
+            final SipResponse response = invite.createResponse(100);
+            relayResponse(response);
             // downstream.tell(IOWriteEvent.create(response), self());
         } else {
             // TODO: schedule timer...

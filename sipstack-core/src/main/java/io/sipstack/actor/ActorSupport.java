@@ -129,6 +129,10 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
         logger().warn("Unhandled event \"{}\". Event will be dropped", event.getClass());
     }
 
+    protected void logWarn(final String msg, Object ... args) {
+        logger().warn("{} " + msg, this.id, args);
+    }
+
     public final S state() {
         return currentState;
     }

@@ -28,7 +28,7 @@ public class DefaultTransactionStore implements TransactionStore {
 
 
     @Override
-    public TransactionHolder ensureTransaction(final SipMessage sipMsg) {
+    public TransactionHolder ensureTransaction(final boolean isUpstream, final SipMessage sipMsg) {
         final TransactionId id = TransactionId.create(sipMsg);
         return transactions[Math.abs(id.hashCode() % stores)].computeIfAbsent(id, obj -> {
 
@@ -38,17 +38,25 @@ public class DefaultTransactionStore implements TransactionStore {
             }
 
             if (sipMsg.isInvite()) {
-                return factory.createInviteServerTransaction(id, sipMsg.toRequest(), config);
+                if (isUpstream) {
+                    return factory.createInviteServerTransaction(id, sipMsg.toRequest(), config);
+                } else {
+                    return factory.createInviteClientTransaction(id, sipMsg.toRequest(), config);
+                }
             }
 
-            // if ack doesn't match an existing io.sipstack.transaction.transaction then this ack must have been to a 2xx and
-            // therefore goes in its own io.sipstack.transaction.transaction but then ACKs doesn't actually have a real
-            // io.sipstack.transaction.transaction so therefore, screw it...
+            // if ack doesn't match an existing transaction then this ack must have been to a 2xx and
+            // therefore goes in its own transaction but then ACKs doesn't actually have a real
+            // transaction so therefore, screw it...
             if (sipMsg.isAck()) {
                 return null;
             }
 
-            return factory.createNonInviteServerTransaction(id, sipMsg.toRequest(), config);
+            if (isUpstream) {
+                return factory.createNonInviteServerTransaction(id, sipMsg.toRequest(), config);
+            } else {
+                throw new RuntimeException("Haven't done the NonInviteClientTransaction just yet");
+            }
         });
     }
 

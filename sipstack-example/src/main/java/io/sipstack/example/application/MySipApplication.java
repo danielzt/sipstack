@@ -47,6 +47,7 @@ public final class MySipApplication extends Application<MyConfiguration> {
         // ua().invite("sip:xxxxx.com").withCSeq().withVia().send();
         // ua(); // will return the current UA instance associated with the current event.
         // ua().onRetransmit();
+
     }
 
     @Override

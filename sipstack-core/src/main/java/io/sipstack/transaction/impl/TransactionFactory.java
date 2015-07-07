@@ -13,6 +13,10 @@ public interface TransactionFactory {
                                                     SipRequest request,
                                                     TransactionLayerConfiguration config);
 
+    TransactionHolder createInviteClientTransaction(TransactionId id,
+                                                    SipRequest request,
+                                                    TransactionLayerConfiguration config);
+
     TransactionHolder createNonInviteServerTransaction(TransactionId id,
                                                        SipRequest request,
                                                        TransactionLayerConfiguration config);

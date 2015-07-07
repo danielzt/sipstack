@@ -6,17 +6,9 @@ import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
-import io.sipstack.transaction.TransactionState;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.*;
 
@@ -29,61 +21,45 @@ public class MockTransactionUser implements TransactionUser {
      * The {@link Transactions} API is our way into the transaction layer
      * and is how we will be writing messages back.
      */
-    private Transactions transactions;
+    private Transactions transactionLayer;
 
-    /**
-     * A list of all messages we have received...
-     */
-    private List<SipAndTransactionHolder> messages = new ArrayList<>();
-
-    private Map<TransactionId, Transaction> allTransactions = new ConcurrentHashMap<>();
-
-    private Map<TransactionId, Transaction> terminatedTransaction = new ConcurrentHashMap<>();
+    private SipAndTransactionStorage storage = new SipAndTransactionStorage();
 
     public void start(final Transactions transactions) {
-        this.transactions = transactions;
+        this.transactionLayer = transactions;
     }
 
     public void ensureTransactionTerminated(final TransactionId id) {
-        final Transaction transaction = terminatedTransaction.remove(id);
-        assertThat(transaction, not((Transaction)null));
-        assertThat(transaction.state(), is(TransactionState.TERMINATED));
+        storage.ensureTransactionTerminated(id);
+    }
+
+    public Transaction assertAndConsumeRequest(final String method) {
+        return storage.assertAndConsumeRequest(method);
+    }
+
+    public Transaction assertAndConsumeResponse(final String method, final int responseStatus) {
+        return storage.assertAndConsumeResponse(method, responseStatus);
     }
 
     /**
-     * Make sure that there was a SINGLE request with the specified method received by
-     * this transaction user.
+     * Poke this client to send out a new request through the transaction layer.
      *
-     * @param method
+     * @param request the request to send.
+     * @return the transaction that got created for this request.
      */
-    public Transaction assertAndConsumeRequest(final String method) {
-        synchronized (messages) {
-            final Iterator<SipAndTransactionHolder> it = messages.iterator();
-            int count = 0;
-            Transaction transaction = null;
-            while (it.hasNext()) {
-                final SipAndTransactionHolder holder = it.next();
-                final SipMessage msg = holder.msg;
-                if (msg.isRequest() && method.equalsIgnoreCase(msg.getMethod().toString())) {
-                    it.remove();
-                    transaction = holder.transaction;
-                    ++count;
-                }
-            }
+    public Transaction sendRequest(final SipRequest request) {
+        final Transaction transaction = transactionLayer.send(request);
+        storage.store(transaction, request);
+        return transaction;
+    }
 
-            if (count == 0) {
-                fail("Expected a " + method.toUpperCase() + " request but didn't find one");
-            } else if (count > 1) {
-                fail("Found many " + method.toUpperCase() + " requests");
-            }
-
-            return transaction;
-        }
+    public void reset() {
+        storage.reset();
     }
 
     @Override
     public void onRequest(final Transaction transaction, final SipRequest request) {
-        recordMessage(transaction, request);
+        storage.store(transaction, request);
 
         final SipHeader header = request.getHeader("X-Transaction-Test-Response");
         int responseCode = 200;
@@ -91,46 +67,22 @@ public class MockTransactionUser implements TransactionUser {
             responseCode = Integer.valueOf(header.getValue().toString());
         }
 
-        transactions.send(request.createResponse(responseCode));
+        transactionLayer.send(request.createResponse(responseCode));
     }
 
     @Override
     public void onResponse(final Transaction transaction, final SipResponse response) {
-        recordMessage(transaction, response);
-    }
-
-    private void recordMessage(final Transaction transaction, final SipMessage msg) {
-        assertThat(transaction, not((Transaction) null));
-
-        synchronized (messages) {
-            messages.add(new SipAndTransactionHolder(transaction, msg));
-        }
-
-        allTransactions.put(transaction.id(), transaction);
+        storage.store(transaction, response);
     }
 
     @Override
     public void onTransactionTerminated(final Transaction transaction) {
-        assertThat(transaction, not((Transaction)null));
-        assertThat(allTransactions.remove(transaction.id()), not((Transaction)null));
-        terminatedTransaction.put(transaction.id(), transaction);
+        storage.onTransactionTerminated(transaction);
     }
 
     @Override
     public void onIOException(Transaction transaction, SipMessage msg) {
         assertThat(transaction, not((Transaction)null));
-    }
-
-    private static class SipAndTransactionHolder {
-
-        private final SipMessage msg;
-        private final Transaction transaction;
-
-        SipAndTransactionHolder(final Transaction transaction, final SipMessage msg) {
-            this.transaction = transaction;
-            this.msg = msg;
-        }
-
     }
 
 }

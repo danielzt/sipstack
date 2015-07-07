@@ -48,14 +48,14 @@ public final class TimersConfiguration {
     
     /**
      * 
-     * Timer B  64*T1            Section 17.1.1.2     INVITE io.sipstack.transaction.transaction
+     * Timer B  64*T1            Section 17.1.1.2     INVITE transaction
      *                                                timeout timer
      */
     @JsonIgnore
     private Duration timerB;
     
     /**
-     * Timer C  > 3min           Section 16.6         proxy INVITE io.sipstack.transaction.transaction
+     * Timer C  > 3min           Section 16.6         proxy INVITE transaction
      *                            bullet 11            timeout
      */
     @JsonIgnore
@@ -77,7 +77,7 @@ public final class TimersConfiguration {
     private Duration timerE;
     
     /**
-     * Timer F  64*T1            Section 17.1.2.2     non-INVITE io.sipstack.transaction.transaction
+     * Timer F  64*T1            Section 17.1.2.2     non-INVITE transaction
      *                                                timeout timer
      */
     @JsonIgnore

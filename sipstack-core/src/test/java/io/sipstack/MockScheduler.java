@@ -9,9 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -21,12 +21,19 @@ public class MockScheduler implements InternalScheduler {
 
     private static final Logger logger = LoggerFactory.getLogger(MockScheduler.class);
 
-    private List<MockCancellable> scheduledTasks = new CopyOnWriteArrayList<>();
+    // private List<MockCancellable> scheduledTasks = new CopyOnWriteArrayList<>();
+    private List<MockCancellable> scheduledTasks = new ArrayList<>();
 
     public final CountDownLatch latch;
 
     public MockScheduler(final CountDownLatch latch) {
         this.latch = latch;
+    }
+
+    public void reset() {
+        synchronized (scheduledTasks) {
+            scheduledTasks.clear();
+        }
     }
 
     /**
@@ -35,7 +42,10 @@ public class MockScheduler implements InternalScheduler {
      * @param index
      */
     public void fire(final int index) throws Exception {
-        final MockCancellable task = scheduledTasks.remove(index);
+        MockCancellable task = null;
+        synchronized (scheduledTasks) {
+            task = scheduledTasks.remove(index);
+        }
         task.listener.onTimeout(task.event);
     }
 
@@ -57,17 +67,21 @@ public class MockScheduler implements InternalScheduler {
 
     private int find(final SipTimer timer) {
         int index = -1;
-        for (final MockCancellable c : scheduledTasks) {
-            ++index;
-            if (c.event.isSipTimerEvent() && c.event.toSipTimerEvent().timer() == timer) {
-                break;
+        synchronized (scheduledTasks) {
+            for (final MockCancellable c : scheduledTasks) {
+                ++index;
+                if (c.event.isSipTimerEvent() && c.event.toSipTimerEvent().timer() == timer) {
+                    break;
+                }
             }
         }
         return index;
     }
 
     public int countCurrentTasks() {
-        return scheduledTasks.size();
+        synchronized (scheduledTasks) {
+            return scheduledTasks.size();
+        }
     }
 
     /**
@@ -77,9 +91,11 @@ public class MockScheduler implements InternalScheduler {
      * @return
      */
     public Optional<MockCancellable> isScheduled(final SipTimer timer) {
-        return scheduledTasks.stream()
-                .filter(c -> c.event.isSipTimerEvent() && c.event.toSipTimerEvent().timer() == timer)
-                .findFirst();
+        synchronized (scheduledTasks) {
+            return scheduledTasks.stream()
+                    .filter(c -> c.event.isSipTimerEvent() && c.event.toSipTimerEvent().timer() == timer)
+                    .findFirst();
+        }
     }
 
     @Override
@@ -89,9 +105,11 @@ public class MockScheduler implements InternalScheduler {
 
     @Override
     public Cancellable schedule(SipTimerListener listener, SipTimerEvent timerEvent, Duration delay) {
-        final MockCancellable cancellable = new MockCancellable(listener, timerEvent, delay);
-        scheduledTasks.add(cancellable);
-        latch.countDown();
-        return cancellable;
+        synchronized (scheduledTasks) {
+            final MockCancellable cancellable = new MockCancellable(listener, timerEvent, delay);
+            scheduledTasks.add(cancellable);
+            latch.countDown();
+            return cancellable;
+        }
     }
 }

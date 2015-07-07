@@ -30,10 +30,11 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
      *
      * @throws Exception
      */
-    @Test(timeout = 1000)
+    @Test(timeout = 2000)
     public void testTransitionToCompleted() throws Exception {
         for (int i = 300; i < 700; ++i) {
             transitionToCompleted(i);
+            reset();
         }
     }
 
@@ -76,7 +77,7 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         // "fire" timer L
         defaultScheduler.fire(SipTimer.L);
 
-        transactionUser.ensureTransactionTerminated(transaction.id());
+        myApplication.ensureTransactionTerminated(transaction.id());
     }
 
 
@@ -116,7 +117,7 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         // ensure that we indeed received an invite request
         // over in the transaction user (which again is the layer above
         // the Transport Layer and is acting as our application right now)
-        final Transaction transaction = transactionUser.assertAndConsumeRequest("invite");
+        final Transaction transaction = myApplication.assertAndConsumeRequest("invite");
 
         // ensure that the transport layer received the final response
         // as our application, the transaction user, generated.

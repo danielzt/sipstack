@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
 
+import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
 
 
@@ -168,6 +169,12 @@ public class SipStackTestBase {
             fail("No timer " + timer + " scheduled");
         }
         return cancellable.get();
+    }
+
+    public MockCancellable assertTimerCancelled(final SipTimer timer) throws InterruptedException {
+        MockCancellable cancellable = assertTimerScheduled(timer);
+        assertThat("Timer " + timer + " was not cancelled as expected", cancellable.isCancelled(), is(true));
+        return cancellable;
     }
 
 }

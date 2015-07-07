@@ -15,7 +15,7 @@ public class TransactionTestBase extends SipStackTestBase {
     protected TransactionLayerConfiguration config;
     protected final Clock clock = new SystemClock();
 
-    protected MockTransactionUser transactionUser;
+    protected MockTransactionUser myApplication;
 
     protected MockTransportLayer transports;
 
@@ -40,13 +40,19 @@ public class TransactionTestBase extends SipStackTestBase {
         // away
         config.setSend100TryingImmediately(true);
 
-        transactionUser = new MockTransactionUser();
+        myApplication = new MockTransactionUser();
         transports = new MockTransportLayer();
 
-        transactionLayer = new DefaultTransactionLayer(clock, defaultScheduler, transactionUser, config);
+        transactionLayer = new DefaultTransactionLayer(clock, defaultScheduler, myApplication, config);
         transactionLayer.start(transports);
 
-        transactionUser.start(transactionLayer);
+        myApplication.start(transactionLayer);
+    }
+
+    public void reset() {
+        transports.reset();
+        myApplication.reset();
+        defaultScheduler.reset();
     }
 
 

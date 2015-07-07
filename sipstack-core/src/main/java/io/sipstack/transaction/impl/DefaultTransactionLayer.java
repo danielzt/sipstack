@@ -60,7 +60,10 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
 
     @Override
     public void onMessage(final Flow flow, final SipMessage msg) {
-        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(msg);
+        // the onMessage method is the API the transaction layer implements to interact
+        // with the underlying transport layer, hence, any message we recieve here
+        // is going up the stack, hence the value true on "ensureTransaction"
+        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(true, msg);
         try {
             invoke(flow, Event.create(msg), holder);
             checkIfTerminated(holder);
@@ -227,6 +230,12 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     }
 
     @Override
+    public TransactionHolder createInviteClientTransaction(final TransactionId id, final SipRequest request, final TransactionLayerConfiguration config) {
+        final TransactionActor actor = new InviteClientTransactionActor(id, request, config);
+        return new DefaultTransactionHolder(defaultTransactionListener, actor);
+    }
+
+    @Override
     public TransactionHolder createNonInviteServerTransaction(final TransactionId id, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new NonInviteServerTransactionActor(id, request, config);
         return new DefaultTransactionHolder(defaultTransactionListener, actor);
@@ -238,8 +247,10 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     }
 
     @Override
-    public Transaction send(SipMessage msg) {
-        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(msg);
+    public Transaction send(final SipMessage msg) {
+        // note, the "send" method is exposed by our "north facing" API hence the
+        // direction of the message is "down" hence the boolean value false to ensureTransaction
+        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(false, msg);
         try {
             invoke(null, Event.create(msg), holder);
             checkIfTerminated(holder);

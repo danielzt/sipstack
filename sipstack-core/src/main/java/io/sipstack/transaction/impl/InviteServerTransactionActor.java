@@ -157,7 +157,7 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
 
     /**
      * The init state. Just make sure that the first event we receive is the same INVITE as created
-     * the io.sipstack.transaction.transaction (yes, we compare references in this case, that's what we want) and then
+     * the transaction (yes, we compare references in this case, that's what we want) and then
      * transition over to the proceeding state.
      */
     private final Consumer<Event> init = event -> {

@@ -1,8 +1,7 @@
 package io.sipstack.actor;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
-import io.sipstack.event.Event;
+import io.sipstack.core.SipTimerListener;
+import io.sipstack.event.SipTimerEvent;
 
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,22 +22,19 @@ public class DefaultInternalScheduler implements InternalScheduler {
     }
 
     @Override
-    public Cancellable schedule(final ChannelHandlerContext ctx, final Event event, final Duration delay) {
-        System.err.println("Scheduling new task");
-        final ScheduledFuture<?> future = scheduler.schedule(new Runnable() {
-            @Override
-            public void run() {
-                System.err.println("Fireing event...");
-                ctx.fireUserEventTriggered(event);
-            }
-        }, delay.toMillis(), TimeUnit.MILLISECONDS);
-
+    public Cancellable schedule(final Runnable job, final Duration delay) {
+        final ScheduledFuture<?> future = scheduler.schedule(job, delay.toMillis(), TimeUnit.MILLISECONDS);
         return new CancellableImpl(future);
     }
 
     @Override
-    public Cancellable schedule(ChannelInboundHandler layer, ChannelHandlerContext ctx, Event event, Duration delay) {
-        throw new RuntimeException("not implemented just yet");
+    public Cancellable schedule(SipTimerListener listener, SipTimerEvent timerEvent, Duration delay) {
+        return schedule(new Runnable() {
+            @Override
+            public void run() {
+                listener.onTimeout(timerEvent);
+            }
+        }, delay);
     }
 
     private static class CancellableImpl implements Cancellable {

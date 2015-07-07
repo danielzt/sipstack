@@ -26,7 +26,7 @@ public final class MySipApplication extends Application<MyConfiguration> {
      * 
      */
     public MySipApplication() {
-        super("My cool SIP io.sipstack.application.application");
+        super("My cool SIP application");
     }
 
     public void processInvite(final SipMessageEvent event) {

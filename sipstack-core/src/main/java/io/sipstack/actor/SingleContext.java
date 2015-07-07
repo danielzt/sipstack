@@ -88,13 +88,20 @@ public class SingleContext implements ActorContext, Scheduler {
             throw new RuntimeException("Unable to schedule a timer because there is no underlying transaction");
         }
 
-        final SipTimerEvent event = SipTimerEvent
-                .withTimer(timer)
-                .withKey(transactionId)
-                .build();
+        final SipTimerEvent event = SipTimerEvent.withTimer(timer).withKey(transactionId).build();
+        return scheduler.schedule(transactionLayer, event, delay);
+
+        /*
+        return scheduler.schedule(new Runnable() {
+            @Override
+            public void run() {
+                transactionLayer.processSipTimerEvent(event);
+            }
+        }, delay);
+        */
 
         // only temp until the scheduler is working again
-        return new CancellableImpl(null);
+        // return new CancellableImpl(null);
         // handlerCtx.executor().sc
 
         // throw new RuntimeException("Guess we got to come up with a new interface");

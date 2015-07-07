@@ -11,8 +11,8 @@ import io.pkts.streams.Stream;
 import io.pkts.streams.StreamHandler;
 import io.pkts.streams.StreamListener;
 import io.pkts.streams.impl.DefaultStreamHandler;
-import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
+import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.netty.codec.sip.Transport;
@@ -22,8 +22,11 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Predicate;
+
+import static org.junit.Assert.*;
 
 
 /**
@@ -160,7 +163,11 @@ public class SipStackTestBase {
      */
     public MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
         defaultScheduler.latch.await();
-        return defaultScheduler.isScheduled(timer).orElseThrow(RuntimeException::new);
+        final Optional<MockCancellable> cancellable = defaultScheduler.isScheduled(timer);
+        if (!cancellable.isPresent()) {
+            fail("No timer " + timer + " scheduled");
+        }
+        return cancellable.get();
     }
 
 }

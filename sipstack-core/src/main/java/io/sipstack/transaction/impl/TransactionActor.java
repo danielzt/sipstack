@@ -3,6 +3,7 @@ package io.sipstack.transaction.impl;
 
 import io.sipstack.actor.Actor;
 import io.sipstack.transaction.TransactionId;
+import io.sipstack.transaction.TransactionState;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -10,6 +11,8 @@ import io.sipstack.transaction.TransactionId;
 public interface TransactionActor extends Actor {
 
     TransactionId id();
+
+    TransactionState state();
 
     /**
      * Get a state representation of the current io.sipstack.transaction.transaction.

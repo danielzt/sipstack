@@ -1,8 +1,7 @@
 package io.sipstack.actor;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
-import io.sipstack.event.Event;
+import io.sipstack.core.SipTimerListener;
+import io.sipstack.event.SipTimerEvent;
 
 import java.time.Duration;
 
@@ -21,7 +20,8 @@ public interface InternalScheduler {
      * @param delay the delay before delivering the event.
      * @return a cancellable representing the task
      */
-    Cancellable schedule(ChannelHandlerContext ctx, Event event, Duration delay);
+    Cancellable schedule(Runnable job, Duration delay);
 
-    Cancellable schedule(ChannelInboundHandler layer, ChannelHandlerContext ctx, Event event, Duration delay);
+    Cancellable schedule(SipTimerListener listener, SipTimerEvent timerEvent, Duration delay);
+
 }

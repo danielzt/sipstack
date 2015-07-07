@@ -1,16 +1,17 @@
 package io.sipstack.transaction.impl;
 
-import io.netty.channel.ChannelHandlerContext;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.actor.SingleContext;
 import io.sipstack.config.TransactionLayerConfiguration;
+import io.sipstack.core.SipTimerListener;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
+import io.sipstack.transaction.TransactionState;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
 import io.sipstack.transactionuser.DefaultTransactionUser;
@@ -25,7 +26,7 @@ import java.util.Optional;
 /**
  * @author jonas@jonasborjesson.com
  */
-public class DefaultTransactionLayer implements TransportUser, Transactions, TransactionFactory {
+public class DefaultTransactionLayer implements TransportUser, Transactions, TransactionFactory, SipTimerListener {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
@@ -61,7 +62,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     public void onMessage(final Flow flow, final SipMessage msg) {
         final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(msg);
         try {
-            invoke(flow, msg, holder);
+            invoke(flow, Event.create(msg), holder);
             checkIfTerminated(holder);
         } catch (final ClassCastException e) {
             // strange...
@@ -80,17 +81,6 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         System.err.println("Nooooo, the write failed for message " + msg);
     }
 
-
-    private void onDownstream(final DefaultTransactionHolder holder, final SipMessage msg) {
-        try {
-            invoke(holder.flow, msg, holder);
-            checkIfTerminated(holder);
-        } catch (final ClassCastException e) {
-            // strange...
-            logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
-        }
-    }
-
     /*
     public Optional<Transaction> getTransaction(final TransactionId id) {
         final TransactionActor actor = transactionStore.get(id);
@@ -102,13 +92,13 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     }
     */
 
-    private void invoke(final Flow flow, final SipMessage msg, final DefaultTransactionHolder holder) {
+    private void invoke(final Flow flow, final Event event, final DefaultTransactionHolder holder) {
         if (holder == null) {
             return;
         }
 
         try {
-            final SingleContext actorCtx = invokeTransaction(flow, msg, holder);
+            final SingleContext actorCtx = invokeTransaction(flow, event, holder);
             actorCtx.downstream().ifPresent(e -> {
                 if (holder.flow().isPresent()) {
                     transports.write(holder.flow().get(), e.getSipMessage());
@@ -130,10 +120,12 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
             // No need for a newServerTransaction since that happens automatically but
             // perhaps we should do what jain sip does there as well?
             actorCtx.upstream().ifPresent(e -> {
-                if (msg.isRequest()) {
-                    holder.tu.onRequest(holder, msg.toRequest());
+                if (e.isSipRequestEvent()) {
+                    holder.tu.onRequest(holder, e.request());
+                } else if (e.isSipResponseEvent()){
+                    holder.tu.onResponse(holder, e.response());
                 } else {
-                    holder.tu.onResponse(holder, msg.toResponse());
+                    throw new RuntimeException("not sure how to forward this event upstream " + e);
                 }
             });
         } catch (final Throwable t) {
@@ -141,24 +133,21 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         }
     }
 
-    public void processSipTimerEvent(final ChannelHandlerContext ctx, final SipTimerEvent event) {
-        throw new RuntimeException("Can't process timer events right now");
-        /*
+    @Override
+    public void onTimeout(SipTimerEvent timer) {
         try {
-            final TransactionId id = (TransactionId) event.key();
-            final TransactionActor transaction = transactionStore.get(id);
-            if (transaction != null) {
-                invoke(ctx, event, transaction);
-                checkIfTerminated(transaction);
+            final TransactionId id = (TransactionId) timer.key();
+            final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.get(id);
+            if (holder != null) {
+                invoke(null, timer, holder);
+                checkIfTerminated(holder);
             }
 
         } catch (final ClassCastException e) {
             // TODO
             e.printStackTrace();
         }
-        */
     }
-
 
     /**
      * If an actor has been terminated then we will clean it up.
@@ -180,6 +169,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
             // TODO: an actor can emit more events here.
             actor.stop();
             actor.postStop();
+            defaultTransactionListener.onTransactionTerminated(holder);
         }
     }
 
@@ -190,7 +180,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
      * @return
      */
     private SingleContext invokeTransaction(final Flow flow,
-                                            final SipMessage msg,
+                                            final Event event,
                                             final DefaultTransactionHolder holder) {
 
         final TransactionActor transaction = holder.actor;
@@ -213,7 +203,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
                         holder.flow = flow;
                     }
 
-                    transaction.onReceive(ctx, Event.create(msg));
+                    transaction.onReceive(ctx, event);
                 } catch (final Throwable t) {
                     // TODO: if the actor throws an exception we should
                     // do what?
@@ -225,7 +215,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
             // or an ACK to a 2xx invite response, then it should be
             // forwarded upstream so simply pretend we invoked and
             // actor which asked to do just that.
-            ctx.forwardUpstream(Event.create(msg));
+            ctx.forwardUpstream(event);
         }
         return ctx;
     }
@@ -251,7 +241,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     public Transaction send(SipMessage msg) {
         final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(msg);
         try {
-            invoke(null, msg, holder);
+            invoke(null, Event.create(msg), holder);
             checkIfTerminated(holder);
         } catch (final ClassCastException e) {
             // strange...
@@ -259,6 +249,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         }
         return holder;
     }
+
 
     /**
      *
@@ -284,6 +275,11 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         @Override
         public TransactionId id() {
             return actor.id();
+        }
+
+        @Override
+        public TransactionState state() {
+            return actor.state();
         }
 
         @Override

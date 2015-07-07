@@ -1,9 +1,8 @@
 package io.sipstack;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
 import io.sipstack.actor.Cancellable;
-import io.sipstack.event.Event;
+import io.sipstack.core.SipTimerListener;
+import io.sipstack.event.SipTimerEvent;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
@@ -13,10 +12,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author jonas@jonasborjesson.com
  */
 public class MockCancellable implements Cancellable {
-    public final Event event;
-    public final ChannelHandlerContext ctx;
+    public final SipTimerListener listener;
+    public final SipTimerEvent event;
     public final Duration delay;
-    public final ChannelInboundHandler handler;
     public final AtomicBoolean canceled = new AtomicBoolean(false);
 
     /**
@@ -25,9 +23,8 @@ public class MockCancellable implements Cancellable {
      */
     public final CountDownLatch cancelLatch = new CountDownLatch(1);
 
-    public MockCancellable(final ChannelInboundHandler handler, final ChannelHandlerContext ctx, final Event event, final Duration delay) {
-        this.handler = handler;
-        this.ctx = ctx;
+    public MockCancellable(final SipTimerListener listener, final SipTimerEvent event, final Duration delay) {
+        this.listener = listener;
         this.event = event;
         this.delay = delay;
     }

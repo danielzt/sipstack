@@ -54,7 +54,6 @@ public abstract class SipTimerEvent extends Event {
 
     public static class Builder {
         private final SipTimer timer;
-        private long timestamp;
         private Object key;
 
         private Builder(final SipTimer timer) {
@@ -81,11 +80,6 @@ public abstract class SipTimerEvent extends Event {
          */
         public Builder withKey(final Object key) {
             this.key = key;
-            return this;
-        }
-
-        public Builder withArrivalTime(final long timestamp) {
-            this.timestamp = timestamp;
             return this;
         }
 

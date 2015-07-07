@@ -1,11 +1,10 @@
 package io.sipstack.actor;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
-import io.sipstack.event.Event;
+import io.sipstack.core.SipTimerListener;
+import io.sipstack.event.SipTimerEvent;
 
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -26,16 +25,22 @@ public class HashWheelScheduler implements InternalScheduler {
     }
 
 
+
     @Override
-    public Cancellable schedule(ChannelHandlerContext ctx, Event event, Duration delay) {
-        throw new RuntimeException("Dont use");
+    public Cancellable schedule(final Runnable job, final Duration delay) {
+        final Task task = new Task(job);
+        final Timeout timeout = timer.newTimeout(task, delay.toMillis(), TimeUnit.MILLISECONDS);
+        return new CancellableTask(timeout);
     }
 
     @Override
-    public Cancellable schedule(final ChannelInboundHandler handler, final ChannelHandlerContext ctx, final Event event, final Duration delay) {
-        final Task task = new Task(handler, ctx, event);
-        final Timeout timeout = timer.newTimeout(task, delay.toMillis(), TimeUnit.MILLISECONDS);
-        return new CancellableTask(timeout);
+    public Cancellable schedule(final SipTimerListener listener, final SipTimerEvent timerEvent, final Duration delay) {
+        return schedule(new Runnable() {
+            @Override
+            public void run() {
+                listener.onTimeout(timerEvent);
+            }
+        }, delay);
     }
 
     private static class CancellableTask implements Cancellable {
@@ -53,20 +58,16 @@ public class HashWheelScheduler implements InternalScheduler {
 
     private static class Task implements TimerTask {
 
-        private final Event event;
-        private final ChannelInboundHandler handler;
-        private final ChannelHandlerContext ctx;
+        private final Runnable job;
 
 
-        public Task(final ChannelInboundHandler handler, final ChannelHandlerContext ctx, final Event event) {
-            this.event = event;
-            this.handler = handler;
-            this.ctx = ctx;
+        public Task(final Runnable job) {
+            this.job = job;
         }
 
         @Override
         public void run(final Timeout timeout) throws Exception {
-            handler.userEventTriggered(ctx, event);
+            job.run();
         }
     }
 }

@@ -7,4 +7,5 @@ public interface Transaction {
 
     TransactionId id();
 
+    TransactionState state();
 }

@@ -205,8 +205,8 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
             final SipResponse response = event.response();
             relayResponse(response);
             if (response.isSuccess()) {
-                // become(TransactionState.ACCEPTED);
-                become(TransactionState.TERMINATED);
+                become(TransactionState.ACCEPTED);
+                // become(TransactionState.TERMINATED);
             } else if (response.isFinal()) {
                 become(TransactionState.COMPLETED);
             }
@@ -228,9 +228,7 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
             if (invite.isAck()) {
                 System.err.println("What the fuck, this is an ACK!");
             }
-            final SipResponse response = invite.createResponse(100);
-            relayResponse(response);
-            // downstream.tell(IOWriteEvent.create(response), self());
+            relayResponse(invite.createResponse(100));
         } else {
             // TODO: schedule timer...
             // timer100Trying = ctx().scheduler().schedule();

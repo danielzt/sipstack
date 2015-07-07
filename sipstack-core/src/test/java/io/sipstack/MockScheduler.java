@@ -1,10 +1,9 @@
 package io.sipstack;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
 import io.sipstack.actor.Cancellable;
 import io.sipstack.actor.InternalScheduler;
-import io.sipstack.event.Event;
+import io.sipstack.core.SipTimerListener;
+import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.SipTimer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +36,7 @@ public class MockScheduler implements InternalScheduler {
      */
     public void fire(final int index) throws Exception {
         final MockCancellable task = scheduledTasks.remove(index);
-        task.handler.userEventTriggered(task.ctx, task.event);
+        task.listener.onTimeout(task.event);
     }
 
     /**
@@ -84,13 +83,13 @@ public class MockScheduler implements InternalScheduler {
     }
 
     @Override
-    public Cancellable schedule(final ChannelHandlerContext ctx, final Event event, final Duration delay) {
-        throw new RuntimeException("Not sure we should use this one anymore");
+    public Cancellable schedule(final Runnable run, Duration delay) {
+        throw new RuntimeException("Sorry, the mock hasn't implemented this one yet");
     }
 
     @Override
-    public Cancellable schedule(ChannelInboundHandler handler, ChannelHandlerContext ctx, Event event, Duration delay) {
-        final MockCancellable cancellable = new MockCancellable(handler, ctx, event, delay);
+    public Cancellable schedule(SipTimerListener listener, SipTimerEvent timerEvent, Duration delay) {
+        final MockCancellable cancellable = new MockCancellable(listener, timerEvent, delay);
         scheduledTasks.add(cancellable);
         latch.countDown();
         return cancellable;

@@ -99,6 +99,8 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
      */
     private Cancellable timerB;
 
+    private Cancellable timerM;
+
     protected InviteClientTransactionActor(final TransactionId id,
                                            final SipRequest invite,
                                            final TransactionLayerConfiguration config) {
@@ -113,6 +115,12 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
         when(TransactionState.CALLING, this::onCalling);
         onEnter(TransactionState.CALLING, this::onEnterCalling);
         onExit(TransactionState.CALLING, this::onExitCalling);
+
+        when(TransactionState.PROCEEDING, this::onProceeding);
+
+        when(TransactionState.ACCEPTED, this::onAccepted);
+        onEnter(TransactionState.ACCEPTED, this::onEnterAccepted);
+        onExit(TransactionState.ACCEPTED, this::onExitAccepted);
     }
 
     /**
@@ -166,7 +174,7 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
             } else if (response.isSuccess()){
                 become(TransactionState.ACCEPTED);
             } else {
-                // TODO: generate the ACK
+                ack();
                 become(TransactionState.COMPLETED);
             }
         } else if (event.isSipTimerA()) {
@@ -205,6 +213,108 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
             timerA.cancel();
         }
         timerB.cancel();
+    }
+
+    /**
+     * Implements the Proceeding state, which is as follows:
+     *
+     * <pre>
+     *
+     *                          |
+     *                          |1xx
+     *                          |1xx to TU
+     *                          |
+     *          1xx             V
+     *          1xx to TU +-----------+
+     *          +---------|           |
+     *          |         |Proceeding |
+     *          +-------->|           |
+     *                    +-----------+ 2xx
+     *   300-699             |    |     2xx to TU
+     *   ACK sent,  +--------+    +---------------+
+     *   resp. to TU|                             |
+     *              |                             |
+     *              V                             V
+     *        +-----------+                   +----------+
+     *        |           |                   |          |
+     *        | Completed |                   | Accepted |
+     *        |           |                   |          |
+     *        +-----------+                   +----------+
+     *
+     * </pre>
+     * @param event
+     */
+    private final void onProceeding(final Event event) {
+        if (event.isSipResponseEvent()) {
+            // all responses to TU
+            ctx().forwardUpstream(event);
+
+            final SipResponse response = event.response();
+            if (response.isSuccess()) {
+                become(TransactionState.ACCEPTED);
+            } else if (response.isFinal()){
+                // error responses since we already checked
+                // for success before this
+                ack();
+                become(TransactionState.COMPLETED);
+            }
+
+            // provisional doesn't do anything except
+            // pushing the response up to TU, which
+            // has already be done. Hence, no else statement
+        }
+    }
+
+    /**
+     * Implements the Accepted state, which is as follows:
+     *
+     * <pre>
+     *                      +----------+
+     *                      |          |
+     *                      | Accepted |
+     *                      |          |-+
+     *                      +----------+ |
+     *                          |  ^     |
+     *                          |  |     |
+     *                          |  +-----+
+     *             Timer M fires|    2xx
+     *                        - |    2xx to TU
+     *              +-----------+
+     *              V
+     *   +------------+
+     *   |            |
+     *   | Terminated |
+     *   |            |
+     *   +------------+
+     *
+     * </pre>
+     * @param event
+     */
+    private final void onAccepted(final Event event) {
+        if (event.isSipResponseEvent()) {
+            final SipResponse response = event.response();
+            if (response.isSuccess()) {
+                ctx().forwardUpstream(event);
+            }
+        } else if (event.isSipTimerM()) {
+            become(TransactionState.TERMINATED);
+        }
+    }
+
+    private final void onEnterAccepted(final Event event) {
+        timerM = scheduleTimer(SipTimer.M, timersConfig.getTimerM());
+    }
+
+    private final void onExitAccepted(final Event event) {
+        timerM.cancel();
+    }
+
+    /**
+     * For Error responses, we will generate the ACK as part of this
+     * transaction.
+     */
+    private void ack() {
+        // TODO: generate the ACK for the error response case
     }
 
     /**

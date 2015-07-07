@@ -112,9 +112,10 @@ public abstract class SipTimerEvent extends Event {
                     return new TimerK(key);
                 case L:
                     return new TimerL(key);
+                case M:
+                    return new TimerM(key);
                 default:
                     throw new RuntimeException("Don't know what you are talking about.");
-
             }
         }
 
@@ -326,6 +327,23 @@ public abstract class SipTimerEvent extends Event {
             @Override
             public SipTimer timer() {
                 return SipTimer.L;
+            }
+
+        }
+
+        private static class TimerM extends SipTimerEvent {
+            private TimerM(final Object key) {
+                super(key);
+            }
+
+            @Override
+            public boolean isSipTimerM() {
+                return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.M;
             }
 
         }

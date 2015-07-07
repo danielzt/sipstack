@@ -125,6 +125,12 @@ public final class TimersConfiguration {
     @JsonIgnore
     private Duration timerL;
 
+    /**
+     * Timer M  64*T1            Section 7.2 (rfc6026)
+     */
+    @JsonIgnore
+    private Duration timerM;
+
     public TimersConfiguration() {
         init();
     }
@@ -149,6 +155,8 @@ public final class TimersConfiguration {
 
         this.timerL = Duration.ofMillis(64 * this.t1.toMillis());
         // this.timerL = Duration.ofMillis(1 * this.t1.toMillis());
+
+        this.timerM = Duration.ofMillis(64 * this.t1.toMillis());
     }
 
     public Duration getT1() {
@@ -224,6 +232,10 @@ public final class TimersConfiguration {
 
     public Duration getTimerL() {
         return this.timerL;
+    }
+
+    public Duration getTimerM() {
+        return this.timerM;
     }
 
 

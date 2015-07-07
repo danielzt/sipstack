@@ -6,6 +6,7 @@ import io.pkts.packet.sip.header.CallIdHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.impl.SipAndTransactionStorage.Holder;
 import io.sipstack.transport.Flow;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,9 +26,89 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         super.setUp();
     }
 
+    /**
+     * While in the accepted state, any 2xx responses will simply be forwarded
+     * up to the TU.
+     *
+     * @throws Exception
+     */
     @Test(timeout = 1000)
-    public void testTransitionToCompleted() throws Exception {
+    public void testRetransmittedWhileInAccepted() throws Exception {
+        final Holder holder = initiateTransition(200);
+        reset();
+        final SipResponse reTransmitted = holder.message().createResponse(200);
+        final Flow flow = Mockito.mock(Flow.class);
+        transactionLayer.onMessage(flow, reTransmitted);
+        myApplication.assertAndConsumeResponse("invite", 200);
+    }
+    /**
+     * Test to go straight from Calling to Accepted and then fire timer M which takes
+     * us to the terminated state.
+     *
+     * @throws Exception
+     */
+    @Test(timeout = 1000)
+    public void testTransitionToAccepted() throws Exception {
         for (int i = 200; i < 300; ++i) {
+            final Transaction transaction = initiateTransition(i).transaction();
+            assertTimerCancelled(SipTimer.A);
+            assertTimerCancelled(SipTimer.B);
+            assertTimerScheduled(SipTimer.M);
+
+            // fire M
+            defaultScheduler.fire(SipTimer.M);
+            myApplication.ensureTransactionTerminated(transaction.id());
+            reset();
+        }
+    }
+
+    /**
+     * Test to go Calling --> Proceeding --> Accepted for every combination
+     * of provisional and success responses.
+     */
+    @Test(timeout = 10000)
+    public void testProceedingToAccepted() throws Exception {
+        for (int i = 100; i < 200; ++i) {
+            for (int j = 200; j < 300; ++j) {
+                final Holder holder = initiateTransition(i);
+                final SipResponse response = holder.message().createResponse(j);
+                final Flow flow = Mockito.mock(Flow.class);
+                transactionLayer.onMessage(flow, response);
+
+                assertTimerScheduled(SipTimer.M);
+                reset();
+            }
+        }
+    }
+
+    /**
+     * Ensure that if we keep getting 1xx responses sent to us while in
+     * the proceeding state that those gets pushed up to the Transaction User
+     * layer.
+     *
+     * @throws Exception
+     */
+    @Test(timeout = 1000)
+    public void testRetransmitWhileInProceeding() throws Exception {
+
+        for (int i = 100; i < 200; ++i) {
+            final Holder holder = initiateTransition(i);
+            assertTimerCancelled(SipTimer.A);
+            assertTimerCancelled(SipTimer.B);
+            reset();
+
+            final SipResponse response = holder.message().createResponse(i);
+            final Flow flow = Mockito.mock(Flow.class);
+            transactionLayer.onMessage(flow, response);
+
+            myApplication.assertAndConsumeResponse("invite", i);
+            reset();
+        }
+    }
+
+    @Test(timeout = 1000)
+    public void testTransitionToProceeding() throws Exception {
+        for (int i = 100; i < 200; ++i) {
             initiateTransition(i);
             assertTimerCancelled(SipTimer.A);
             assertTimerCancelled(SipTimer.B);
@@ -37,7 +118,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
 
     @Test(timeout = 500)
     public void testFireTimerA() throws Exception {
-        final SipAndTransactionStorage.Holder holder = initiateNewTransaction();
+        final Holder holder = initiateNewTransaction();
         final Transaction t1 = holder.transaction();
         final SipRequest request = holder.message().toRequest();
 
@@ -47,6 +128,14 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         assertThat(request, is(retransmittedRequest));
     }
 
+    @Test(timeout = 500)
+    public void testFireTimerB() throws Exception {
+        final Transaction t1 = initiateNewTransaction().transaction();
+        defaultScheduler.fire(SipTimer.B);
+        myApplication.ensureTransactionTerminated(t1.id());
+        assertTimerCancelled(SipTimer.A);
+    }
+
     /**
      * Initiate a new invite client transaction returning both the transaction and the request
      * as it was propagated through the transaction layer.
@@ -54,7 +143,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      * @return
      * @throws Exception
      */
-    public SipAndTransactionStorage.Holder initiateNewTransaction() throws Exception {
+    public Holder initiateNewTransaction() throws Exception {
         final SipRequest invite = defaultInviteRequest.clone();
         // change the branch since we will otherwise actually hit the
         // same transaction and then this will be a re-transmission
@@ -75,7 +164,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         assertTimerScheduled(SipTimer.A);
         assertTimerScheduled(SipTimer.B);
 
-        return new SipAndTransactionStorage.Holder(t1, request);
+        return new Holder(t1, request);
     }
 
     /**
@@ -85,8 +174,8 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      *
      * @param finalResponseStatus
      */
-    public Transaction initiateTransition(final int finalResponseStatus) throws Exception {
-        final SipAndTransactionStorage.Holder holder = initiateNewTransaction();
+    public Holder initiateTransition(final int finalResponseStatus) throws Exception {
+        final Holder holder = initiateNewTransaction();
         final Transaction t1 = holder.transaction();
         final SipRequest request = holder.message().toRequest();
 
@@ -103,7 +192,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         // transaction as what the original invite request got associated with.
         assertThat(t1.id(), is(t2.id()));
 
-        return t1;
+        return holder;
     }
 
 }

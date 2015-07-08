@@ -16,6 +16,7 @@ import io.sipstack.transactionuser.DefaultProxyBranch;
 import io.sipstack.transactionuser.DefaultUA;
 import io.sipstack.transactionuser.Proxy;
 import io.sipstack.transactionuser.ProxyBranch;
+import io.sipstack.transactionuser.TransactionUserEvent;
 import io.sipstack.transactionuser.UA;
 
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ public class DefaultApplicationContext implements InternalApplicationContext {
     private Map<String, DefaultUA> uaStore;
     private Map<String, DefaultB2BUA> b2buaStore;
 
-    private SipMessage currentMessage;
+    private TransactionUserEvent currentEvent;
 
     private final ApplicationController parent;
 
@@ -70,7 +71,7 @@ public class DefaultApplicationContext implements InternalApplicationContext {
             throw new IllegalArgumentException(String.format("A proxy with name {} already exists", friendlyName));
         }
 
-        return new ProxyBuilder(friendlyName, currentMessage.toRequest());
+        return new ProxyBuilder(friendlyName, currentEvent.message().toRequest());
     }
 
     @Override
@@ -152,8 +153,8 @@ public class DefaultApplicationContext implements InternalApplicationContext {
     }
 
     @Override
-    public void preInvoke(final SipMessage message) {
-        this.currentMessage = message;
+    public void preInvoke(final TransactionUserEvent event) {
+        this.currentEvent = event;
     }
 
     /**
@@ -166,13 +167,13 @@ public class DefaultApplicationContext implements InternalApplicationContext {
 
         // start any proxy objects that hasn't been started yet
         if (proxies != null) {
-            proxies.values().stream().forEach(DefaultProxy::actuallyStart);
+            proxies.values().forEach(DefaultProxy::actuallyStart);
         }
 
     }
 
-    public void send(final SipMessage message) {
-        parent.send(message);
+    public void send(final DefaultUA ua, final SipMessage message) {
+        parent.send(ua, message);
     }
 
     private class ProxyBranchBuilder implements ProxyBranch.Builder {
@@ -301,6 +302,9 @@ public class DefaultApplicationContext implements InternalApplicationContext {
         @Override
         public UA build() {
             final DefaultUA ua = new DefaultUA(DefaultApplicationContext.this, friendlyName, request, target);
+            if (request == currentEvent.message()) {
+                currentEvent.dialog().setConsumer(ua);
+            }
             registerUA(ua);
             return ua;
         }

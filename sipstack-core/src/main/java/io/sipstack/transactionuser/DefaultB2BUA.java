@@ -1,10 +1,13 @@
 package io.sipstack.transactionuser;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
+import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
@@ -83,11 +86,11 @@ public class DefaultB2BUA implements B2BUA {
     }
 
     private void processResponse(final DefaultUA source, final DefaultUA target, final SipResponse response) {
-        final SipResponse builder = null; // TODO
+        final SipResponse builder = target.getRequest().createResponse(response.getStatus());
 
         responseHandlers.forEach(h -> h.accept(response, builder));
 
-        uaB.send(builder);
+        target.send(builder);
     }
 
     class MyReqeuestStream implements RequestStream {

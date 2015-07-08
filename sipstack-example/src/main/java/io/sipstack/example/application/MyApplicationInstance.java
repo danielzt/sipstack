@@ -7,6 +7,7 @@ import io.sipstack.application.ApplicationInstance;
 import io.sipstack.event.Event;
 import io.sipstack.transactionuser.Proxy;
 import io.sipstack.transactionuser.ProxyBranch;
+import io.sipstack.transactionuser.TransactionUserEvent;
 
 /**
  * @author jonas@jonasborjesson.com

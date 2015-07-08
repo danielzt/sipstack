@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.address.URI;
@@ -12,7 +15,8 @@ import io.sipstack.application.DefaultApplicationContext;
 /**
  * @author ajansson@twilio.com
  */
-public class DefaultUA implements UA, Consumer<SipMessage> {
+public class DefaultUA implements UA, Consumer<TransactionUserEvent> {
+    private final Logger logger = LoggerFactory.getLogger(DefaultUA.class);
 
     private final DefaultApplicationContext parent;
     private final String friendlyName;
@@ -41,7 +45,8 @@ public class DefaultUA implements UA, Consumer<SipMessage> {
 
     @Override
     public void send(final SipMessage message) {
-        parent.send(message);
+        log(message, " -> ");
+        parent.send(this, message);
     }
 
     @Override
@@ -50,7 +55,20 @@ public class DefaultUA implements UA, Consumer<SipMessage> {
     }
 
     @Override
-    public void accept(final SipMessage sipMessage) {
-        handlers.forEach(h -> h.accept(sipMessage));
+    public void accept(final TransactionUserEvent event) {
+        final SipMessage message = event.message();
+        log(message, " <- ");
+        handlers.forEach(h -> h.accept(event.message()));
+    }
+
+    private void log(final SipMessage message, final String direction) {
+        final StringBuilder sb = new StringBuilder();
+        sb.append(friendlyName).append(direction);
+        if (message.isRequest()) {
+            sb.append(message.getMethod());
+        } else {
+            sb.append(message.toResponse().getStatus());
+        }
+        logger.info(sb.toString());
     }
 }

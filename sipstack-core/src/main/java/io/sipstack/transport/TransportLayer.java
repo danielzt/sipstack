@@ -261,6 +261,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
             this.onSuccess = onSuccess;
             this.onFailure = onFailure;
             this.onCancel = onCancel;
+            actualFuture.addListener(this);
         }
 
         @Override

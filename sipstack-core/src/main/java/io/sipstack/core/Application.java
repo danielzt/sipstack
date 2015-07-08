@@ -161,6 +161,8 @@ public abstract class Application<T extends Configuration> {
             final NettyNetworkLayer server = networkBuilder.build();
             server.start();
 
+            stack.useNetworkLayer(server);
+
             // will wait until server shuts down again.
             server.sync();
 

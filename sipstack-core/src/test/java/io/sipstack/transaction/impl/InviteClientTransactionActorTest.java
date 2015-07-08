@@ -156,8 +156,10 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         // transaction layer to send requests/responses, to send an INVITE.
         myApplication.sendRequest(invite);
 
-        // TODO: need to fetch the transaction here.
-        final Transaction t1 = null;
+        // We need to know what transaction the "transaction user" (i.e. our app) got
+        // for the request (the invite) it just sent. Our application is storing
+        // all transactinos so we can look it up.
+        final Transaction t1 = myApplication.assertTransaction(invite);
 
 
         // the INVITE should have been sent through the transaction layer down to the

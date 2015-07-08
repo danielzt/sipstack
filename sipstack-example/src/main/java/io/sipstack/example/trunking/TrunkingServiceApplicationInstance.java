@@ -1,8 +1,5 @@
 package io.sipstack.example.trunking;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +17,8 @@ import io.pkts.packet.sip.header.AddressParametersHeader;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.application.ApplicationInstance;
+import io.sipstack.transactionuser.B2BUA;
+import io.sipstack.transactionuser.UA;
 
 public class TrunkingServiceApplicationInstance extends ApplicationInstance {
 
@@ -60,24 +59,41 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
     private void doInitialInvite(final SipRequest request) {
         logInfo(request, "Received initial invite. Request URI: " + request.getRequestUri());
 
+        final UA uaA = uaWithFriendlyName("A").withRequest(request).build();
+
         if (request.getMaxForwards().getMaxForwards() == 0) {
             logInfo(request, "Max-Forwards header of incoming INVITE is zero. Returning 483 and killing the call.");
-            rejectCall(request, 483, null);
+            rejectCall(uaA, request, 483, null);
             return;
         }
 
-        // check if this is a verification call
-        checkVerificationCall(request);
+        final UA uaB = uaWithFriendlyName("B").withTarget(request.getRequestUri()).build();
+        final B2BUA b2b = b2buaWithFriendlyName("b2bua").withA(uaA).withB(uaB).build();
 
-        request.getHeader(TwilioHeaders.X_TWILIO_ACCOUNT_SID_HEADER).ifPresent(callLog::setAccountSid);
-        request.getHeader(TwilioHeaders.X_ORIGINAL_CALL_ID).ifPresent(callLog::setSipCallId);
-        request.getHeader(TwilioHeaders.X_TWILIO_API_VERSION_HEADER).ifPresent(callLog::setApiVersion);
-        request.getHeader(TwilioHeaders.X_TWILIO_PHONENUMBER_SID).ifPresent(callLog::setPhoneNumberSid);
-        request.getHeader(TwilioHeaders.X_TWILIO_PROVIDER_SID).ifPresent(callLog::setProviderSid);
+        b2b.onRequest().filter(SipRequest::isInitial).doProcess(this::onInitialRequest);
+        b2b.onRequest().filter(SipRequest::isCancel).doProcess(this::onCancelRequest);
+        b2b.onRequest().filter(SipRequest::isBye).doProcess(this::onByeRequest);
+
+        b2b.onResponse().filter(r -> r.isInitial() && r.isSuccess()).doProcess(this::onInitialSuccessResponse);
+        b2b.onResponse().filter(r -> r.isInitial() && r.isError()).doProcess(this::onInitialErrorResponse);
+
+        b2b.onResponse().filter(SipResponse::isBye).doProcess(this::onByeResponse);
+        b2b.onResponse().filter(SipResponse::isInfo).doProcess(this::onInfoResponse);
+
+        b2b.start();
+    }
+
+    private void onInitialRequest(final B2BUA b2bua, final SipRequest request, final SipRequest.Builder builder) {
 
         try {
-            // Create forked leg
-            final SipRequest.Builder linked = SipRequest.invite(request.getRequestUri());
+            request.getHeader(TwilioHeaders.X_TWILIO_ACCOUNT_SID_HEADER).ifPresent(callLog::setAccountSid);
+            request.getHeader(TwilioHeaders.X_ORIGINAL_CALL_ID).ifPresent(callLog::setSipCallId);
+            request.getHeader(TwilioHeaders.X_TWILIO_API_VERSION_HEADER).ifPresent(callLog::setApiVersion);
+            request.getHeader(TwilioHeaders.X_TWILIO_PHONENUMBER_SID).ifPresent(callLog::setPhoneNumberSid);
+            request.getHeader(TwilioHeaders.X_TWILIO_PROVIDER_SID).ifPresent(callLog::setProviderSid);
+
+            // check if this is a verification call
+            checkVerificationCall(request);
 
             // TODO copy headers, except "Remote-Party-ID" or TwilioHeaders.X_TWILIO_VERIFICATION_CALL
 
@@ -85,12 +101,11 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
             // user part, only put user part. Otherwise, put the SIP URI without parameters.
             // TODO: we might need to see P-Preferred-Identity to determine the true callerid, but
             // ignore it at this point.
-            final Address remoteAddress;
-
             final Optional<SipHeader> remotePartyIdHeader = request.getHeader("Remote-Party-ID");
+            final Address remoteAddress;
             if (remotePartyIdHeader.isPresent()) {
                 remoteAddress = ((AddressParametersHeader) remotePartyIdHeader.get()).getAddress();
-                patchCallerId(remoteAddress, request, linked);
+                patchCallerId(remoteAddress, request, builder);
             } else {
                 remoteAddress = request.getFromHeader().getAddress();
             }
@@ -101,7 +116,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
 
             final EdgeType edgeType = parseEdgeType(request);
             if (edgeType == EdgeType.PHONE) {
-                processOriginatingInvite(request, linked, callLog);
+                processOriginatingInvite(request, builder);
             } else if (edgeType == EdgeType.PUBLIC_SIP) {
                 // If user part is not E.164 number, throw exception
                 // NOTE: this check has to go last. If it doesn't then
@@ -114,76 +129,90 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
                 //    rejectCall(request, 400, "Invalid phone number");
                 //}
 
-                processTerminatingInvite(request, linked, callLog);
+                processTerminatingInvite(request, builder);
             } else {
                 throw new SipParseException("Unsupported edge type " + edgeType);
             }
 
-            final SipRequest linkedRequest = linked.build();
-            linkedRequest.setHeader(SipHeader.create(TwilioHeaders.X_TWILIO_DIRECTION_HEADER, "outbound"));
-
-            // Send the forked INVITE back to proxy-core
-            sendSipMessage(linkedRequest);
+            builder.header(SipHeader.create(TwilioHeaders.X_TWILIO_DIRECTION_HEADER, "outbound"));
         } catch (final SipParseException e) {
             logWarn(request, e.getMessage(), e);
-            rejectCall(request, 400, null);
+            rejectCall(b2bua.getUaA(), request, 400, null);
         } catch (final Exception e) {
-            logError(request, "Error message: " + e.getMessage(), e);
-            rejectCall(request, 500, null);
+            logError(request, "Error", e);
+            rejectCall(b2bua.getUaA(), request, 500, null);
         }
     }
 
-    private void rejectCall(final SipRequest invite, final int statusCode, final String reason) {
+    private void onCancelRequest(final B2BUA b2bua, final SipRequest request, final SipRequest.Builder builder) {
+        updateStatus(request, CallLog.Status.NO_ANSWER);
+    }
+
+    private void onByeRequest(final B2BUA b2bua, final SipRequest request, final SipRequest.Builder builder) {
+        // TODO: should handle BYE in transfer case!!!!
+
+        updateStatus(request, CallLog.Status.COMPLETED);
+
+        // B2BUA BYE
+        //copyByeHeaders(request, builder);
+    }
+
+    private void checkVerificationCall(final SipMessage message) {
+        if (message.getHeader(TwilioHeaders.X_TWILIO_VERIFICATION_CALL).isPresent()) {
+            callLog.setVerificationCall(true);
+            callLog.setFlag(CallLog.TRUNKING_VERIFICATION_CALL_FLAG);
+            callLog.setPrice(0.0);
+        }
+    }
+
+    private void rejectCall(final UA uaA, final SipRequest invite, final int statusCode, final String reason) {
         // TODO how to set reason phrase?
         final SipResponse response = invite.createResponse(statusCode);
         updateStatus(response, CallLog.Status.FAIL);
-        sendSipMessage(response);
+        uaA.send(response);
     }
 
     /**
      * Handle INVITE request of originating case.
-     *
-     * @param linkedRequest
-     * @param callLog
      */
-    private SipMessage processOriginatingInvite(final SipRequest request, final SipRequest linkedRequest, final CallLog callLog) {
+    private void processOriginatingInvite(final SipRequest request, final SipRequest.Builder linked) {
 
-        final SipURI requestURI = (SipURI) linkedRequest.getRequestURI();
+        final SipURI requestURI = linked.requestURI();
 
-        final String trunkSidHeader = request.getHeader(TwilioHeaders.X_TWILIO_TRUNK_SID);
-        if (trunkSidHeader !=null) {
+        final Optional<SipHeader> trunkSidHeader = request.getHeader(TwilioHeaders.X_TWILIO_TRUNK_SID);
+        if (trunkSidHeader.isPresent()) {
             // If we have a trunk sid proxy core supported the 'trunk' user parameter
-            requestURI.setUserParam("trunk");
+            requestURI.setParameter("user", "trunk");
         } else {
-            requestURI.setUserParam("public-sip");
-            linkedRequest.setHeader("X-Twilio-OutboundRequestUri0", requestURI.toString());
-            linkedRequest.setHeader("X-Twilio-OutboundRouteCount", "1");
+            requestURI.setParameter("public-sip", "trunk");
+            linked.header(SipHeader.create("X-Twilio-OutboundRequestUri0", requestURI.toString()));
+            linked.header(SipHeader.create("X-Twilio-OutboundRouteCount", "1"));
         }
 
         // Set the From header in the forked INVITE as {caller's number}@{customer's trunking domain}.
         // This makes a callback use our Twilio terminating.
-        final SipURI fromURI = (SipURI) linkedRequest.getFrom().getURI();
-        fromURI.setHost(getDefaultTrunkingDomain(callLog.getAccountSid()));
+//        final SipURI fromURI = (SipURI) linked.from().getAddress().getURI();
+//        fromURI.setHost(getDefaultTrunkingDomain(callLog.getAccountSid()));
 
         // In originating, if the callerid is not E.164, set it as unknown
         // This is not to reveal the sender's SIP URI in short-circuiting case.
-        if (!SipUtil.isValidE164Number(callLog.getFrom())) {
-            callLog.setFrom(UNKNOWN_CALLERID);
-        }
+//        if (!SipUtil.isValidE164Number(callLog.getFrom())) {
+//            callLog.setFrom(UNKNOWN_CALLERID);
+//        }
 
         // Set user part of To header as "sipout". This is what PMG expects for outbound.
-        final Address toAddress = linkedRequest.getTo();
-        toAddress.setDisplayName("sipout");
+        final Address toAddress = linked.to().getAddress();
+//        toAddress.setDisplayName("sipout");
         final SipURI toURI = (SipURI) toAddress.getURI();
-        toURI.setUser("sipout");
+        toURI.setParameter("user", "sipout");
 
         // Set to field in calllog, which is SIP URI in request-URI
-        callLog.setTo(parseSipUri((SipURI) request.getRequestURI()));
+        callLog.setTo(parseSipUri((SipURI) request.getRequestUri()));
 
         // Set calledvia if there is Diversion header. This is twilio number and used as To field in billing.
-        if (linkedRequest.getHeader("Diversion") != null) {
+        if (request.getHeader("Diversion").isPresent()) {
             try {
-                final String user = getSipURIFromHeader(linkedRequest, "Diversion").getUser();
+                final String user = getSipURIFromHeader(request, "Diversion").getUser().toString();
                 callLog.setCalledVia(user);
                 logInfo(request, "Processing trunking-originating to " + user);
             } catch (final Exception e) {
@@ -193,7 +222,6 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         }
 
         callLog.setFlag(CallLog.TRUNKING_ORIGINATING_FLAG);
-        return linkedRequest;
     }
 
     /**
@@ -211,8 +239,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         });
         this.callLog.setFlag(CallLog.TRUNKING_TERMINATING_FLAG);
 
-        ((SipURI) linked.build().getRequestUri()).setParameter().to
-        requestURI.setUserParam("phone");
+//        ((SipURI) linked.getRequestUri()).setUserParam("phone");
     }
 
     /**
@@ -247,551 +274,305 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         linked.from(from);
     }
 
-    @Override
-    private void doAck(final SipRequest request) throws ServletException, IOException {
-        final B2buaHelper b2buaHelper = new TwilioB2buaHelper(request);
-        final SipSession linkedSession = b2buaHelper.getLinkedSession(request.getSession());
-        if (linkedSession != null && linkedSession.isValid()) {
-            final SipRequest outstandingAck =
-                    (SipRequest) linkedSession.getAttribute(SessionAttributes.OUTSTANDING_ACK);
-            if (outstandingAck != null) {
-                if(request.getContent() != null && request.getContentType() != null) {
-                    outstandingAck.setContentLength(request.getContentLength());
-                    outstandingAck.setContent(request.getContent(), request.getContentType());
-                }
-                sendSipMessage(outstandingAck);
-            }
-        }
-    }
-
-    private void doBye(final SipRequest request) throws ServletException, IOException {
-        // TODO: should handle BYE in transfer case!!!!
-
-        final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(request);
-
-        // This terminates calls
-        if (updateStatus(request, Status.COMPLETED)) {
-            // B2BUA BYE
-            final SipRequest linkedRequest = b2buaHelper.createBye();
-            if (linkedRequest != null) {
-                copyByeHeaders(request, linkedRequest);
-                sendSipMessage(linkedRequest);
-            } else {
-                logInfo(request, "Can't send BYE to already terminated linked session.");
-                sendSipMessage(request.createResponse(200));
-            }
-
-            releaseMediaSession(request.getApplicationSession());
-        } else {
-            logInfo(request, "Received BYE at invalid status. Responding with 200 OK "
-                    + "but won't forward BYE to the other side.");
-            sendSipMessage(request.createResponse(200));
-
-            // clean up SAS
-            request.getApplicationSession().invalidate();
-        }
-    }
-
     private void doInfo(final SipRequest request) {
-        final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(request);
-        final SipSession linkedSession = b2buaHelper.getLinkedSession(request.getSession());
-        if (linkedSession != null) {
-            try {
-                final SipRequest linkedRequest = linkedSession.createRequest("INFO");
-                linkedRequest.setAttribute(ORIGINAL_REQ, request);
-                linkedRequest.setContent(request.getContent(), request.getContentType());
-                copyHeaders(request, linkedRequest, ImmutableList.of("Info-Package", "Content-Disposition"));
-                sendSipMessage(linkedRequest);
-            } catch (final Exception e) {
-                logInfo(linkedSession.getApplicationSession(), "Unable to create INFO message: " + e.getMessage());
-                sendSipMessage(request.createResponse(200));
-            }
-        }
+//        final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(request);
+//        final SipSession linkedSession = b2buaHelper.getLinkedSession(request.getSession());
+//        if (linkedSession != null) {
+//            try {
+//                final SipRequest linkedRequest = linkedSession.createRequest("INFO");
+//                linkedRequest.setAttribute(ORIGINAL_REQ, request);
+//                linkedRequest.setContent(request.getContent(), request.getContentType());
+//                copyHeaders(request, linkedRequest, ImmutableList.of("Info-Package", "Content-Disposition"));
+//                sendSipMessage(linkedRequest);
+//            } catch (final Exception e) {
+//                logInfo(linkedSession.getApplicationSession(), "Unable to create INFO message: " + e.getMessage());
+//                sendSipMessage(request.createResponse(200));
+//            }
+//        }
     }
 
-    private void doCancel(final SipRequest request) throws ServletException, IOException {
-        if (updateStatus(request, Status.NO_ANSWER)) {
-            // send b2buaed CANCEL to the other leg
-            final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(request);
-            final SipSession linkedSession = b2buaHelper.getLinkedSession(request.getSession());
-            final SipRequest linkedRequest = b2buaHelper.createCancel(linkedSession);
-            if (linkedRequest != null) {
-                sendSipMessage(linkedRequest);
-                // Set attr_cancelling to know this session is canceled when receiving response.
-                linkedSession.setAttribute(SessionAttributes.CANCELLING, true);
+    private void doRefer(final SipRequest request) {
+//        final SipApplicationSession sas = request.getApplicationSession(false);
+//        if (sas != null) {
+//            final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(request);
+//            final SipSession linkedSession = b2buaHelper.getLinkedSession(request.getSession());
+//            final String referTo = request.getHeader("Refer-To");
+//            final String callSid = getCallSid();
+//            logDebug(request, "Received refer target: " + referTo);
+//
+//            // reply to transferer with 202
+//            final SipResponse response = request.createResponse(202);
+//            sendSipMessage(response);
+//
+//            // create and send invite with no SDP to transfer target
+//            final SipRequest createdRequest =
+//                    this.sipFactory.createRequest(sas, "INVITE", linkedSession.getRemoteParty(),
+//                            this.sipFactory.createAddress(referTo));
+//            // createdRequest.pushRoute(getNextHopURI());
+//            sendSipMessage(createdRequest);
+//
+//            // store transfer state
+//            final CallLog transferCallLog = new CallLog(callSid);
+//            transferCallLog.setStatus(Status.UNDIALED);
+//            sas.setAttribute(SessionAttributes.TRANSFER_TRANSFERER_SESSION, request.getSession());
+//            sas.setAttribute(SessionAttributes.TRANSFER_TRANSFEREE_SESSION, linkedSession);
+//            sas.setAttribute(SessionAttributes.TRANSFER_TARGET_SESSION, createdRequest.getSession());
+//            sas.setAttribute(SessionAttributes.TRANSFER_CALLLOG, transferCallLog);
+//        }
+    }
+
+    private void onInitialSuccessResponse(final B2BUA b2bua, final SipResponse response, final SipResponse builder) {
+        if (true) { // transferCallLog == null)
+            updateStatus(response, CallLog.Status.ANSWERED);
+            checkVerificationCall(response);
+            // If this is trunking-terminating, try to update ProviderSid
+            if (callLog.isFlagEnabled(CallLog.TRUNKING_TERMINATING_FLAG)) {
+                final Optional<SipHeader> providerSid = response.getHeader(TwilioHeaders.X_TWILIO_PROVIDER_SID);
+                providerSid.ifPresent(callLog::setProviderSid);
             }
-
-            releaseMediaSession(request.getApplicationSession());
-
-            // Note that container sends "200 canceling" for the CANCEL request
-            // and 487 for the INVITE to the original sender
         } else {
-            logInfo(request, "Received CANCEL at invalid status so dropping it.");
+            // Transfer case
+//            if (transferCallLog.getStatus() == Status.RINGING) {
+//                // When receiving 200 from transfer-target, send re-INVITE to transferee
+//                final SipSession
+//                        transfereeSession =
+//                        (SipSession) sas.getAttribute(SessionAttributes.TRANSFER_TRANSFEREE_SESSION);
+//                final SipRequest reInviteRequest = transfereeSession.createRequest("INVITE");
+//                sendSipMessage(reInviteRequest);
+//                transferCallLog.setStatus(Status.ANSWERED);
+//            } else if (transferCallLog.getStatus() == Status.ANSWERED) {
+//                // When receiving 200 from transferee for re-INVITE
+//                // TODO: send ACK to the target
+//                sas.removeAttribute(SessionAttributes.TRANSFER_CALLLOG);
+//            }
         }
     }
 
-    private void doRefer(final SipRequest request) throws ServletException, IOException {
-        final SipApplicationSession sas = request.getApplicationSession(false);
-        if (sas != null) {
-            final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(request);
-            final SipSession linkedSession = b2buaHelper.getLinkedSession(request.getSession());
-            final String referTo = request.getHeader("Refer-To");
-            final String callSid = getCallSid(request);
-            logDebug(request, "Received refer target: " + referTo);
+    private void onInitialErrorResponse(final B2BUA b2bua, final SipResponse response, final SipResponse builder) {
+        logInfo(response, "Received final response. Call is terminated.");
 
-            // reply to transferer with 202
-            final SipResponse response = request.createResponse(202);
-            sendSipMessage(response);
+        if (true) { // transferCallLog == null)
 
-            // create and send invite with no SDP to transfer target
-            final SipRequest createdRequest =
-                    this.sipFactory.createRequest(sas, "INVITE", linkedSession.getRemoteParty(),
-                            this.sipFactory.createAddress(referTo));
-            // createdRequest.pushRoute(getNextHopURI());
-            sendSipMessage(createdRequest);
-
-            // store transfer state
-            final CallLog transferCallLog = new CallLog(callSid);
-            transferCallLog.setStatus(Status.UNDIALED);
-            sas.setAttribute(SessionAttributes.TRANSFER_TRANSFERER_SESSION, request.getSession());
-            sas.setAttribute(SessionAttributes.TRANSFER_TRANSFEREE_SESSION, linkedSession);
-            sas.setAttribute(SessionAttributes.TRANSFER_TARGET_SESSION, createdRequest.getSession());
-            sas.setAttribute(SessionAttributes.TRANSFER_CALLLOG, transferCallLog);
-        }
-    }
-
-    /**
-     * B2BUA success response to the other side
-     */
-    private void doSuccessResponse(final SipResponse response) throws ServletException, IOException {
-        final String method = response.getMethod();
-        final SipApplicationSession sas = response.getApplicationSession(false);
-        if (sas != null) {
-            if (method.equals("INVITE")) {
-                boolean deferAck = false;
-                if (sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG) == null) {
-                    if (updateStatus(response, Status.ANSWERED)) {
-                        checkVerificationCall(response);
-                        // If this is trunking-terminating, try to update ProviderSid
-                        final CallLog callLog = (CallLog) sas.getAttribute(SessionAttributes.CALLLOG);
-                        if (callLog.isFlagEnabled(CallLog.TRUNKING_TERMINATING_FLAG)) {
-                            final String providerSid = response.getHeader(TwilioHeaders.X_TWILIO_PROVIDER_SID);
-                            if (providerSid != null && !providerSid.isEmpty()) {
-                                callLog.setProviderSid(providerSid);
-                            }
-                        }
-
-                        final SipResponse linkedResponse = createLinkedResponseToInvite(response);
-                        if (linkedResponse != null) {
-                            final MediaSession mediaSession = getMediaSession(sas);
-                            if (mediaSession != null) {
-                                final MediaSession.AnswerBuilder answer = mediaSession.withAnswer(response.getContent());
-                                Futures.addCallback(answer.send(), new FutureCallback<SdpResponse>() {
-                                    @Override
-                                    public void onSuccess(final SdpResponse result) {
-                                        try {
-                                            linkedResponse.setContent(result.getSdp(), APPLICATION_SDP);
-                                        } catch (final UnsupportedEncodingException e) {
-                                            logWarn(linkedResponse, "Failed to update SDP", e);
-                                        }
-                                        sendSipMessage(linkedResponse);
-                                    }
-
-                                    @Override
-                                    public void onFailure(final Throwable t) {
-                                        logWarn(response, "Media server error response. Terminating session", t);
-                                        sendSipMessage(response.getSession().createRequest("BYE"));
-                                        rejectCall(linkedResponse.getRequest(), response.getRequest(), 500,
-                                                "Media Server Error");
-                                    }
-                                });
-                            } else {
-                                sendSipMessage(linkedResponse);
-                            }
-                            deferAck = true;
-                        }
-                    } else {
-                        logInfo(response, "Received success response at invalid status. Won't forward it to the other leg.");
-                    }
-                } else {
-                    // Transfer case
-                    final CallLog transferCallLog = (CallLog) sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG);
-                    if (transferCallLog.getStatus() == Status.RINGING) {
-                        // When receiving 200 from transfer-target, send re-INVITE to transferee
-                        final SipSession transfereeSession = (SipSession) sas.getAttribute(SessionAttributes.TRANSFER_TRANSFEREE_SESSION);
-                        final SipRequest reInviteRequest = transfereeSession.createRequest("INVITE");
-                        sendSipMessage(reInviteRequest);
-                        transferCallLog.setStatus(Status.ANSWERED);
-                    } else if (transferCallLog.getStatus() == Status.ANSWERED) {
-                        // When receiving 200 from transferee for re-INVITE
-                        // TODO: send ACK to the target
-                        sas.removeAttribute(SessionAttributes.TRANSFER_CALLLOG);
-                    }
-                }
-
-                if (deferAck) {
-                    // Wait to send ACK until we get ACK from linked session to be able to copy SDP if any
-                    response.getSession().setAttribute(SessionAttributes.OUTSTANDING_ACK, response.createAck());
-                } else {
-                    // Send ACK now toward the sender of 200
-                    sendSipMessage(response.createAck());
-                }
-
-                if (response.getSession().getAttribute(SessionAttributes.CANCELLING) != null) {
-                    // Response is for a cancelled INVITE, we must send BYE
-                    logInfo(response, "Received success response for cancelled INVITE. Will send BYE.");
-                    final SipRequest byeRequest = response.getSession().createRequest("BYE");
-                    sendSipMessage(byeRequest);
-                }
-            } else if (method.equals("BYE")) {
-                logInfo(response, "Received final response. Call is terminated. AppSessionId: " + sas.getId());
-                final SipResponse linkedResponse = createLinkedResponseToBye(response);
-                if (linkedResponse != null) {
-                    copyByeHeaders(response, linkedResponse);
-                    sendSipMessage(linkedResponse);
-                }
-                sas.invalidate();
-            } else if (method.equals("INFO")) {
-                final SipRequest originalRequest = (SipRequest)response.getRequest().getAttribute(ORIGINAL_REQ);
-                final SipResponse r = originalRequest.createResponse(200);
-                sendSipMessage(r);
+            // Regular case
+            CallLog.Status callLogStatus = CallLog.Status.FAIL;
+            if (response.getStatus() == 486) { // Busy Here
+                callLogStatus = CallLog.Status.BUSY;
             }
+    
+            updateStatus(response, callLogStatus);
+        } else {
+            // Transfer case
+//            if (transferCallLog.getStatus() == Status.UNDIALED || transferCallLog.getStatus() == Status.RINGING) {
+//                // When receiving error from transfer-target,
+//                // TODO: send NOTIFY to transferer
+//            }
         }
     }
 
-    private void doErrorResponse(final SipResponse response) throws ServletException, IOException {
-        final SipApplicationSession sas = response.getApplicationSession(false);
-        if (sas != null) {
-            final String method = response.getMethod();
-            final SipSession session = response.getSession();
-            logInfo(response, "Received final response. Call is terminated. AppSessionId: " + sas.getId());
-
-            if (method.equals("INVITE")) {
-                if (sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG) == null) {
-
-                    // If the response is for the canceled INVITE, we don't need to do anything
-                    // because container already sent 487 to the sender of cancel
-                    if (session.getAttribute(SessionAttributes.CANCELLING) == null) {
-                        // Regular case
-                        Status callLogStatus = Status.FAIL;
-                        if (response.getStatus() == SipResponse.SC_BUSY_HERE) {
-                            callLogStatus = Status.BUSY;
-                        }
-
-                        if (updateStatus(response, callLogStatus)) {
-                            final SipResponse linkedResponse = createLinkedResponseToInvite(response);
-                            if (linkedResponse != null) {
-                                sendSipMessage(linkedResponse);
-                            }
-
-                            releaseMediaSession(sas);
-                        } else {
-                            logInfo(response, "Received error response at invalid status so dropping it.");
-                        }
-                    }
-                } else {
-                    // Transfer case
-                    final CallLog transferCallLog = (CallLog) sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG);
-                    if (transferCallLog.getStatus() == Status.UNDIALED || transferCallLog.getStatus() == Status.RINGING) {
-                        // When receiving error from transfer-target,
-                        // TODO: send NOTIFY to transferer
-                    }
-                }
-
-                // This is the final response to INVITE so let's clean up SAS. Note that even in the
-                // CANCEL case with many derived sessions, this will clean up everything.
-                sas.invalidate();
-            } else if (method.equals("BYE")) {
-                final SipResponse linkedResponse = createLinkedResponseToBye(response);
-                if (linkedResponse != null) {
-                    copyByeHeaders(response, linkedResponse);
-                    sendSipMessage(linkedResponse);
-                }
-                sas.invalidate();
-            }
-            // Note that ACK for error response is sent by container.
-        }
+    private void onByeResponse(final B2BUA b2bua, final SipResponse response, final SipResponse builder) {
+        logInfo(response, "Received final response. Call is terminated.");
+//        copyByeHeaders(response, builder);
     }
 
-    private void doProvisionalResponse(final SipResponse response) throws ServletException, IOException {
-        final SipApplicationSession sas = response.getApplicationSession(false);
-        if (sas != null) {
-            final int statusCode = response.getStatus();
-            final String method = response.getMethod();
-            if (method.equals("INVITE") && statusCode >= 180 && statusCode <= 183) {
-                if (sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG) == null) {
-                    // Regular case
-                    if (updateStatus(response, Status.RINGING)) {
-                        checkVerificationCall(response);
-                        final SipResponse linkedResponse = createLinkedResponseToInvite(response);
-                        if (linkedResponse != null) {
-                            final MediaSession mediaSession = getMediaSession(sas);
-                            if (mediaSession != null && APPLICATION_SDP.equals(response.getContentType())) {
-                                final MediaSession.AnswerBuilder answer = mediaSession.withAnswer(response.getContent())
-                                        .withProvisional(true);
-                                Futures.addCallback(answer.send(), new FutureCallback<SdpResponse>() {
-                                    @Override
-                                    public void onSuccess(final SdpResponse result) {
-                                        try {
-                                            linkedResponse.setContent(result.getSdp(), APPLICATION_SDP);
-                                        } catch (final UnsupportedEncodingException e) {
-                                            logWarn(response, "Failed to update SDP", e);
-                                        }
-                                        sendSipMessage(linkedResponse);
-                                    }
-
-                                    @Override
-                                    public void onFailure(final Throwable t) {
-                                        logWarn(response, "Media server error on provisional response (ignored)", t);
-                                    }
-                                });
-                            } else {
-                                sendSipMessage(linkedResponse);
-                            }
-                        }
-                    } else {
-                        logInfo(response, "Received provisional response at invalid status so dropping it.");
-                    }
-                } else {
-                    // Transfer case
-                    final CallLog transferCallLog = (CallLog) sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG);
-                    if (transferCallLog.getStatus() == Status.UNDIALED) {
-                        // TODO: Send notify to the tranferer
-                        transferCallLog.setStatus(Status.RINGING);
-                    }
-                }
-            }
-        }
+    private void onInfoResponse(final B2BUA b2bua, final SipResponse response, final SipResponse builder) {
+//        final SipRequest originalRequest = (SipRequest) response.getRequest().getAttribute(ORIGINAL_REQ);
+//        final SipResponse r = originalRequest.createResponse(200);
+//        sendSipMessage(r);
     }
 
-    /**
-     * This method creates a b2buaed response from a response to INVITE.
-     *
-     * @param response
-     * @throws IOException
-     */
-    private SipResponse createLinkedResponseToInvite(final SipResponse response) throws IOException {
-        final SipSession session = response.getSession(false);
-        final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(response.getRequest());
-        final SipSession linkedSession = b2buaHelper.getLinkedSession(session);
-        final SipResponse responseOther =
-                b2buaHelper.createResponseToOriginalRequest(linkedSession, response.getStatus(),
-                        response.getReasonPhrase());
-        if (responseOther != null && response.getContentType() != null) {
-            responseOther.setContent(response.getContent(), response.getContentType());
-        }
-        b2buaHelper.updateSession(session);
-        return responseOther;
-    }
-
-    private SipResponse createLinkedResponseToBye(final SipResponse response) {
-        final TwilioB2buaHelper b2buaHelper = new TwilioB2buaHelper(response.getRequest());
-        final SipResponse linkedResponse = b2buaHelper.createLinkedResponseToBye(response);
-        return linkedResponse;
-    }
-
-    private boolean updateStatus(final SipMessage message, final CallLog.Status status) {
-        final SipApplicationSession as = message.getApplicationSession(false);
-        return updateStatus(as, message, status);
-    }
-
-    private boolean updateStatus(final SipApplicationSession as, final CallLog.Status status) {
-        return updateStatus(as, null, status);
+    private void doProvisionalResponse(final SipResponse response) {
+//        final SipApplicationSession sas = response.getApplicationSession(false);
+//        if (sas != null) {
+//            final int statusCode = response.getStatus();
+//            final String method = response.getMethod();
+//            if (method.equals("INVITE") && statusCode >= 180 && statusCode <= 183) {
+//                if (sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG) == null) {
+//                    // Regular case
+//                    if (updateStatus(response, Status.RINGING)) {
+//                        checkVerificationCall(response);
+//                        final SipResponse linkedResponse = createLinkedResponseToInvite(response);
+//                        if (linkedResponse != null) {
+//                            final MediaSession mediaSession = getMediaSession(sas);
+//                            if (mediaSession != null && APPLICATION_SDP.equals(response.getContentType())) {
+//                                final MediaSession.AnswerBuilder answer = mediaSession.withAnswer(response.getContent())
+//                                        .withProvisional(true);
+//                                Futures.addCallback(answer.send(), new FutureCallback<SdpResponse>() {
+//                                    @Override
+//                                    public void onSuccess(final SdpResponse result) {
+//                                        try {
+//                                            linkedResponse.setContent(result.getSdp(), APPLICATION_SDP);
+//                                        } catch (final UnsupportedEncodingException e) {
+//                                            logWarn(response, "Failed to update SDP", e);
+//                                        }
+//                                        sendSipMessage(linkedResponse);
+//                                    }
+//
+//                                    @Override
+//                                    public void onFailure(final Throwable t) {
+//                                        logWarn(response, "Media server error on provisional response (ignored)", t);
+//                                    }
+//                                });
+//                            } else {
+//                                sendSipMessage(linkedResponse);
+//                            }
+//                        }
+//                    } else {
+//                        logInfo(response, "Received provisional response at invalid status so dropping it.");
+//                    }
+//                } else {
+//                    // Transfer case
+//                    final CallLog transferCallLog = (CallLog) sas.getAttribute(SessionAttributes.TRANSFER_CALLLOG);
+//                    if (transferCallLog.getStatus() == Status.UNDIALED) {
+//                        // TODO: Send notify to the tranferer
+//                        transferCallLog.setStatus(Status.RINGING);
+//                    }
+//                }
+//            }
+//        }
     }
 
     /**
      * This method updates the call status. Also call terminateCall() if status is final.
-     * Returns true if the SIP message needs to be forwarded to the other leg.
      *
-     * @param as
      * @param message
      * @param status
      * @return
      */
-    private boolean updateStatus(final SipApplicationSession as, final SipMessage message, final CallLog.Status status) {
-        boolean needForward = false;
-        if (as != null) {
-            final CallLog callLog = (CallLog) as.getAttribute(SessionAttributes.CALLLOG);
-            if (callLog == null) {
-                logWarn(message, "No CallLog entry associated with message. Probably an internal service issue. Please file a bug to Voicecon.");
-            }
+    private void updateStatus(final SipMessage message, final CallLog.Status status) {
+        // update only current status is not final
+        if (!callLog.isFinalStatus()) {
+            if (callLog.getStatus() != status) {
+                final String msg = "Changed status : " + callLog.getStatus() + " -> " + status;
+                if (message != null) {
+                    logInfo(message, msg);
+                } else {
+                    logInfo(msg);
+                }
+                // If state is answered, update start time so we can calculate call duration
+                // accurately. Also set hasEstablished flag for billing later.
+                if (status == CallLog.Status.ANSWERED) {
+                    callLog.markStartTime();
+                    callLog.established();
+                }
 
-            // update only current status is not final
-            if (!callLog.isFinalStatus()) {
-                needForward = true;
-                if (callLog.getStatus() != status) {
-                    final String msg = "Changed status : " + callLog.getStatus() + " -> " + status;
-                    if (message != null) {
-                        logInfo(message, msg);
-                    } else {
-                        logInfo(as, msg);
-                    }
-                    // If state is answered, update start time so we can calculate call duration
-                    // accurately. Also set hasEstablished flag for billing later.
-                    if (status == Status.ANSWERED) {
-                        callLog.setStartTime(LocalDateTime.now());
-                        callLog.established();
-                    }
+                callLog.markDateUpdated();
+                callLog.setStatus(status);
 
-                    callLog.setDateUpdated(DateTime.now());
-                    callLog.setStatus(status);
-
-                    // If new status is final, terminate call
-                    if (callLog.isFinalStatus()) {
-                        terminateCall(as, callLog);
-                    }
+                // If new status is final, terminate call
+                if (callLog.isFinalStatus()) {
+                    completeCall();
                 }
             }
         }
-        return needForward;
     }
 
     /**
      * This method terminates the call by sending postflight and billing request.
-     *
-     * @param sas
-     * @param callLog
      */
-    private void terminateCall(final SipApplicationSession sas, final CallLog callLog) {
-        callLog.setEndTime(DateTime.now());
+    private void completeCall() {
+        callLog.markEndTime();
         try {
             callLog.calculateAndSetDuration();
-            logInfo(sas, callLog, "Call terminated with status " + callLog.getStatus() + " Duration of call (sec) " + callLog.getDuration());
+            logInfo(callLog, "Call terminated with status " + callLog.getStatus() + " Duration of call (sec) " + callLog.getDuration());
             callLog.callLogHasBeenReported();
-            callPostflight(sas, callLog);
+            callPostflight();
 
             // send billing event only if call has been established and call duration is not 0.
             // so we bill even when the final status is not completed, but has established before.
             if (callLog.hasEstablished() && callLog.getDuration() > 0 && !callLog.isVerificationCall()) {
-                callBilling(sas, callLog);
+                callBilling();
             } else {
-                logInfo(sas, callLog, "Not sending billing event because call status has not been established or duration is 0.");
+                logInfo(callLog, "Not sending billing event because call status has not been established or duration is 0.");
             }
         } catch (final IllegalArgumentException e) {
-            logWarn(sas, callLog, "Failed to calculate call duration (sec): " + callLog);
+            logWarn(callLog, "Failed to calculate call duration (sec): " + callLog);
         }
     }
 
     /**
      * This method sends a request to the postflight-voice-api to write the call log. Invoked when
      * the call state reaches to the final state.
-     *
-     * @param sas
-     * @param callLog
      */
-    private void callPostflight(final SipApplicationSession sas, final CallLog callLog) {
-        if (this.postflight == null) {
-            logWarn(sas, callLog, "Not sending postflight request because it is disabled");
-            return;
-        }
-
-        final String sasId = sas.getId();
-        final Call call = callLog.getCall();
-        final ListenableFuture<Void> resp = this.postflight.writeFinalCall(callLog.getAccountSid(), call);
-        // Note that application session might be already invalidated when callback is invoked.
-        // So don't try to access application session.
-        Futures.addCallback(resp, new FutureCallback<Void>() {
-            @Override
-            public void onSuccess(final Void result) {
-                logger.info(buildLogMessage(sasId, callLog, "Successfully written to postflight.\n"
-                        + PostflightUtils.convertCallToJson(call)));
-            }
-
-            @Override
-            public void onFailure(final Throwable t) {
-                logger.warn(buildLogMessage(sasId, callLog, "Received error from postflight. Error message: "
-                        + t.getMessage() + "\n"
-                        + PostflightUtils.generatePostflightUrl(callLog.getAccountSid(), callLog.getSid()) + "\n"
-                        + PostflightUtils.convertCallToJson(call)));
-            }
-        });
+    private void callPostflight() {
+//        if (this.postflight == null) {
+//            logWarn(sas, callLog, "Not sending postflight request because it is disabled");
+//            return;
+//        }
+//
+//        final String sasId = sas.getId();
+//        final Call call = callLog.getCall();
+//        final ListenableFuture<Void> resp = this.postflight.writeFinalCall(callLog.getAccountSid(), call);
+//        // Note that application session might be already invalidated when callback is invoked.
+//        // So don't try to access application session.
+//        Futures.addCallback(resp, new FutureCallback<Void>() {
+//            @Override
+//            public void onSuccess(final Void result) {
+//                logger.info(buildLogMessage(sasId, callLog, "Successfully written to postflight.\n"
+//                        + PostflightUtils.convertCallToJson(call)));
+//            }
+//
+//            @Override
+//            public void onFailure(final Throwable t) {
+//                logger.warn(buildLogMessage(sasId, callLog, "Received error from postflight. Error message: "
+//                        + t.getMessage() + "\n"
+//                        + PostflightUtils.generatePostflightUrl(callLog.getAccountSid(), callLog.getSid()) + "\n"
+//                        + PostflightUtils.convertCallToJson(call)));
+//            }
+//        });
     }
 
     /**
      * This method sends a billing event to AWS SQS billing queue. Invoked at the end of each call.
-     *
-     * @param sas
-     * @param callLog
      */
-    private void callBilling(final SipApplicationSession sas, final CallLog callLog) {
-        if (this.billing == null) {
-            logWarn(sas, callLog, "Not sending billing event because it is disabled");
-            return;
-        }
-
-        final String sasId = sas.getId();
-        final List<VoiceBillingEvent> billingEvents = BillingUtils.convertToBillingEvents(callLog);
-        for (final VoiceBillingEvent billingEvent : billingEvents) {
-            final ListenableFuture<String> future = this.billing.sendMessageAsync(billingEvent);
-            Futures.addCallback(future, new FutureCallback<String>() {
-                @Override
-                public void onSuccess(final String result) {
-                    logger.info(buildLogMessage(sasId, callLog, "Successfully sent billing event. MessageId: "
-                            + result + "\n"
-                            + billingEvent.toXml()));
-                }
-
-                @Override
-                public void onFailure(final Throwable t) {
-                    logger.warn(buildLogMessage(sasId, callLog, "Received error from billing. Error message: "
-                            + t.getMessage() + "\n"
-                            + billingEvent.toXml()));
-                }
-            });
-        }
+    private void callBilling() {
+//        if (this.billing == null) {
+//            logWarn(sas, callLog, "Not sending billing event because it is disabled");
+//            return;
+//        }
+//
+//        final String sasId = sas.getId();
+//        final List<VoiceBillingEvent> billingEvents = BillingUtils.convertToBillingEvents(callLog);
+//        for (final VoiceBillingEvent billingEvent : billingEvents) {
+//            final ListenableFuture<String> future = this.billing.sendMessageAsync(billingEvent);
+//            Futures.addCallback(future, new FutureCallback<String>() {
+//                @Override
+//                public void onSuccess(final String result) {
+//                    logger.info(buildLogMessage(sasId, callLog, "Successfully sent billing event. MessageId: "
+//                            + result + "\n"
+//                            + billingEvent.toXml()));
+//                }
+//
+//                @Override
+//                public void onFailure(final Throwable t) {
+//                    logger.warn(buildLogMessage(sasId, callLog, "Received error from billing. Error message: "
+//                            + t.getMessage() + "\n"
+//                            + billingEvent.toXml()));
+//                }
+//            });
+//        }
     }
 
     /**
-     * This method contains common tasks before sending SIP messages. Used for both request and
-     * response.
-     *
-     * @param message
+     * Helper to read callsid.
+     * @return CallSid
      */
-    private void sendSipMessage(final SipMessage message) {
-        try {
-            message.setHeader(callLog.getCallSidHeader());
-            message.send();
-        } catch (final IOException e) {
-            logWarn(message, "Failed to send SIP message. Error message: " + e);
-        }
-    }
-
-    /**
-     * Helper to read callsid from application session. Return null if there is no callsid in as.
-     *
-     * @param message
-     * @return
-     */
-    private String getCallSid(final SipMessage message) {
-        final SipApplicationSession as = message.getApplicationSession(false);
-        if (as != null) {
-            return (String) as.getAttribute(SessionAttributes.CALLSID);
-        }
-        return null;
+    private String getCallSid() {
+        return callLog.getSid();
     }
 
     /**
      * Helper to read a SIP header in the request and return as SipURI format
      *
-     * @param request
-     * @param headerName
-     * @return
-     * @throws SipHeaderParseException
+     * @param request Request
+     * @param headerName Header name
+     * @return Sip URI
      */
-    private SipURI getSipURIFromHeader(final SipRequest request, final String headerName)
-            throws SipHeaderParseException {
-        try {
-            final Address address = request.getAddressHeader(headerName);
-            if (address != null) {
-                return (SipURI) address.getURI();
-            } else {
-                logger.info("Header " + headerName + " is null.");
-                throw new ServletParseException();
-            }
-        } catch (final ServletParseException e) {
-            throw new SipHeaderParseException(e, headerName);
-        } catch (final ClassCastException e) {
-            throw new SipHeaderParseException(e, headerName);
+    private SipURI getSipURIFromHeader(final SipRequest request, final String headerName) {
+        final Optional<SipHeader> header = request.getHeader(headerName);
+        if (header.isPresent() && header.get() instanceof AddressParametersHeader) {
+            return (SipURI) ((AddressParametersHeader) header.get()).getAddress().getURI();
+        } else {
+            throw new SipParseException("Header " + headerName + " is not set or does not contain a SIP URI");
         }
     }
 
@@ -799,22 +580,23 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
      * Helper to extract caller information from SIP address. If the user part of the address is
      * E.164, return only the user part. Otherwise, return the SIP URI.
      *
-     * @param address
+     * @param address Address
      * @return
      */
     private String parseCallerId(final Address address) {
         final SipURI uri = (SipURI) address.getURI();
-        if (SipUtil.isValidE164Number(uri.getUser())) {
-            return uri.getUser();
-        } else {
-            return parseSipUri(uri);
-        }
+        return uri.getUser().toString();
+//        if (SipUtil.isValidE164Number(uri.getUser())) {
+//            return uri.getUser();
+//        } else {
+//            return parseSipUri(uri);
+//        }
     }
 
     /**
      * Helper to extract SIP URI without any parameters.
      *
-     * @param uri
+     * @param uri SIP URI
      * @return
      */
     private String parseSipUri(final SipURI uri) {
@@ -829,7 +611,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
     /**
      * Helper to read the user parameter in the SIP From header.
      *
-     * @param sipMessage
+     * @param sipMessage SIP message
      * @return
      * @throws IllegalArgumentException
      */
@@ -846,7 +628,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
      * @param to
      */
     private void copyByeHeaders(final SipMessage from, final SipMessage to) {
-        copyHeaders(from, to, this.config.getCopyByeHeaders());
+//        copyHeaders(from, to, this.config.getCopyByeHeaders());
     }
 
     /**
@@ -878,17 +660,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
     private String buildLogMessage(final SipMessage message, final String str) {
         return String.format("[%s,%s,%d,%s,%s] %s", id(), message.getMethod(),
                 message instanceof SipResponse ? ((SipResponse) message).getStatus() : 0,
-                        getCallSid(message), message.getCallIDHeader().getCallId(), str);
-    }
-
-    private String buildLogMessage(final String sasId, final CallLog callLog, final String msg) {
-        return String.format("[%s,%s] %s", sasId, callLog.getSid(), msg);
-    }
-
-    private void logDebug(final SipMessage message, final String str) {
-        if (logger.isDebugEnabled()) {
-            logger.debug(buildLogMessage(message, str));
-        }
+                        getCallSid(), message.getCallIDHeader().getCallId(), str);
     }
 
     private void logInfo(final SipMessage message, final String str) {
@@ -917,27 +689,11 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         logger.info(buildLogMessage(str));
     }
 
-    private void logWarn(final SipMessage message, final String str) {
-        logger.warn(buildLogMessage(message, str));
-    }
-
     private void logWarn(final SipMessage message, final String str, final Throwable t) {
         logger.warn(buildLogMessage(message, str), t);
     }
 
-    private void logError(final SipMessage message, final String str) {
-        logger.error(buildLogMessage(message, str));
-    }
-
     private void logError(final SipMessage message, final String str, final Throwable t) {
         logger.error(buildLogMessage(message, str), t);
-    }
-
-    private void checkVerificationCall(final SipMessage msg) {
-        if ( null != msg.getHeader(TwilioHeaders.X_TWILIO_VERIFICATION_CALL) ) {
-            callLog.setVerificationCall(true);
-            callLog.setFlag(CallLog.TRUNKING_VERIFICATION_CALL_FLAG);
-            callLog.setPrice(0.0);
-        }
     }
 }

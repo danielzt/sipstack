@@ -5,13 +5,18 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.address.Address;
 import io.pkts.packet.sip.address.SipURI;
+import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.event.Event;
+import io.sipstack.transactionuser.B2BUA;
+import io.sipstack.transactionuser.DefaultB2BUA;
 import io.sipstack.transactionuser.DefaultProxy;
 import io.sipstack.transactionuser.DefaultProxyBranch;
+import io.sipstack.transactionuser.DefaultUA;
 import io.sipstack.transactionuser.Proxy;
 import io.sipstack.transactionuser.ProxyBranch;
+import io.sipstack.transactionuser.UA;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,8 +48,16 @@ import java.util.function.Consumer;
 public class DefaultApplicationContext implements InternalApplicationContext {
 
     private Map<String, DefaultProxy> proxies;
+    private Map<String, DefaultUA> uaStore;
+    private Map<String, DefaultB2BUA> b2buaStore;
 
     private SipMessage currentMessage;
+
+    private final ApplicationController parent;
+
+    public DefaultApplicationContext(final ApplicationController parent) {
+        this.parent = parent;
+    }
 
     @Override
     public Optional<Proxy> getProxyByName(final String friendlyName) {
@@ -69,6 +82,24 @@ public class DefaultApplicationContext implements InternalApplicationContext {
         return builder;
     }
 
+    @Override
+    public UA.Builder uaWithFriendlyName(final String friendlyName) {
+        if (uaStore != null && uaStore.containsKey(friendlyName)) {
+            throw new IllegalArgumentException(String.format("A ua with name {} already exists", friendlyName));
+        }
+
+        return new UABuilder(friendlyName);
+    }
+
+    @Override
+    public B2BUA.Builder b2buaWithFriendlyName(final String friendlyName) {
+        if (b2buaStore != null && b2buaStore.containsKey(friendlyName)) {
+            throw new IllegalArgumentException(String.format("A b2bua with name {} already exists", friendlyName));
+        }
+
+        return new B2BUABuilder(friendlyName);
+    }
+
     /**
      * When the proxy builder has been built it will register with
      * the context in order to indicate that it is ready for use.
@@ -83,6 +114,40 @@ public class DefaultApplicationContext implements InternalApplicationContext {
     private void ensureProxyStore() {
         if (proxies == null) {
             proxies = new HashMap<>(4);
+        }
+    }
+
+    /**
+     * When the ua builder has been built it will register with
+     * the context in order to indicate that it is ready for use.
+     *
+     * @param ua
+     */
+    private void registerUA(final DefaultUA ua) {
+        ensureUAStore();
+        uaStore.put(ua.friendlyName(), ua);
+    }
+
+    private void ensureUAStore() {
+        if (uaStore == null) {
+            uaStore = new HashMap<>(4);
+        }
+    }
+
+    /**
+     * When the b2bua builder has been built it will register with
+     * the context in order to indicate that it is ready for use.
+     *
+     * @param b2bua
+     */
+    private void registerB2BUA(final DefaultB2BUA b2bua) {
+        ensureB2BUAStore();
+        b2buaStore.put(b2bua.friendlyName(), b2bua);
+    }
+
+    private void ensureB2BUAStore() {
+        if (b2buaStore == null) {
+            b2buaStore = new HashMap<>(4);
         }
     }
 
@@ -104,6 +169,10 @@ public class DefaultApplicationContext implements InternalApplicationContext {
             proxies.values().stream().forEach(DefaultProxy::actuallyStart);
         }
 
+    }
+
+    public void send(final SipMessage message) {
+        parent.send(message);
     }
 
     private class ProxyBranchBuilder implements ProxyBranch.Builder {
@@ -201,6 +270,72 @@ public class DefaultApplicationContext implements InternalApplicationContext {
             final DefaultProxy proxy = new DefaultProxy(friendlyName, request, branches);
             registerProxy(proxy);
             return proxy;
+        }
+    }
+
+    /**
+     * Note that this class is NOT static and shouldn't be.
+     */
+    private class UABuilder implements UA.Builder {
+
+        private final String friendlyName;
+        private URI target;
+        private SipRequest request;
+
+        private UABuilder(final String friendlyName) {
+            this.friendlyName = friendlyName;
+        }
+
+        @Override
+        public UA.Builder withTarget(final URI target) {
+            this.target = target;
+            return this;
+        }
+
+        @Override
+        public UA.Builder withRequest(final SipRequest request) {
+            this.request = request;
+            return this;
+        }
+
+        @Override
+        public UA build() {
+            final DefaultUA ua = new DefaultUA(DefaultApplicationContext.this, friendlyName, request, target);
+            registerUA(ua);
+            return ua;
+        }
+    }
+
+    /**
+     * Note that this class is NOT static and shouldn't be.
+     */
+    private class B2BUABuilder implements B2BUA.Builder {
+
+        private final String friendlyName;
+        private DefaultUA uaA;
+        private DefaultUA uaB;
+
+        private B2BUABuilder(final String friendlyName) {
+            this.friendlyName = friendlyName;
+        }
+
+        @Override
+        public B2BUA.Builder withA(final UA uaA) {
+            this.uaA = (DefaultUA) uaA;
+            return this;
+        }
+
+        @Override
+        public B2BUA.Builder withB(final UA uaB) {
+            this.uaB = (DefaultUA) uaB;
+            return this;
+        }
+
+        @Override
+        public B2BUA build() {
+            final DefaultB2BUA b2bua = new DefaultB2BUA(friendlyName, uaA, uaB);
+            registerB2BUA(b2bua);
+            return b2bua;
         }
     }
 }

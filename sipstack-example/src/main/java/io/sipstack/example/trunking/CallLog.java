@@ -2,6 +2,7 @@ package io.sipstack.example.trunking;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 import gov.nist.javax.sip.header.SIPHeader;
@@ -129,32 +130,32 @@ public class CallLog {
         this.SipCallId = sipHeader.getValue().toString();
     }
 
-    public DateTime getStartTime() {
+    public LocalDateTime getStartTime() {
         return this.StartTime;
     }
 
-    public DateTime getEndTime() {
+    public void markStartTime() {
+        this.StartTime = LocalDateTime.now();
+    }
+
+    public LocalDateTime getEndTime() {
         return this.EndTime;
     }
 
-    public void setEndTime(final DateTime endTime) {
-        this.EndTime = endTime;
+    public void markEndTime() {
+        this.EndTime = LocalDateTime.now();
     }
 
-    public DateTime getDateCreated() {
+    public LocalDateTime getDateCreated() {
         return this.DateCreated;
     }
 
-    public void setDateCreated(final DateTime dateCreated) {
-        this.DateCreated = dateCreated;
-    }
-
-    public DateTime getDateUpdated() {
+    public LocalDateTime getDateUpdated() {
         return this.DateUpdated;
     }
 
-    public void setDateUpdated(final DateTime dateUpdated) {
-        this.DateUpdated = dateUpdated;
+    public void markDateUpdated() {
+        this.DateUpdated = LocalDateTime.now();
     }
 
     public String getApiVersion() {
@@ -194,7 +195,7 @@ public class CallLog {
     }
 
     /**
-     * Use {@link isFlagEnabled} instead to check if a certain flag has been set
+     * Use {@link #isFlagEnabled(int)} instead to check if a certain flag has been set
      * @return
      */
     public int getFlag() {
@@ -269,7 +270,7 @@ public class CallLog {
         if (!this.hasEstablished) {
             this.Duration = 0;
         } else {
-            this.Duration = Seconds.secondsBetween(this.StartTime, this.EndTime).getSeconds();
+            this.Duration = (int) java.time.Duration.between(this.StartTime, this.EndTime).get(ChronoUnit.SECONDS);
         }
     }
 
@@ -320,17 +321,17 @@ public class CallLog {
                 @JsonProperty("groupSid") final String groupSid,
                 @JsonProperty("apiVersion") final String apiVersion) {
      */
-    public Call getCall() {
-        return new Call(this.sid, "", this.AccountSid, this.PhoneNumberSid, this.From, this.To, this.status.getStatusCode(), this.Flag,
-                null, null, null, this.SipCallId, this.ProviderSid, this.StartTime, this.EndTime, this.Duration,
-                this.CalledVia, null, this.Price.orNull(), this.DateCreated, this.DateUpdated, null, this.CallerIdName, null, null,
-                this.ApiVersion);
-    }
+//    public Call getCall() {
+//        return new Call(this.sid, "", this.AccountSid, this.PhoneNumberSid, this.From, this.To, this.status.getStatusCode(), this.Flag,
+//                null, null, null, this.SipCallId, this.ProviderSid, this.StartTime, this.EndTime, this.Duration,
+//                this.CalledVia, null, this.Price.orNull(), this.DateCreated, this.DateUpdated, null, this.CallerIdName, null, null,
+//                this.ApiVersion);
+//    }
 
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder();
-        sb.append("Sid=" + this.sid + ",");
+        sb.append("Sid=" + getSid() + ",");
         sb.append("AccountSid=" + this.AccountSid + ",");
         sb.append("PhoneNumberSid=" + this.PhoneNumberSid + ",");
         sb.append("From=" + this.From + ",");
@@ -342,7 +343,7 @@ public class CallLog {
         sb.append("StartTime=" + this.StartTime + ",");
         sb.append("EndTime=" + this.EndTime + ",");
         sb.append("Duration=" + this.Duration + ",");
-        sb.append("Price=" + this.Price.orNull() + ",");
+        sb.append("Price=" + this.Price.orElse(null) + ",");
         sb.append("DateCreated" + this.DateCreated + ",");
         sb.append("DateUpdated=" + this.DateUpdated + ",");
         sb.append("CalledVia=" + this.CalledVia + ",");

@@ -5,14 +5,11 @@ package io.sipstack.example.trunking;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
-import io.pkts.packet.sip.SipRequest;
-import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.application.ApplicationInstance;
 import io.sipstack.application.ApplicationInstanceCreator;
 import io.sipstack.core.Application;
 import io.sipstack.core.Bootstrap;
 import io.sipstack.core.Environment;
-import io.sipstack.example.application.MyApplicationInstance;
 import io.sipstack.example.application.MyConfiguration;
 
 

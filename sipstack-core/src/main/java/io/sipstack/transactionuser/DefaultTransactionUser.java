@@ -18,8 +18,8 @@ public class DefaultTransactionUser implements TransactionUser {
 
     }
 
-    public void start(final Transactions transactions) {
-        this.transactions = transactions;
+    public void init(final Transactions transactionLayer) {
+        this.transactions = transactionLayer;
     }
 
     @Override

@@ -11,6 +11,8 @@ import io.pkts.packet.sip.SipResponse;
  */
 public interface TransactionUser {
 
+    void init(Transactions transactionLayer);
+
     void onRequest(Transaction transaction, SipRequest request);
 
     void onResponse(Transaction transaction, SipResponse response);

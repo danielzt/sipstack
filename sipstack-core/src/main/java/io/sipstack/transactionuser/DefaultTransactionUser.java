@@ -25,7 +25,7 @@ public class DefaultTransactionUser implements TransactionUser {
     @Override
     public void onRequest(Transaction transaction, SipRequest request) {
         if (!request.isAck()) {
-            transactions.send(request.createResponse(200));
+            transactions.send(transaction.flow(), request.createResponse(200));
         }
     }
 

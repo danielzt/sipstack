@@ -2,7 +2,10 @@ package io.sipstack.transport;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.core.SipStack;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
@@ -10,9 +13,12 @@ import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.Transport;
 
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * The {@link TransportLayer} is responsible for maintaining {@link Flow}s, which represents
@@ -57,12 +63,13 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
         try {
             final SipMessageEvent event = (SipMessageEvent)msg;
             final Connection connection = event.connection();
+            // TODO: lookup the flow
             Flow flow = null;
             final Optional<Object> optional = connection.fetchObject();
             if (optional.isPresent()) {
                 flow = (Flow)optional.get();
             } else {
-                flow = new DefaultFlow(connection, ctx);
+                flow = new DefaultFlow(connection);
                 connection.storeObject(flow);
             }
             transportUser.onMessage(flow, ((SipMessageEvent) msg).message());
@@ -154,14 +161,161 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
         ((DefaultFlow)flow).connection.send(msg);
     }
 
+    @Override
+    public Flow.Builder createFlow(final String host) {
+        PreConditions.ensureNotEmpty("You must specify the host to connect to", host);
+        return new FlowBuilder(host);
+    }
 
-    private class DefaultFlow implements Flow {
-        private final ChannelHandlerContext ctx;
+    private class FlowBuilder implements Flow.Builder {
+
+        private Consumer<Flow> onSuccess;
+        private Consumer<Flow> onFailure;
+        private Consumer<Flow> onCancelled;
+        private String host;
+        private int port;
+        private Transport transport;
+
+        private FlowBuilder(final String host) {
+            this.host = host;
+        }
+
+        @Override
+        public Flow.Builder withPort(final int port) {
+            this.port = port;
+            return this;
+        }
+
+        @Override
+        public Flow.Builder withTransport(final Transport transport) {
+            this.transport = transport;
+            return this;
+        }
+
+        @Override
+        public Flow.Builder onSuccess(final Consumer<Flow> consumer) {
+            this.onSuccess = consumer;
+            return this;
+        }
+
+        @Override
+        public Flow.Builder onFailure(final Consumer<Flow> consumer) {
+            this.onFailure = consumer;
+            return this;
+        }
+
+        @Override
+        public Flow.Builder onCancelled(Consumer<Flow> consumer) {
+            this.onCancelled = consumer;
+            return this;
+        }
+
+        @Override
+        public FlowFuture connect() throws IllegalArgumentException {
+            final int port = this.port == -1 ? defaultPort() : this.port;
+            final InetSocketAddress remoteAddress = new InetSocketAddress(host, port);
+            // TODO: we need to figure out if we already have a flow pointing
+            // to the same remote:local:transport. May have to ask the network layer
+            // if it knows what local ip:port we will be using.
+            final Future<Connection> future = network.connect(remoteAddress, transport == null ? Transport.udp : transport);
+            return new DefaultFlowFuture(future, onSuccess, onFailure, onCancelled);
+        }
+
+        /**
+         * The default port should probably be coming from somewhere else.
+         * @return
+         */
+        private int defaultPort() {
+            if (transport == null || transport == Transport.udp || transport == Transport.tcp) {
+                return 5060;
+            }
+
+            if (transport == Transport.tls) {
+                return 5061;
+            }
+
+            if (transport == Transport.ws) {
+                return 5062;
+            }
+
+            if (transport == Transport.wss) {
+                return 5063;
+            }
+
+            return 5060;
+        }
+    }
+
+    private static class DefaultFlowFuture implements FlowFuture, GenericFutureListener<Future<Connection>> {
+
+        private final Consumer<Flow> onSuccess;
+        private final Consumer<Flow> onFailure;
+        private final Consumer<Flow> onCancel;
+        private final Future<Connection> actualFuture;
+
+        private DefaultFlowFuture(final Future<Connection> actualFuture,
+                                  final Consumer<Flow> onSuccess,
+                                  final Consumer<Flow> onFailure,
+                                  final Consumer<Flow> onCancel) {
+            this.actualFuture = actualFuture;
+            this.onSuccess = onSuccess;
+            this.onFailure = onFailure;
+            this.onCancel = onCancel;
+        }
+
+        @Override
+        public boolean cancel() {
+            return actualFuture.cancel(false);
+        }
+
+        @Override
+        public void operationComplete(final Future<Connection> future) throws Exception {
+            if (future.isSuccess() && onSuccess != null) {
+                // TODO: need to save this flow
+                final Connection connection = future.getNow();
+                final Flow flow = new DefaultFlow(connection);
+                onSuccess.accept(flow);
+            } else if (future.isCancelled() && onCancel != null) {
+                onCancel.accept(new CancelledFlow());
+            } else if (future.cause() != null && onFailure != null) {
+                onFailure.accept(new FailureFlow(future.cause()));
+            }
+        }
+    }
+
+    /**
+     * TODO
+     */
+    private static class CancelledFlow implements Flow {
+
+        @Override
+        public ConnectionId id() {
+            return null;
+        }
+    }
+
+    /**
+     * TODO
+     */
+    private static class FailureFlow implements Flow {
+
+        private final Throwable cause;
+
+        private FailureFlow(final Throwable cause) {
+            this.cause = cause;
+        }
+
+        @Override
+        public ConnectionId id() {
+            return null;
+        }
+    }
+
+    private static class DefaultFlow implements Flow {
         private final Connection connection;
 
-        DefaultFlow(final Connection connection, final ChannelHandlerContext ctx) {
+        DefaultFlow(final Connection connection) {
             this.connection = connection;
-            this.ctx = ctx;
         }
 
         @Override

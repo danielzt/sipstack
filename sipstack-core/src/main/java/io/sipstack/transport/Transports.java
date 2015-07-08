@@ -30,4 +30,12 @@ public interface Transports {
      */
     void write(Flow flow, SipMessage msg);
 
+    /**
+     *
+     * @param host
+     * @return
+     * @throws IllegalArgumentException
+     */
+    Flow.Builder createFlow(String host) throws IllegalArgumentException;
+
 }

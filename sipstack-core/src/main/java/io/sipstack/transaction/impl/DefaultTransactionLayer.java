@@ -21,8 +21,6 @@ import io.sipstack.transport.Transports;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
-
 /**
  * @author jonas@jonasborjesson.com
  */
@@ -63,7 +61,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         // the onMessage method is the API the transaction layer implements to interact
         // with the underlying transport layer, hence, any message we recieve here
         // is going up the stack, hence the value true on "ensureTransaction"
-        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(true, msg);
+        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(true, flow, msg);
         try {
             invoke(flow, Event.create(msg), holder);
             checkIfTerminated(holder);
@@ -103,25 +101,9 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         try {
             final SingleContext actorCtx = invokeTransaction(flow, event, holder);
             actorCtx.downstream().ifPresent(e -> {
-                if (holder.flow().isPresent()) {
-                    transports.write(holder.flow().get(), e.getSipMessage());
-                } else {
-                    transports.write(e.getSipMessage());
-                }
+                transports.write(holder.flow(), e.getSipMessage());
             });
 
-            // TODO: I wonder how we are going to prevent upstream
-            // actors from writing straight to the socket. We could have the
-            // DefaultFlow.write() actually buffer somehow using another
-            // contextual ThreadLocal whatever. Also, same goes for creating
-            // new Transactions. We probably want to provide another contextual
-            // ThreadLocal called e.g. Transactions where the TransactionUser implementation
-            // can do Transactions.newClientTransaction(request).send();
-            // Perhaps a way to also set the "listener" such as Transactions.newClientTransaction(myDialog, request).send();
-            // where the dialog would then implement TransactionUser.
-            //
-            // No need for a newServerTransaction since that happens automatically but
-            // perhaps we should do what jain sip does there as well?
             actorCtx.upstream().ifPresent(e -> {
                 if (e.isSipRequestEvent()) {
                     holder.tu.onRequest(holder, e.request());
@@ -201,10 +183,14 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
             synchronized (transaction) {
                 try {
 
+                    //
+                    // TODO: not sure we should do this anymore, which also means we don't need to
+                    // pass in the flow on the invokeTransaction
+                    //
                     // the flow may change so keep it up to date
-                    if (holder.flow != flow && flow != null) {
-                        holder.flow = flow;
-                    }
+                    // if (holder.flow != flow && flow != null) {
+                        // holder.flow = flow;
+                    // }
 
                     transaction.onReceive(ctx, event);
                 } catch (final Throwable t) {
@@ -224,35 +210,30 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     }
 
     @Override
-    public TransactionHolder createInviteServerTransaction(final TransactionId id, final SipRequest request, final TransactionLayerConfiguration config) {
+    public TransactionHolder createInviteServerTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new InviteServerTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(defaultTransactionListener, actor);
+        return new DefaultTransactionHolder(defaultTransactionListener, flow, actor);
     }
 
     @Override
-    public TransactionHolder createInviteClientTransaction(final TransactionId id, final SipRequest request, final TransactionLayerConfiguration config) {
+    public TransactionHolder createInviteClientTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new InviteClientTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(defaultTransactionListener, actor);
+        return new DefaultTransactionHolder(defaultTransactionListener, flow, actor);
     }
 
     @Override
-    public TransactionHolder createNonInviteServerTransaction(final TransactionId id, final SipRequest request, final TransactionLayerConfiguration config) {
+    public TransactionHolder createNonInviteServerTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new NonInviteServerTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(defaultTransactionListener, actor);
+        return new DefaultTransactionHolder(defaultTransactionListener, flow, actor);
     }
 
     @Override
-    public Transaction send(Flow flow, SipMessage msg) {
-        throw new RuntimeException("TODO");
-    }
-
-    @Override
-    public Transaction send(final SipMessage msg) {
+    public Transaction send(final Flow flow, final SipMessage msg) {
         // note, the "send" method is exposed by our "north facing" API hence the
         // direction of the message is "down" hence the boolean value false to ensureTransaction
-        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(false, msg);
+        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(false, flow, msg);
         try {
-            invoke(null, Event.create(msg), holder);
+            invoke(flow, Event.create(msg), holder);
             checkIfTerminated(holder);
         } catch (final ClassCastException e) {
             // strange...
@@ -261,6 +242,19 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         return holder;
     }
 
+
+    // @Override
+    public Transaction send(final SipMessage msg) {
+        // not allowed or should we allow this then to find an existing
+        // transaction and if there is one it will be used and since a flow
+        // always will be available on a transaction, we should be fine...
+        throw new RuntimeException("Not allowed anymore!!!");
+    }
+
+    @Override
+    public Flow.Builder createFlow(String host) throws IllegalArgumentException {
+        return transports.createFlow(host);
+    }
 
     /**
      *
@@ -278,7 +272,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
 
         private Flow flow;
 
-        private DefaultTransactionHolder(TransactionUser tu, final TransactionActor actor) {
+        private DefaultTransactionHolder(final TransactionUser tu, final Flow flow, final TransactionActor actor) {
             this.tu = tu;
             this.actor = actor;
         }
@@ -299,9 +293,10 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
         }
 
         @Override
-        public Optional<Flow> flow() {
-            return Optional.ofNullable(flow);
+        public Flow flow() {
+            return flow;
         }
+
     }
 
 

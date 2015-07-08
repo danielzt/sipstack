@@ -2,6 +2,7 @@ package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.transaction.TransactionId;
+import io.sipstack.transport.Flow;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -17,10 +18,11 @@ public interface TransactionStore {
      *                   lower level parts of the stack traveling "up") and as such, if it is a request we should
      *                   create a server transaction. If false, then it is traveling the opposite direction and as such
      *                   we need to create a client transaction.
+     * @param flow every transaction
      * @param msg
      * @return
      */
-    TransactionHolder ensureTransaction(boolean isUpstream, SipMessage msg);
+    TransactionHolder ensureTransaction(boolean isUpstream, Flow flow, SipMessage msg);
 
     TransactionHolder get(TransactionId id);
 

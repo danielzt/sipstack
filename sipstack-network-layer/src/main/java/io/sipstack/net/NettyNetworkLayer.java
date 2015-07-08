@@ -15,15 +15,19 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.concurrent.Future;
 import io.sipstack.config.NetworkInterfaceConfiguration;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
 import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
+import io.sipstack.netty.codec.sip.Transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,17 +62,28 @@ public class NettyNetworkLayer implements NetworkLayer {
 
     private final List<NettyNetworkInterface> interfaces;
 
+    private final NettyNetworkInterface defaultInterface;
+
     /**
      * 
      */
     private NettyNetworkLayer(final CountDownLatch latch, final List<NettyNetworkInterface> ifs) {
         this.latch = latch;
         this.interfaces = ifs;
+
+        // TODO: make this configurable. For now, it is simply the
+        // first one...
+        this.defaultInterface = ifs.get(0);
     }
 
     @Override
     public void start() {
         this.interfaces.forEach(NettyNetworkInterface::up);
+    }
+
+    @Override
+    public Future<Connection> connect(final InetSocketAddress address, final Transport transport) {
+        return this.defaultInterface.connect(address, transport);
     }
 
     @Override

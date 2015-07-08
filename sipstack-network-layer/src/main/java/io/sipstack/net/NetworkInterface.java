@@ -1,9 +1,11 @@
 package io.sipstack.net;
 
 import io.netty.channel.ChannelFuture;
+import io.netty.util.concurrent.Future;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.Transport;
 
-import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -38,5 +40,5 @@ public interface NetworkInterface {
      * @throws IllegalTransportException in case the {@link NetworkInterface} isn't configured with
      *         the specified {@link Transport}
      */
-    ChannelFuture connect(final SocketAddress remoteAddress, final Transport transport);
+    Future<Connection> connect(final InetSocketAddress remoteAddress, final Transport transport);
 }

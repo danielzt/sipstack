@@ -5,9 +5,12 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
+import io.netty.util.concurrent.Future;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.config.NetworkInterfaceConfiguration;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.netty.codec.sip.UdpConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +41,8 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
 
     private final List<ListeningPoint> listeningPoints;
 
+    private final ListeningPoint[] listeningPointsByTransport = new ListeningPoint[Transport.values().length];
+
 
     private NettyNetworkInterface(final String name, final Bootstrap udpBootstrap, final ServerBootstrap tcpBootstrap,
                                   final List<ListeningPoint> lps) {
@@ -45,6 +50,7 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
         this.udpBootstrap = udpBootstrap;
         this.tcpBootstrap = tcpBootstrap;
         this.listeningPoints = lps;
+        lps.forEach(lp -> listeningPointsByTransport[lp.getTransport().ordinal()] = lp);
     }
 
     @Override
@@ -61,7 +67,7 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
         final CountDownLatch bindLatch = new CountDownLatch(this.listeningPoints.size());
         final List<ListeningPoint> errors = Collections.synchronizedList(new ArrayList<ListeningPoint>());
         this.listeningPoints.forEach(lp -> {
-            final ListeningPoint listenPoint = lp;
+            final ListeningPoint listeningPoint = lp;
             final SipURI listen = lp.getListenAddress();
             final Transport transport = getTransport(listen);
             final int port = getPort(listen.getPort(), transport);
@@ -83,11 +89,11 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
                 public void operationComplete(final ChannelFuture future) throws Exception {
                     if (future.isDone() && future.isSuccess()) {
                         final Channel channel = future.channel();
-                        listenPoint.setChannel(channel);
-                        NettyNetworkInterface.this.logger.info("Successfully bound to listening point: " + listenPoint);
+                        listeningPoint.setChannel(channel);
+                        NettyNetworkInterface.this.logger.info("Successfully bound to listening point: " + listeningPoint);
                     } else if (future.isDone() && !future.isSuccess()) {
-                        NettyNetworkInterface.this.logger.info("Unable to bind to listening point: " + listenPoint);
-                        errors.add(listenPoint);
+                        NettyNetworkInterface.this.logger.info("Unable to bind to listening point: " + listeningPoint);
+                        errors.add(listeningPoint);
                     }
                     bindLatch.countDown();
                 }
@@ -111,7 +117,7 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
 
     }
 
-    private Transport getTransport(final SipURI uri) {
+    private static Transport getTransport(final SipURI uri) {
         return Transport.valueOf(uri.getTransportParam().toString());
     }
 
@@ -153,9 +159,18 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
      *         the specified {@link Transport}
      */
     @Override
-    public ChannelFuture connect(final SocketAddress remoteAddress, final Transport transport)
+    public Future<Connection> connect(final InetSocketAddress remoteAddress, final Transport transport)
             throws IllegalTransportException {
-        return null;
+        if (transport == Transport.udp || transport == null) {
+            final ListeningPoint lp = listeningPointsByTransport[Transport.udp.ordinal()];
+            final UdpConnection connection = new UdpConnection(lp.getChannel(), remoteAddress);
+            return this.udpBootstrap.group().next().newSucceededFuture(connection);
+        }
+
+        // TODO: TCP
+        // TODO: TLS
+
+        throw new IllegalTransportException("Stack has not been configured for transport " + transport);
     }
 
     static Builder with(final NetworkInterfaceConfiguration config) {
@@ -216,7 +231,7 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
             this.config.getTransports().forEach(t -> {
                 final SipURI listen = SipURI.withTemplate(listenAddress).withTransport(t.toString()).build();
                 final SipURI vipClone = vipAddress != null ? vipAddress.clone() : null;
-                lps.add(ListeningPoint.create(listen, vipClone));
+                lps.add(ListeningPoint.create(t, listen, vipClone));
             });
 
             return new NettyNetworkInterface(this.config.getName(), this.udpBootstrap, this.tcpBootstrap,

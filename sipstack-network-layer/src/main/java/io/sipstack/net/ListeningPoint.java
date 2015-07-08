@@ -4,8 +4,11 @@
 package io.sipstack.net;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.pkts.packet.sip.address.SipURI;
+import io.sipstack.netty.codec.sip.Transport;
 
+import java.net.SocketAddress;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
@@ -21,21 +24,28 @@ public final class ListeningPoint {
 
     private final SipURI listenAddress;
     private final SipURI vipAddress;
+    private final Transport transport;
 
     private final AtomicReference<Channel> channel = new AtomicReference<>();
 
     /**
      * 
      */
-    private ListeningPoint(final SipURI listenAddress, final SipURI vipAddress) {
+    private ListeningPoint(final Transport transport, final SipURI listenAddress, final SipURI vipAddress) {
         this.listenAddress = listenAddress;
         this.vipAddress = vipAddress;
+        this.transport = transport;
     }
 
-    public static ListeningPoint create(final SipURI listen, final SipURI vipAddress) {
+    public static ListeningPoint create(final Transport transport, final SipURI listen, final SipURI vipAddress) {
+        assertNotNull(transport);
         assertNotNull(listen);
         assertNotNull(vipAddress);
-        return new ListeningPoint(listen, vipAddress);
+        return new ListeningPoint(transport, listen, vipAddress);
+    }
+
+    public Transport getTransport() {
+        return this.transport;
     }
 
     public SipURI getListenAddress() {
@@ -53,6 +63,11 @@ public final class ListeningPoint {
 
     public Channel getChannel() {
         return this.channel.get();
+    }
+
+    public ChannelFuture connect(final SocketAddress address) {
+        final Channel channel = this.channel.get();
+        return channel.connect(address, channel.voidPromise());
     }
 
     @Override

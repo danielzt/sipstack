@@ -4,6 +4,7 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.header.SipHeader;
+import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionUser;
@@ -47,10 +48,17 @@ public class MockTransactionUser implements TransactionUser {
      * @param request the request to send.
      * @return the transaction that got created for this request.
      */
-    public Transaction sendRequest(final SipRequest request) {
-        final Transaction transaction = transactionLayer.send(request);
-        storage.store(transaction, request);
-        return transaction;
+    public void sendRequest(final SipRequest request) {
+        transactionLayer.createFlow("127.0.0.1")
+                .withTransport(Transport.udp)
+                .withPort(5060)
+                .onSuccess(f -> {
+                    final Transaction t = transactionLayer.send(f, request);
+                    storage.store(t, request);
+                })
+                .onFailure(f -> fail("Not sure why this failed"))
+                .onCancelled(f -> fail("Who cancelled the flow future!"))
+                .connect();
     }
 
     public void reset() {
@@ -67,7 +75,15 @@ public class MockTransactionUser implements TransactionUser {
             responseCode = Integer.valueOf(header.getValue().toString());
         }
 
-        transactionLayer.send(request.createResponse(responseCode));
+        transactionLayer.send(transaction.flow(), request.createResponse(responseCode));
+
+        /*
+        FlowFuture flowFuture = Flow.withHost().withPort()...connect();
+
+        transactionLayer.newFlow().withHost("127.0.0.1").withPort(5060).withTransport(Transport.tcp).onComplete(to something).onFailure(hello).connect();
+
+        final Transaction anotherTransaction = transactionLayer.send(anotherFlow, request);
+        */
     }
 
     @Override

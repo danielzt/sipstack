@@ -70,6 +70,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
     public void testProceedingToAccepted() throws Exception {
         for (int i = 100; i < 200; ++i) {
             for (int j = 200; j < 300; ++j) {
+                System.out.println("Testing provisional " + i + " then final " + j);
                 final Holder holder = initiateTransition(i);
                 final SipResponse response = holder.message().createResponse(j);
                 final Flow flow = Mockito.mock(Flow.class);
@@ -153,7 +154,11 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
 
         // ask our "application", which is just a Transaction User and that is using the
         // transaction layer to send requests/responses, to send an INVITE.
-        final Transaction t1 = myApplication.sendRequest(invite);
+        myApplication.sendRequest(invite);
+
+        // TODO: need to fetch the transaction here.
+        final Transaction t1 = null;
+
 
         // the INVITE should have been sent through the transaction layer down to the
         // transport layer, for which we have a mock implementation so check that we

@@ -116,7 +116,6 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
      */
     private Cancellable timerL;
 
-
     /**
      * @param id
      * @param initialState

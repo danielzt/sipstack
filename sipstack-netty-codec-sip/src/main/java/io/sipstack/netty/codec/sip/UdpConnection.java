@@ -12,11 +12,6 @@ import java.net.InetSocketAddress;
  */
 public final class UdpConnection extends AbstractConnection {
 
-    // public UdpConnection(final ChannelHandlerContext ctx, final InetSocketAddress remoteAddress)
-    // {
-    // super(ctx, remoteAddress);
-    // }
-
     public UdpConnection(final Channel channel, final InetSocketAddress remoteAddress) {
         super(Transport.udp, channel, remoteAddress);
     }

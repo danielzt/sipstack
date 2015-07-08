@@ -33,5 +33,7 @@ public interface Transactions {
      * @param msg
      * @return
      */
-    Transaction send(SipMessage msg);
+    // Transaction send(SipMessage msg);
+
+    Flow.Builder createFlow(String host) throws IllegalArgumentException;
 }

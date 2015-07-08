@@ -88,8 +88,8 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
     private Cancellable timerJ;
 
     protected NonInviteServerTransactionActor(final TransactionId id,
-                                           final SipRequest request,
-                                           final TransactionLayerConfiguration config) {
+                                              final SipRequest request,
+                                              final TransactionLayerConfiguration config) {
         super(id.toString(), TransactionState.INIT, TransactionState.TERMINATED, TransactionState.values());
 
         this.id = id;

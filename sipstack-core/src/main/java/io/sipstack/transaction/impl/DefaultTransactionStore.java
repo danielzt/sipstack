@@ -3,6 +3,7 @@ package io.sipstack.transaction.impl;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.transaction.TransactionId;
+import io.sipstack.transport.Flow;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +29,7 @@ public class DefaultTransactionStore implements TransactionStore {
 
 
     @Override
-    public TransactionHolder ensureTransaction(final boolean isUpstream, final SipMessage sipMsg) {
+    public TransactionHolder ensureTransaction(final boolean isUpstream, final Flow flow, final SipMessage sipMsg) {
         final TransactionId id = TransactionId.create(sipMsg);
         return transactions[Math.abs(id.hashCode() % stores)].computeIfAbsent(id, obj -> {
 
@@ -39,9 +40,9 @@ public class DefaultTransactionStore implements TransactionStore {
 
             if (sipMsg.isInvite()) {
                 if (isUpstream) {
-                    return factory.createInviteServerTransaction(id, sipMsg.toRequest(), config);
+                    return factory.createInviteServerTransaction(id, flow, sipMsg.toRequest(), config);
                 } else {
-                    return factory.createInviteClientTransaction(id, sipMsg.toRequest(), config);
+                    return factory.createInviteClientTransaction(id, flow, sipMsg.toRequest(), config);
                 }
             }
 
@@ -53,7 +54,7 @@ public class DefaultTransactionStore implements TransactionStore {
             }
 
             if (isUpstream) {
-                return factory.createNonInviteServerTransaction(id, sipMsg.toRequest(), config);
+                return factory.createNonInviteServerTransaction(id, flow, sipMsg.toRequest(), config);
             } else {
                 throw new RuntimeException("Haven't done the NonInviteClientTransaction just yet");
             }

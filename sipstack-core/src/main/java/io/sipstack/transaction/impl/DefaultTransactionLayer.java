@@ -274,6 +274,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
 
         private DefaultTransactionHolder(final TransactionUser tu, final Flow flow, final TransactionActor actor) {
             this.tu = tu;
+            this.flow = flow;
             this.actor = actor;
         }
 

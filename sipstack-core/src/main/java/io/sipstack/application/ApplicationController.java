@@ -10,6 +10,7 @@ import io.sipstack.actor.InternalScheduler;
 import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
+import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
@@ -133,7 +134,10 @@ public class ApplicationController extends InboundOutboundHandlerAdapter impleme
     }
 
     public void send(final SipMessage message) {
-        transactionLayer.createFlow(((SipURI) message.toRequest().getRequestUri()).getHost())
+        final SipURI target = (SipURI) message.toRequest().getRequestUri();
+        transactionLayer.createFlow(target.getHost())
+                .withPort(target.getPort())
+                .withTransport(Transport.udp)
                 .onSuccess(f -> transactionLayer.send(f, message))
                 .connect();
     }

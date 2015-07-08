@@ -3,7 +3,6 @@ package io.sipstack.transport;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.config.TransportLayerConfiguration;
@@ -11,9 +10,11 @@ import io.sipstack.core.SipStack;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.transport.impl.DefaultFlow;
+import io.sipstack.transport.impl.FlowFutureImpl;
+import io.sipstack.transport.impl.InternalFlow;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -158,7 +159,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
 
     @Override
     public void write(final Flow flow, final SipMessage msg) {
-        ((DefaultFlow)flow).connection.send(msg);
+        ((InternalFlow)flow).write(msg);
     }
 
     @Override
@@ -218,7 +219,9 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
             // to the same remote:local:transport. May have to ask the network layer
             // if it knows what local ip:port we will be using.
             final Future<Connection> future = network.connect(remoteAddress, transport == null ? Transport.udp : transport);
-            return new DefaultFlowFuture(future, onSuccess, onFailure, onCancelled);
+            final FlowFutureImpl flowFuture = new FlowFutureImpl(future, onSuccess, onFailure, onCancelled);
+            future.addListener(flowFuture);
+            return flowFuture;
         }
 
         /**
@@ -246,83 +249,4 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
         }
     }
 
-    private static class DefaultFlowFuture implements FlowFuture, GenericFutureListener<Future<Connection>> {
-
-        private final Consumer<Flow> onSuccess;
-        private final Consumer<Flow> onFailure;
-        private final Consumer<Flow> onCancel;
-        private final Future<Connection> actualFuture;
-
-        private DefaultFlowFuture(final Future<Connection> actualFuture,
-                                  final Consumer<Flow> onSuccess,
-                                  final Consumer<Flow> onFailure,
-                                  final Consumer<Flow> onCancel) {
-            this.actualFuture = actualFuture;
-            this.onSuccess = onSuccess;
-            this.onFailure = onFailure;
-            this.onCancel = onCancel;
-            actualFuture.addListener(this);
-        }
-
-        @Override
-        public boolean cancel() {
-            return actualFuture.cancel(false);
-        }
-
-        @Override
-        public void operationComplete(final Future<Connection> future) throws Exception {
-            if (future.isSuccess() && onSuccess != null) {
-                // TODO: need to save this flow
-                final Connection connection = future.getNow();
-                final Flow flow = new DefaultFlow(connection);
-                onSuccess.accept(flow);
-            } else if (future.isCancelled() && onCancel != null) {
-                onCancel.accept(new CancelledFlow());
-            } else if (future.cause() != null && onFailure != null) {
-                onFailure.accept(new FailureFlow(future.cause()));
-            }
-        }
-    }
-
-    /**
-     * TODO
-     */
-    private static class CancelledFlow implements Flow {
-
-        @Override
-        public ConnectionId id() {
-            return null;
-        }
-    }
-
-    /**
-     * TODO
-     */
-    private static class FailureFlow implements Flow {
-
-        private final Throwable cause;
-
-        private FailureFlow(final Throwable cause) {
-            this.cause = cause;
-        }
-
-        @Override
-        public ConnectionId id() {
-            return null;
-        }
-    }
-
-    private static class DefaultFlow implements Flow {
-        private final Connection connection;
-
-        DefaultFlow(final Connection connection) {
-            this.connection = connection;
-        }
-
-        @Override
-        public ConnectionId id() {
-            return connection.id();
-        }
-
-    }
 }

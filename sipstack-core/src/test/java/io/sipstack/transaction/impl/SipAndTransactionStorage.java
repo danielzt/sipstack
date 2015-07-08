@@ -48,6 +48,16 @@ public class SipAndTransactionStorage {
         }
     }
 
+    public Transaction assertTransaction(final SipMessage msg) {
+        return assertTransaction(TransactionId.create(msg));
+    }
+
+    public Transaction assertTransaction(final TransactionId id) {
+        final Transaction t = allTransactions.get(id);
+        assertThat(t, not((Transaction)null));
+        return t;
+    }
+
     public void store(final Transaction transaction, final SipMessage msg) {
         assertThat(transaction, not((Transaction) null));
 

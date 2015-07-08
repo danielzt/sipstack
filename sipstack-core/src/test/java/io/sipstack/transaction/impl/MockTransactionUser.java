@@ -10,14 +10,8 @@ import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
-import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.*;
 
@@ -33,10 +27,6 @@ public class MockTransactionUser implements TransactionUser {
     private Transactions transactionLayer;
 
     private SipAndTransactionStorage storage = new SipAndTransactionStorage();
-
-    private Map<TransactionId, Transaction> allTransactions = new ConcurrentHashMap<>();
-
-    private Map<TransactionId, Transaction> terminatedTransaction = new ConcurrentHashMap<>();
 
     public void ensureTransactionTerminated(final TransactionId id) {
         storage.ensureTransactionTerminated(id);
@@ -67,6 +57,21 @@ public class MockTransactionUser implements TransactionUser {
                 .onFailure(f -> fail("Not sure why this failed"))
                 .onCancelled(f -> fail("Who cancelled the flow future!"))
                 .connect();
+    }
+
+    /**
+     * Lookup a specific transaction based on the message
+     *
+     * @param msg
+     * @return
+     */
+    public Transaction assertTransaction(final SipMessage msg) {
+        final TransactionId id = TransactionId.create(msg);
+        return storage.assertTransaction(id);
+    }
+
+    public Transaction assertTransaction(final TransactionId id) {
+        return storage.assertTransaction(id);
     }
 
     public void reset() {

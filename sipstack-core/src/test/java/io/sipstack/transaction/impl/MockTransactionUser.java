@@ -9,6 +9,14 @@ import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.*;
 
@@ -25,9 +33,9 @@ public class MockTransactionUser implements TransactionUser {
 
     private SipAndTransactionStorage storage = new SipAndTransactionStorage();
 
-    public void start(final Transactions transactions) {
-        this.transactionLayer = transactions;
-    }
+    private Map<TransactionId, Transaction> allTransactions = new ConcurrentHashMap<>();
+
+    private Map<TransactionId, Transaction> terminatedTransaction = new ConcurrentHashMap<>();
 
     public void ensureTransactionTerminated(final TransactionId id) {
         storage.ensureTransactionTerminated(id);
@@ -58,13 +66,18 @@ public class MockTransactionUser implements TransactionUser {
     }
 
     @Override
+    public void init(final Transactions transactionLayer) {
+        this.transactionLayer = transactionLayer;
+    }
+
+    @Override
     public void onRequest(final Transaction transaction, final SipRequest request) {
         storage.store(transaction, request);
 
-        final SipHeader header = request.getHeader("X-Transaction-Test-Response");
+        final Optional<SipHeader> header = request.getHeader("X-Transaction-Test-Response");
         int responseCode = 200;
-        if (header != null) {
-            responseCode = Integer.valueOf(header.getValue().toString());
+        if (header.isPresent()) {
+            responseCode = Integer.valueOf(header.get().getValue().toString());
         }
 
         transactionLayer.send(request.createResponse(responseCode));

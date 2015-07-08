@@ -3,10 +3,15 @@ package io.sipstack.application;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
+import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.TransactionUser;
+import io.sipstack.transaction.Transactions;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +19,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author jonas@jonasborjesson.com
  */
-public class ApplicationController extends InboundOutboundHandlerAdapter {
+public class ApplicationController extends InboundOutboundHandlerAdapter implements TransactionUser {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
@@ -26,11 +31,13 @@ public class ApplicationController extends InboundOutboundHandlerAdapter {
 
     private final ApplicationInstanceStore applicationStore;
 
+    private Transactions transactionLayer;
+
     public ApplicationController(final Clock clock, final InternalScheduler scheduler, final ApplicationInstanceCreator creator) {
         this.clock = clock;
         this.scheduler = scheduler;
         this.appCreator = creator;
-        applicationStore = new DefaultApplicationInstanceStore(creator);
+        applicationStore = new DefaultApplicationInstanceStore(this, creator);
     }
 
     /**
@@ -78,7 +85,11 @@ public class ApplicationController extends InboundOutboundHandlerAdapter {
             app._ctx.set(appCtx);
             try {
                 appCtx.preInvoke(message);
-                app.onRequest(message.toRequest());
+                if (message.isRequest()) {
+                    app.onRequest(message.toRequest());
+                } else {
+                    app.onResponse(message.toResponse());
+                }
             } catch (final Throwable t) {
                 t.printStackTrace();
             }
@@ -89,5 +100,38 @@ public class ApplicationController extends InboundOutboundHandlerAdapter {
                 t.printStackTrace();
             }
         }
+    }
+
+    @Override
+    public void init(final Transactions transactionLayer) {
+        this.transactionLayer = transactionLayer;
+    }
+
+    @Override
+    public void onRequest(final Transaction transaction, final SipRequest request) {
+        final ApplicationInstance app = applicationStore.ensureApplication(request);
+        final InternalApplicationContext appContext = applicationStore.ensureApplicationContext(app.id());
+        invokeApplication(app, appContext, request);
+    }
+
+    @Override
+    public void onResponse(final Transaction transaction, final SipResponse response) {
+        final ApplicationInstance app = applicationStore.ensureApplication(response);
+        final InternalApplicationContext appContext = applicationStore.ensureApplicationContext(app.id());
+        invokeApplication(app, appContext, response);
+    }
+
+    @Override
+    public void onTransactionTerminated(final Transaction transaction) {
+        // TODO
+    }
+
+    @Override
+    public void onIOException(final Transaction transaction, final SipMessage msg) {
+        // TODO
+    }
+
+    public void send(final SipMessage message) {
+        transactionLayer.send(message);
     }
 }

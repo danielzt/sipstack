@@ -11,11 +11,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class DefaultApplicationInstanceStore implements ApplicationInstanceStore {
 
+    private final ApplicationController parent;
     private final Map<Buffer, ApplicationInstance> instances;
     private final Map<Buffer, InternalApplicationContext> contexts;
     private final ApplicationInstanceCreator creator;
 
-    public DefaultApplicationInstanceStore(final ApplicationInstanceCreator creator) {
+    public DefaultApplicationInstanceStore(final ApplicationController parent, final ApplicationInstanceCreator creator) {
+        this.parent = parent;
         this.creator = creator;
         instances = new ConcurrentHashMap<>(100000);
         contexts = new ConcurrentHashMap<>(100000);
@@ -29,7 +31,7 @@ public class DefaultApplicationInstanceStore implements ApplicationInstanceStore
 
     @Override
     public InternalApplicationContext ensureApplicationContext(final Buffer appId) {
-        return contexts.computeIfAbsent(appId, obj -> new DefaultApplicationContext());
+        return contexts.computeIfAbsent(appId, obj -> new DefaultApplicationContext(parent));
     }
 
     @Override

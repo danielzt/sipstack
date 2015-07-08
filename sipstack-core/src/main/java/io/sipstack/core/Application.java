@@ -17,6 +17,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.HashWheelScheduler;
 import io.sipstack.actor.InternalScheduler;
+import io.sipstack.application.ApplicationController;
 import io.sipstack.application.ApplicationInstanceCreator;
 import io.sipstack.cli.CommandLineArgs;
 import io.sipstack.config.Configuration;
@@ -146,9 +147,15 @@ public abstract class Application<T extends Configuration> {
             final InternalScheduler scheduler = new HashWheelScheduler();
             final Clock clock = new SystemClock();
 
+            final ApplicationController controller = new ApplicationController(clock, scheduler, applicationCreator());
+
             // catch 22. The sipstack needs a reference to the network layer
             // and the network layer needs the handler to pass messages to.
-            final SipStack stack = SipStack.withConfiguration(sipConfig).withClock(clock).withScheduler(scheduler).build();
+            final SipStack stack = SipStack.withConfiguration(sipConfig)
+                    .withClock(clock)
+                    .withScheduler(scheduler)
+                    .withTransactionUser(controller)
+                    .build();
             networkBuilder.withHandler(stack.handler());
 
             final NettyNetworkLayer server = networkBuilder.build();

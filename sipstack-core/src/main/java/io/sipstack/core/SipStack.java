@@ -6,6 +6,7 @@ import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
+import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transactionuser.DefaultTransactionUser;
 import io.sipstack.transport.TransportLayer;
@@ -44,6 +45,7 @@ public interface SipStack {
         private final SipConfiguration config;
         private Clock clock;
         private InternalScheduler scheduler;
+        private TransactionUser transactionUser;
 
         private Builder(final SipConfiguration config) {
             this.config = config;
@@ -59,20 +61,26 @@ public interface SipStack {
             return this;
         }
 
+        public Builder withTransactionUser(final TransactionUser transactionUser) {
+            this.transactionUser = transactionUser;
+            return this;
+        }
+
         public SipStack build() {
             ensureNotNull(scheduler, "You must specify the scheduler");
             final Clock clock = this.clock != null ? this.clock : new SystemClock();
 
-            final DefaultTransactionUser tu = new DefaultTransactionUser();
+            if (this.transactionUser == null) {
+                this.transactionUser = new DefaultTransactionUser();
+            }
 
-            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler, tu, config.getTransaction());
-            tu.start(transaction);
+            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler, transactionUser, config.getTransaction());
+            transactionUser.init(transaction);
 
             final TransportLayer transport = new TransportLayer(config.getTransport(), transaction);
             transaction.start(transport);
 
-            return new DefaultSipStack(transport, transaction, tu);
+            return new DefaultSipStack(transport, transaction, transactionUser);
         }
-
     }
 }

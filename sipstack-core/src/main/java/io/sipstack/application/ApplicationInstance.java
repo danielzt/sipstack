@@ -6,7 +6,9 @@ import io.pkts.packet.sip.SipParseException;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.address.SipURI;
+import io.sipstack.transactionuser.B2BUA;
 import io.sipstack.transactionuser.Proxy;
+import io.sipstack.transactionuser.UA;
 
 import java.io.IOException;
 
@@ -30,6 +32,14 @@ public abstract class ApplicationInstance {
 
     private ApplicationContext ctx() {
         return _ctx.get();
+    }
+
+    public final UA.Builder uaWithFriendlyName(final String friendlyName) {
+        return ctx().uaWithFriendlyName(friendlyName);
+    }
+
+    public final B2BUA.Builder b2buaWithFriendlyName(final String friendlyName) {
+        return ctx().b2buaWithFriendlyName(friendlyName);
     }
 
     public final Proxy.Builder proxy(final SipURI to) {

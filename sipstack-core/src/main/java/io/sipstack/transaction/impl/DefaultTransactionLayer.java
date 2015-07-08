@@ -106,9 +106,9 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
 
             actorCtx.upstream().ifPresent(e -> {
                 if (e.isSipRequestEvent()) {
-                    holder.tu.onRequest(holder, e.request());
+                    defaultTransactionListener.onRequest(holder, e.request());
                 } else if (e.isSipResponseEvent()){
-                    holder.tu.onResponse(holder, e.response());
+                    defaultTransactionListener.onResponse(holder, e.response());
                 } else {
                     throw new RuntimeException("not sure how to forward this event upstream " + e);
                 }
@@ -212,19 +212,27 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     @Override
     public TransactionHolder createInviteServerTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new InviteServerTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(defaultTransactionListener, flow, actor);
+        return new DefaultTransactionHolder(flow, actor);
     }
 
     @Override
     public TransactionHolder createInviteClientTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new InviteClientTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(defaultTransactionListener, flow, actor);
+        return new DefaultTransactionHolder(flow, actor);
     }
 
     @Override
     public TransactionHolder createNonInviteServerTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new NonInviteServerTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(defaultTransactionListener, flow, actor);
+        return new DefaultTransactionHolder(flow, actor);
+    }
+
+    @Override
+    public TransactionHolder createAckTransaction(final TransactionId id, final boolean isServer,
+                                                  final Flow flow, final SipRequest request,
+                                                  final TransactionLayerConfiguration config) {
+        final TransactionActor actor = new AckTransactionActor(id, isServer);
+        return new DefaultTransactionHolder(flow, actor);
     }
 
     @Override
@@ -263,17 +271,9 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
 
         private final TransactionActor actor;
 
-        /**
-         * It is this listener that will be receiving all {@link SipMessage}s
-         * as well as any updates when a transaction has been created/destroyed
-         * etc.
-         */
-        private final TransactionUser tu;
-
         private Flow flow;
 
-        private DefaultTransactionHolder(final TransactionUser tu, final Flow flow, final TransactionActor actor) {
-            this.tu = tu;
+        private DefaultTransactionHolder(final Flow flow, final TransactionActor actor) {
             this.flow = flow;
             this.actor = actor;
         }

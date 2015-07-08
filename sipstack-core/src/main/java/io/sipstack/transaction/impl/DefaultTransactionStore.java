@@ -50,7 +50,7 @@ public class DefaultTransactionStore implements TransactionStore {
             // therefore goes in its own transaction but then ACKs doesn't actually have a real
             // transaction so therefore, screw it...
             if (sipMsg.isAck()) {
-                return null;
+                return factory.createAckTransaction(id, isUpstream, flow, sipMsg.toRequest(), config);
             }
 
             if (isUpstream) {

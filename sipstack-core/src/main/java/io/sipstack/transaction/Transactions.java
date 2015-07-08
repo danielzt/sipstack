@@ -1,5 +1,6 @@
 package io.sipstack.transaction;
 
+import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.transport.Flow;
 
@@ -36,4 +37,8 @@ public interface Transactions {
     // Transaction send(SipMessage msg);
 
     Flow.Builder createFlow(String host) throws IllegalArgumentException;
+
+    default Flow.Builder createFlow(Buffer host) throws IllegalArgumentException {
+        return createFlow(host.toString());
+    }
 }

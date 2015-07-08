@@ -1,5 +1,7 @@
 package io.sipstack.transactionuser;
 
+import java.util.function.Consumer;
+
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.address.URI;
@@ -10,6 +12,8 @@ import io.pkts.packet.sip.address.URI;
 public interface UA {
 
     void send(SipMessage message);
+
+    void addHandler(Consumer<SipMessage> handler);
 
     interface Builder {
 

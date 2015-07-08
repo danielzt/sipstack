@@ -5,6 +5,7 @@ import io.netty.channel.ChannelPromise;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.Clock;
@@ -132,6 +133,8 @@ public class ApplicationController extends InboundOutboundHandlerAdapter impleme
     }
 
     public void send(final SipMessage message) {
-        transactionLayer.send(message);
+        transactionLayer.createFlow(((SipURI) message.toRequest().getRequestUri()).getHost())
+                .onSuccess(f -> transactionLayer.send(f, message))
+                .connect();
     }
 }

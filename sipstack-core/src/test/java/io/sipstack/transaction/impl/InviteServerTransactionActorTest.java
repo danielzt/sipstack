@@ -24,6 +24,30 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         super.setUp();
     }
 
+    /**
+     * An ACK to a 200 goes in its own transaction, even though it actually doesn't really
+     * have a transaction.
+     *
+     * @throws Exception
+     */
+    // @Test(timeout = 500)
+    @Test
+    public void testAckTo200() throws Exception {
+        final Transaction transaction = transitionToAccepted(200);
+
+        // note, we create the ACK based on the defaultInviteRequest
+        // but if that isn't true then we are screwed since it won't
+        // be the same dialog. But then again, we are testing the
+        // transaction level so it wouldn't matchi this ACK to
+        // anything anyway...
+        final Flow flow = Mockito.mock(Flow.class);
+        transactionLayer.onMessage(flow, defaultAckRequest);
+
+        final Transaction ackTransaction = myApplication.assertAndConsumeRequest("ack");
+        assertThat(ackTransaction.flow(), is(flow));
+
+        myApplication.ensureTransactionTerminated(ackTransaction.id());
+    }
 
     /**
      * Ensure that we can transition to the completed state correctly

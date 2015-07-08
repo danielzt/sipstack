@@ -41,7 +41,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
 
     private ActorContext currentContext;
 
-    protected ActorSupport(final String id, final S initialState, final S terminalState, final S[] values) {
+    protected ActorSupport(final String id, final S initialState, final S terminalState, final S ... values) {
         this.id = id;
         currentState = initialState;
         this.terminalState = terminalState;

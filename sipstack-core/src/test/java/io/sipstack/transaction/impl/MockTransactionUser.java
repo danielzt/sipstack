@@ -87,6 +87,10 @@ public class MockTransactionUser implements TransactionUser {
     public void onRequest(final Transaction transaction, final SipRequest request) {
         storage.store(transaction, request);
 
+        if (request.isAck()) {
+            return;
+        }
+
         final Optional<SipHeader> header = request.getHeader("X-Transaction-Test-Response");
         int responseCode = 200;
         if (header.isPresent()) {

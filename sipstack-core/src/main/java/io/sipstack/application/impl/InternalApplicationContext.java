@@ -1,5 +1,9 @@
-package io.sipstack.application;
+package io.sipstack.application.impl;
 
+import io.pkts.packet.sip.SipMessage;
+import io.sipstack.application.ApplicationContext;
+import io.sipstack.application.ApplicationController;
+import io.sipstack.transactionuser.Dialog;
 import io.sipstack.transactionuser.TransactionUserEvent;
 
 /**

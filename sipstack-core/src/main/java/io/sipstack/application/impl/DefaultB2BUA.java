@@ -1,17 +1,15 @@
-package io.sipstack.transactionuser;
+package io.sipstack.application.impl;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
-import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.header.ViaHeader;
+import io.sipstack.application.B2BUA;
 
 /**
  * @author ajansson@twilio.com
@@ -29,8 +27,8 @@ public class DefaultB2BUA implements B2BUA {
         this.uaA = uaA;
         this.uaB = uaB;
 
-        uaA.addHandler(m -> processMessage(uaA, uaB, m));
-        uaB.addHandler(m -> processMessage(uaB, uaA, m));
+        uaA.addHandler(m -> processMessage(uaB, m));
+        uaB.addHandler(m -> processMessage(uaA, m));
     }
 
     public String friendlyName() {
@@ -39,12 +37,12 @@ public class DefaultB2BUA implements B2BUA {
 
     @Override
     public void start() {
-        processRequest(uaA, uaB, uaA.getRequest());
+        processRequest(uaB, uaA.getRequest());
     }
 
     @Override
     public RequestStream onRequest() {
-        return new MyReqeuestStream();
+        return new MyRequestStream();
     }
 
     @Override
@@ -62,30 +60,54 @@ public class DefaultB2BUA implements B2BUA {
         return uaB;
     }
 
-    private void processMessage(final DefaultUA source, final DefaultUA target, final SipMessage message) {
+    private void processMessage(final DefaultUA target, final SipMessage message) {
         if (message.isRequest()) {
-            processRequest(source, target, message.toRequest());
+            processRequest(target, message.toRequest());
         } else {
-            processResponse(source, target, message.toResponse());
+            processResponse(target, message.toResponse());
         }
     }
 
-    private void processRequest(final DefaultUA source, final DefaultUA target, final SipRequest request) {
-        final SipRequest.Builder builder = SipRequest.request(request.getMethod(), target.getTarget());
-        builder.from(request.getFromHeader());
-        builder.to(request.getToHeader());
-        builder.contact(request.getContactHeader());
+    private void processRequest(final DefaultUA target, final SipRequest request) {
+        if (request.isInvite()) {
+            final SipRequest.Builder builder = SipRequest.invite(target.getTarget())
+                    .from(request.getFromHeader())
+                    .to(request.getToHeader())
+                    .contact(request.getContactHeader());
 
-        requestHandlers.forEach(h -> h.accept(request, builder));
+            requestHandlers.forEach(h -> h.accept(request, builder));
 
-        final SipRequest requestB = builder.build();
-        final ViaHeader via =
-                ViaHeader.with().host("127.0.0.1").port(5060).transportUDP().branch(ViaHeader.generateBranch()).build();
-        requestB.addHeaderFirst(via);
-        target.send(requestB);
+            final SipRequest requestB = builder.build();
+            final ViaHeader via = ViaHeader.with()
+                    .host("127.0.0.1")
+                    .port(5060)
+                    .transportUDP()
+                    .branch(ViaHeader.generateBranch())
+                    .build();
+            requestB.addHeaderFirst(via);
+            target.send(requestB);
+        } else if (request.isAck()) {
+            final SipRequest.Builder builder = target.createAck();
+
+            requestHandlers.forEach(h -> h.accept(request, builder));
+
+            final SipRequest requestB = builder.build();
+            final ViaHeader via = ViaHeader.with()
+                    .host("127.0.0.1")
+                    .port(5060)
+                    .transportUDP()
+                    .branch(ViaHeader.generateBranch())
+                    .build();
+            requestB.addHeaderFirst(via);
+            target.send(requestB);
+        } else if (request.isBye()) {
+
+        } else {
+            throw new RuntimeException("TODO");
+        }
     }
 
-    private void processResponse(final DefaultUA source, final DefaultUA target, final SipResponse response) {
+    private void processResponse(final DefaultUA target, final SipResponse response) {
         final SipResponse builder = target.getRequest().createResponse(response.getStatus());
 
         responseHandlers.forEach(h -> h.accept(response, builder));
@@ -93,7 +115,7 @@ public class DefaultB2BUA implements B2BUA {
         target.send(builder);
     }
 
-    class MyReqeuestStream implements RequestStream {
+    class MyRequestStream implements RequestStream {
 
         private Predicate<SipRequest> filter;
 

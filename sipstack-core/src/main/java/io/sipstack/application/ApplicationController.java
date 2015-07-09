@@ -2,21 +2,17 @@ package io.sipstack.application;
 
 import java.util.function.Consumer;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.pkts.packet.sip.SipMessage;
-import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.actor.InternalScheduler;
-import io.sipstack.event.Event;
-import io.sipstack.netty.codec.sip.Clock;
-import io.sipstack.netty.codec.sip.Transport;
-import io.sipstack.transaction.impl.DefaultTransactionLayer;
-import io.sipstack.transactionuser.DefaultUA;
-import io.sipstack.transactionuser.Dialog;
-import io.sipstack.transactionuser.TransactionUserEvent;
-import io.sipstack.transactionuser.TransactionUserLayer;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.pkts.packet.sip.SipMessage;
+import io.sipstack.actor.InternalScheduler;
+import io.sipstack.application.impl.DefaultApplicationInstanceStore;
+import io.sipstack.application.impl.InternalApplicationContext;
+import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
+import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.TransactionUserLayer;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -29,21 +25,20 @@ public class ApplicationController implements Consumer<TransactionUserEvent> {
 
     private final Clock clock;
 
-    private final ApplicationInstanceCreator appCreator;
+    private final ApplicationInstanceCreator creator;
 
-    private final ApplicationInstanceStore applicationStore;
+    private TransactionUserLayer tu;
 
-    private TransactionUserLayer transactionUserLayer;
+    private ApplicationInstanceStore applicationStore;
 
     public ApplicationController(final Clock clock, final InternalScheduler scheduler, final ApplicationInstanceCreator creator) {
         this.clock = clock;
         this.scheduler = scheduler;
-        this.appCreator = creator;
-        applicationStore = new DefaultApplicationInstanceStore(this, creator);
+        this.creator = creator;
     }
 
-    public void start(final TransactionUserLayer transactionUserLayer) {
-        this.transactionUserLayer = transactionUserLayer;
+    public void start(final TransactionUserLayer tu) {
+        applicationStore = new DefaultApplicationInstanceStore(tu, creator);
     }
 
     private void invokeApplication(final ApplicationInstance app, final InternalApplicationContext appCtx, final TransactionUserEvent event) {
@@ -60,11 +55,11 @@ public class ApplicationController implements Consumer<TransactionUserEvent> {
             app._ctx.set(appCtx);
             try {
                 appCtx.preInvoke(event);
-                final SipMessage message = event.message();
-                if (message.isRequest()) {
-                    app.onRequest(message.toRequest());
+                if (event.dialog().getConsumer() != null) {
+                    event.dialog().getConsumer().accept(event);
                 } else {
-                    app.onResponse(message.toResponse());
+                    final SipMessage message = event.message();
+                    app.onMessage(message);
                 }
             } catch (final Throwable t) {
                 t.printStackTrace();
@@ -76,12 +71,6 @@ public class ApplicationController implements Consumer<TransactionUserEvent> {
                 t.printStackTrace();
             }
         }
-    }
-
-    public void send(final DefaultUA ua, final SipMessage message) {
-        final Dialog dialog = transactionUserLayer.findOrCreateDialog(message);
-        dialog.setConsumer(ua);
-        dialog.send(message);
     }
 
     @Override

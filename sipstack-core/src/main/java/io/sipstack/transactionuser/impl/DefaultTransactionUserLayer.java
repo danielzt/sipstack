@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
@@ -20,11 +21,11 @@ import io.sipstack.transactionuser.TransactionUserLayer;
 public class DefaultTransactionUserLayer implements TransactionUserLayer, TransactionUser {
 
     private Transactions transactions;
+    private final Consumer<TransactionUserEvent> consumer;
     private Map<String, Dialogs> dialogs = new ConcurrentHashMap<>();
-    private final Consumer<TransactionUserEvent> defaultConsumer;
 
-    public DefaultTransactionUserLayer(final Consumer<TransactionUserEvent> defaultConsumer) {
-        this.defaultConsumer = defaultConsumer;
+    public DefaultTransactionUserLayer(final Consumer<TransactionUserEvent> consumer) {
+        this.consumer = consumer;
     }
 
     public void start(final Transactions transactionLayer) {
@@ -33,11 +34,14 @@ public class DefaultTransactionUserLayer implements TransactionUserLayer, Transa
 
     @Override
     public Dialog findOrCreateDialog(final SipMessage message) {
-        return findOrCreateDialogs(message).getDialog(message);
+        return findOrCreateDialogs(message).process(null, message);
     }
 
     private Dialogs findOrCreateDialogs(final SipMessage message) {
-        return dialogs.computeIfAbsent(getDialogKey(message), k -> new Dialogs(transactions, message, defaultConsumer));
+        return dialogs.computeIfAbsent(getDialogKey(message), k -> {
+            PreConditions.assertArgument(message.isRequest(), "Must be request");
+            return new Dialogs(transactions, message.toRequest());
+        });
     }
 
     /**
@@ -50,15 +54,17 @@ public class DefaultTransactionUserLayer implements TransactionUserLayer, Transa
     }
 
     @Override
-    public void onRequest(Transaction transaction, SipRequest request) {
+    public void onRequest(Transaction tx, SipRequest request) {
         final Dialogs dialogs = findOrCreateDialogs(request);
-        dialogs.receive(transaction, request);
+        final Dialog dialog = dialogs.process(tx, request);
+        consumer.accept(new TransactionUserEvent(dialog, tx, request));
     }
 
     @Override
-    public void onResponse(Transaction transaction, SipResponse response) {
-        final Dialogs dialog = findOrCreateDialogs(response);
-        dialog.receive(transaction, response);
+    public void onResponse(Transaction tx, SipResponse response) {
+        final Dialogs dialogs = findOrCreateDialogs(response);
+        final Dialog dialog = dialogs.process(tx, response);
+        consumer.accept(new TransactionUserEvent(dialog, tx, response));
     }
 
     @Override

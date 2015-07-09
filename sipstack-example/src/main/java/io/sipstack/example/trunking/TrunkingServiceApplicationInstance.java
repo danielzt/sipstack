@@ -17,8 +17,8 @@ import io.pkts.packet.sip.header.AddressParametersHeader;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.application.ApplicationInstance;
-import io.sipstack.transactionuser.B2BUA;
-import io.sipstack.transactionuser.UA;
+import io.sipstack.application.B2BUA;
+import io.sipstack.application.UA;
 
 public class TrunkingServiceApplicationInstance extends ApplicationInstance {
 
@@ -37,17 +37,12 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
     }
 
     @Override
-    public void onRequest(final SipRequest request) {
-        if (request.isInitial() && request.isInvite()) {
-            doInitialInvite(request);
+    public void onMessage(final SipMessage message) {
+        if (message.isRequest() && message.isInitial() && message.isInvite()) {
+            doInitialInvite(message.toRequest());
         } else {
-            super.onRequest(request);
+            super.onMessage(message);
         }
-    }
-
-    @Override
-    public void onResponse(final SipResponse response) {
-        super.onResponse(response);
     }
 
     private void doInitialInvite(final SipRequest request) {

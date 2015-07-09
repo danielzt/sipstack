@@ -3,6 +3,7 @@ package io.sipstack.transactionuser;
 import java.util.function.Consumer;
 
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
 
 /**
  * @author ajansson@twilio.com
@@ -13,7 +14,11 @@ public interface Dialog {
      */
     String id();
 
-    void setConsumer(final Consumer<TransactionUserEvent> consumer);
+    Consumer<TransactionUserEvent> getConsumer();
 
-    void send(final SipMessage message);
+    void setConsumer(Consumer<TransactionUserEvent> consumer);
+
+    void send(SipMessage message);
+
+    SipRequest.Builder createAck();
 }

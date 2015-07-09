@@ -4,7 +4,11 @@ import java.util.function.Consumer;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.address.Address;
 import io.pkts.packet.sip.address.SipURI;
+import io.pkts.packet.sip.header.ToHeader;
+import io.pkts.packet.sip.header.impl.AddressParametersHeaderImpl;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.Transactions;
@@ -13,54 +17,97 @@ import io.sipstack.transactionuser.TransactionUserEvent;
 import io.sipstack.transport.Flow;
 
 /**
+ * Implements https://tools.ietf.org/html/rfc4235#section-3.7.1
+ *
+ *     +----------+            +----------+
+ *     |          | 1xx-notag  |          |
+ *     |          |----------->|          |
+ *     |  Trying  |            |Proceeding|-----+
+ *     |          |---+  +-----|          |     |
+ *     |          |   |  |     |          |     |
+ *     +----------+   |  |     +----------+     |
+ *          |   |     |  |          |           |
+ *          |   |     |  |          |           |
+ *          +<--C-----C--+          |1xx-tag    |
+ *          |   |     |             |           |
+ * cancelled|   |     |             V           |
+ *  rejected|   |     |1xx-tag +----------+     |
+ *          |   |     +------->|          |     |2xx
+ *          |   |              |          |     |
+ *          +<--C--------------|  Early   |-----C---+ 1xx-tag
+ *          |   |   replaced   |          |     |   | w/new tag
+ *          |   |              |          |<----C---+ (new FSM
+ *          |   |              +----------+     |      instance
+ *          |   |   2xx             |           |      created)
+ *          |   +----------------+  |           |
+ *          |                    |  |2xx        |
+ *          |                    |  |           |
+ *          V                    V  V           |
+ *     +----------+            +----------+     |
+ *     |          |            |          |     |
+ *     |          |            |          |     |
+ *     |Terminated|<-----------| Confirmed|<----+
+ *     |          |  error     |          |
+ *     |          |  timeout   |          |
+ *     +----------+  replaced  +----------+
+ *                   local-bye   |      ^
+ *                   remote-bye  |      |
+ *                               |      |
+ *                               +------+
+ *                                2xx w. new tag
+ *                                 (new FSM instance
+ *                                  created)
  * @author ajansson@twilio.com
  */
+
 public class Dialogs {
+
+    private enum State {TRYING, PROCEEDING, EARLY, CONFIRMED, TERMINATED}
+
     private Transactions transactions;
-    // For now just use call-id as id
-    private final Buffer id;
+    private final SipRequest request;
     // For now just one dialog
-    private final Dialog dialog;
-    private Flow flow;
+    private final MyDialog dialog;
     private Consumer<TransactionUserEvent> consumer;
+    private Flow flow;
 
     public Dialogs(final Transactions transactions,
-            final SipMessage message, final Consumer<TransactionUserEvent> consumer) {
+            final SipRequest request) {
         this.transactions = transactions;
-        this.id = message.getCallIDHeader().getCallId();
-        this.consumer =  consumer;
+        this.request = request;
         this.dialog = new MyDialog();
     }
 
     public String id() {
-        return id.toString();
+        // For now just use call-id as id
+        return request.getCallIDHeader().getCallId().toString();
     }
 
-    public Dialog getDialog(final SipMessage message) {
+    public Dialog process(final Transaction tx, final SipMessage message) {
+        if (tx != null) {
+            this.flow = tx.flow();
+        }
+        if (message.isResponse() && message.getToHeader().getTag() != null) {
+            dialog.setToTag(message.getToHeader().getTag());
+        }
         return dialog;
     }
 
-    public void setConsumer(final Consumer<TransactionUserEvent> consumer) {
-        this.consumer = consumer;
-    }
-
-    public void receive(final Transaction transaction, final SipMessage message) {
-        this.flow = transaction.flow();
-        if (consumer != null) {
-            consumer.accept(new TransactionUserEvent(dialog, transaction, message));
-        }
-    }
-
-    public void send(final SipMessage message) {
-    }
-
     public class MyDialog implements Dialog {
+        private State state = State.TRYING;
+        private Buffer toTag;
+
         public MyDialog() {
         }
 
         @Override
         public String id() {
             return Dialogs.this.id();
+        }
+
+        @Override
+        public Consumer<TransactionUserEvent> getConsumer() {
+            return Dialogs.this.consumer;
         }
 
         public void setConsumer(final Consumer<TransactionUserEvent> consumer) {
@@ -83,6 +130,23 @@ public class Dialogs {
             } else {
                 transactions.send(flow, message);
             }
+        }
+
+        @Override
+        public SipRequest.Builder createAck() {
+            final ToHeader to = request.getToHeader().clone();
+            if (toTag != null) {
+                // TODO ugly internal class
+                to.setParameter(AddressParametersHeaderImpl.TAG, toTag);
+            }
+            return SipRequest.ack((SipURI) request.getRequestUri())
+                    .from(request.getFromHeader())
+                    .to(to)
+                    .callId(request.getCallIDHeader());
+        }
+
+        public void setToTag(final Buffer toTag) {
+            this.toTag = toTag;
         }
     }
 

@@ -1,4 +1,4 @@
-package io.sipstack.transactionuser;
+package io.sipstack.application;
 
 import java.util.function.Consumer;
 
@@ -14,6 +14,8 @@ public interface UA {
     void send(SipMessage message);
 
     void addHandler(Consumer<SipMessage> handler);
+
+    SipRequest.Builder createAck();
 
     interface Builder {
 

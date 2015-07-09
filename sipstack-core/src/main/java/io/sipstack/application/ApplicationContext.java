@@ -1,9 +1,7 @@
 package io.sipstack.application;
 
 import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.transactionuser.B2BUA;
 import io.sipstack.transactionuser.Proxy;
-import io.sipstack.transactionuser.UA;
 
 import java.util.Optional;
 

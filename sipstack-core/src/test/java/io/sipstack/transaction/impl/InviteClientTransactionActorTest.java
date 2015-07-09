@@ -78,13 +78,18 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      * Test to go Calling --> Proceeding --> Accepted for every combination
      * of provisional and success responses.
      */
-    @Test(timeout = 10000)
+    @Test(timeout = 500)
     public void testProceedingToAccepted() throws Exception {
-        for (int i = 100; i < 200; ++i) {
-            for (int j = 200; j < 300; ++j) {
-                System.out.println("Testing provisional " + i + " then final " + j);
-                final Holder holder = initiateTransition(i);
-                final SipResponse response = holder.message().createResponse(j);
+        final int[] provisional = new int[]{100, 180, 181, 182, 183, 199};
+        final int[] successful = new int[]{200, 202, 204};
+
+        for (int i = 0; i < provisional.length; ++i) {
+            for (int j = 0; j < successful.length; ++j) {
+                final int provisionalResponse = provisional[i];
+                final int successfulResponse = successful[j];
+                System.out.println("Testing provisional " + provisionalResponse + " then final " + successfulResponse);
+                final Holder holder = initiateTransition(provisionalResponse);
+                final SipResponse response = holder.message().createResponse(successfulResponse);
                 final Flow flow = Mockito.mock(Flow.class);
                 transactionLayer.onMessage(flow, response);
 

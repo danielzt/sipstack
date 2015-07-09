@@ -3,7 +3,10 @@ package io.sipstack.transaction.impl;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.address.SipURI;
+import io.pkts.packet.sip.header.CSeqHeader;
 import io.pkts.packet.sip.header.SipHeader;
+import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
@@ -111,6 +114,29 @@ public class MockTransactionUser implements TransactionUser {
     @Override
     public void onResponse(final Transaction transaction, final SipResponse response) {
         storage.store(transaction, response);
+
+        if (response.isSuccess() && response.isInvite()) {
+            final ViaHeader via = ViaHeader.with()
+                    .host("127.0.0.1")
+                    .port(5099)
+                    .transportUDP()
+                    .branch(ViaHeader.generateBranch())
+                    .build();
+
+            // of course, the request-uri of the ack should be the contact etc but
+            // we keep it simple here
+            final CSeqHeader cSeq = CSeqHeader.with().cseq(response.getCSeqHeader().getSeqNumber()).method("ACK").build();
+            final SipRequest ack = SipRequest.ack(SipURI.withHost("127.0.0.1").withPort(5090).build())
+                    .callId(response.getCallIDHeader())
+                    .from(response.getFromHeader())
+                    .to(response.getToHeader())
+                    .cseq(cSeq)
+                    .via(via).build();
+
+            final Transaction ackTransaction = transactionLayer.send(transaction.flow(), ack);
+            assertThat(ackTransaction, not((Transaction)null));
+            storage.store(ackTransaction, ack);
+        }
     }
 
     @Override

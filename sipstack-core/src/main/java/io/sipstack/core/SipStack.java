@@ -6,9 +6,8 @@ import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
-import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
-import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.TransactionEvent;
 import io.sipstack.transactionuser.TransactionUserLayer;
 import io.sipstack.transactionuser.impl.DefaultTransactionUserLayer;
 import io.sipstack.transport.TransportLayer;
@@ -52,7 +51,7 @@ public interface SipStack {
         private Clock clock;
         private InternalScheduler scheduler;
         private DefaultTransactionUserLayer transactionUserLayer;
-        private Consumer<TransactionUserEvent> consumer;
+        private Consumer<TransactionEvent> consumer;
 
         private Builder(final SipConfiguration config) {
             this.config = config;
@@ -68,7 +67,7 @@ public interface SipStack {
             return this;
         }
 
-        public Builder withConsumer(final Consumer<TransactionUserEvent> consumer) {
+        public Builder withConsumer(final Consumer<TransactionEvent> consumer) {
             this.consumer = consumer;
             return this;
         }

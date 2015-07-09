@@ -3,17 +3,17 @@ package io.sipstack.transactionuser.impl;
 import java.util.function.Consumer;
 
 import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
-import io.pkts.packet.sip.address.Address;
-import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.header.ToHeader;
 import io.pkts.packet.sip.header.impl.AddressParametersHeaderImpl;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.Transactions;
 import io.sipstack.transactionuser.Dialog;
-import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.DialogEvent;
+import io.sipstack.transactionuser.TransactionEvent;
 import io.sipstack.transport.Flow;
 
 /**
@@ -62,91 +62,139 @@ import io.sipstack.transport.Flow;
 
 public class Dialogs {
 
+    private static final String REMOTE_HOST = System.getProperty("remotehost", "127.0.0.1");
+    private static final int REMOTE_PORT = Integer.getInteger("remoteport", 5060);
+
     private enum State {TRYING, PROCEEDING, EARLY, CONFIRMED, TERMINATED}
 
-    private Transactions transactions;
+    private final Consumer<DialogEvent> upstream;
+    private final Transactions transactions;
     private final SipRequest request;
-    // For now just one dialog
-    private final MyDialog dialog;
-    private Consumer<TransactionUserEvent> consumer;
+    private final Buffer callId;
+    private final Buffer localTag;
     private Flow flow;
 
-    public Dialogs(final Transactions transactions,
-            final SipRequest request) {
+    // For now support only one dialog
+    private final MyDialog dialog = new MyDialog();
+
+    public Dialogs(final Consumer<DialogEvent> upstream, final Transactions transactions,
+            final Transaction tx, final SipRequest request, final boolean isUpstream) {
+        this.upstream = upstream;
         this.transactions = transactions;
         this.request = request;
-        this.dialog = new MyDialog();
-    }
-
-    public String id() {
-        // For now just use call-id as id
-        return request.getCallIDHeader().getCallId().toString();
-    }
-
-    public Dialog process(final Transaction tx, final SipMessage message) {
+        this.callId = request.getCallIDHeader().getCallId();
+        this.localTag = getLocalTag(request, isUpstream);
         if (tx != null) {
             this.flow = tx.flow();
         }
-        if (message.isResponse() && message.getToHeader().getTag() != null) {
-            dialog.setToTag(message.getToHeader().getTag());
-        }
+    }
+
+    /**
+     * Gets the dialog key (call id + local tag)
+     * @param message SIP message
+     * @return Dialog key.
+     */
+    public static Buffer getDialogKey(final SipMessage message, final boolean isUpstream) {
+        return Buffers.wrap(message.getCallIDHeader().getCallId(), getLocalTag(message, isUpstream));
+    }
+
+    public void dispatchUpstream(final TransactionEvent event) {
+        dialog.dispatchUpstream(event);
+    }
+
+    public Dialog getDialog(final SipMessage message) {
         return dialog;
+    }
+
+    private static Buffer getLocalTag(final SipMessage message, final boolean isUpstream) {
+        if (isUpstream) {
+            if (message.isRequest()) {
+                return message.getToHeader().getTag();
+            } else {
+                return message.getFromHeader().getTag();
+            }
+        } else {
+            if (message.isRequest()) {
+                return message.getFromHeader().getTag();
+            } else {
+                return message.getToHeader().getTag();
+            }
+        }
+    }
+
+    private static Buffer getRemoteTag(final SipMessage message, final boolean isUpstream) {
+        if (isUpstream) {
+            if (message.isRequest()) {
+                return message.getFromHeader().getTag();
+            } else {
+                return message.getToHeader().getTag();
+            }
+        } else {
+            if (message.isRequest()) {
+                return message.getToHeader().getTag();
+            } else {
+                return message.getFromHeader().getTag();
+            }
+        }
     }
 
     public class MyDialog implements Dialog {
         private State state = State.TRYING;
-        private Buffer toTag;
+        private Buffer remoteTag;
+        private Buffer id;
 
         public MyDialog() {
         }
 
         @Override
-        public String id() {
-            return Dialogs.this.id();
-        }
-
-        @Override
-        public Consumer<TransactionUserEvent> getConsumer() {
-            return Dialogs.this.consumer;
-        }
-
-        public void setConsumer(final Consumer<TransactionUserEvent> consumer) {
-            Dialogs.this.consumer = consumer;
-        }
-
-        @Override
         public void send(final SipMessage message) {
             if (flow == null) {
-                final SipURI target = (SipURI) message.toRequest().getRequestUri();
-                transactions.createFlow(target.getHost())
-                        .withPort(target.getPort())
+                transactions.createFlow(REMOTE_HOST)
+                        .withPort(REMOTE_PORT)
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             flow = f;
-                            transactions.send(f, message);
+                            final Transaction t = transactions.send(f, message);
                         })
                         .connect();
 
             } else {
-                transactions.send(flow, message);
+                final Transaction t = transactions.send(flow, message);
             }
         }
 
         @Override
         public SipRequest.Builder createAck() {
             final ToHeader to = request.getToHeader().clone();
-            if (toTag != null) {
+            if (remoteTag != null) {
                 // TODO ugly internal class
-                to.setParameter(AddressParametersHeaderImpl.TAG, toTag);
+                to.setParameter(AddressParametersHeaderImpl.TAG, remoteTag);
             }
-            return SipRequest.ack((SipURI) request.getRequestUri())
+            return SipRequest.ack(request.getRequestUri())
                     .from(request.getFromHeader())
                     .to(to)
                     .callId(request.getCallIDHeader());
         }
 
-        public void setToTag(final Buffer toTag) {
-            this.toTag = toTag;
+        @Override
+        public SipRequest.Builder createBye() {
+            final ToHeader to = request.getToHeader().clone();
+            if (remoteTag != null) {
+                // TODO ugly internal class
+                to.setParameter(AddressParametersHeaderImpl.TAG, remoteTag);
+            }
+            return SipRequest.bye(request.getRequestUri())
+                    .from(request.getFromHeader())
+                    .to(to)
+                    .callId(request.getCallIDHeader());
+        }
+
+        public void dispatchUpstream(final TransactionEvent event) {
+            final Buffer remoteTag = getRemoteTag(event.message(), true);
+            if (event.message().isResponse() && remoteTag != null) {
+                this.remoteTag = remoteTag;
+            }
+            upstream.accept(new DefaultDialogEvent(this, event));
         }
     }
 

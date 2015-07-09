@@ -18,6 +18,7 @@ import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.application.ApplicationInstance;
 import io.sipstack.application.B2BUA;
+import io.sipstack.application.SipRequestEvent;
 import io.sipstack.application.UA;
 
 public class TrunkingServiceApplicationInstance extends ApplicationInstance {
@@ -37,18 +38,19 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
     }
 
     @Override
-    public void onMessage(final SipMessage message) {
-        if (message.isRequest() && message.isInitial() && message.isInvite()) {
-            doInitialInvite(message.toRequest());
+    public void onRequest(final SipRequestEvent event) {
+        if (event.message().isInvite()) {
+            doInitialInvite(event);
         } else {
-            super.onMessage(message);
+            super.onRequest(event);
         }
     }
 
-    private void doInitialInvite(final SipRequest request) {
+    private void doInitialInvite(final SipRequestEvent event) {
+        final SipRequest request = event.message().toRequest();
         logInfo(request, "Received initial invite. Request URI: " + request.getRequestUri());
 
-        final UA uaA = uaWithFriendlyName("A").withRequest(request).build();
+        final UA uaA = uaWithFriendlyName("A").withRequest(event).build();
 
         if (request.getMaxForwards().getMaxForwards() == 0) {
             logInfo(request, "Max-Forwards header of incoming INVITE is zero. Returning 483 and killing the call.");

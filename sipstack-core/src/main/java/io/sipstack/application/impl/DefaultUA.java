@@ -13,43 +13,35 @@ import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.application.UA;
 import io.sipstack.transactionuser.Dialog;
-import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.DialogEvent;
 import io.sipstack.transactionuser.TransactionUserLayer;
 
 /**
  * @author ajansson@twilio.com
  */
-public class DefaultUA implements UA, Consumer<TransactionUserEvent> {
+public class DefaultUA implements UA, Consumer<DialogEvent> {
     private final Logger logger = LoggerFactory.getLogger(DefaultUA.class);
 
     private final TransactionUserLayer tu;
     private final String friendlyName;
     private final URI target;
     private final List<Consumer<SipMessage>> handlers = new ArrayList<>(2);
-    private final SipRequest request;
+    private final DefaultSipRequestEvent request;
     private volatile Dialog dialog;
 
-    public DefaultUA(final TransactionUserLayer tu, final String friendlyName, final SipRequest request,
+    public DefaultUA(final TransactionUserLayer tu, final String friendlyName, final DefaultSipRequestEvent request,
             final URI target) {
         this.tu = tu;
         this.friendlyName = friendlyName;
         this.request = request;
         this.target = target;
         if (request != null) {
-            assertDialog(request);
+            dialog = tu.createDialog(this, request.transaction(), request.message());
         }
-    }
-
-    public void setDialog(final Dialog dialog) {
-        this.dialog = dialog;
     }
 
     public String friendlyName() {
         return friendlyName;
-    }
-
-    public SipRequest getRequest() {
-        return request;
     }
 
     public URI getTarget() {
@@ -64,9 +56,11 @@ public class DefaultUA implements UA, Consumer<TransactionUserEvent> {
     }
 
     private Dialog assertDialog(final SipMessage message) {
+        if (dialog == null && message.isRequest()) {
+            dialog = tu.createDialog(this, message.toRequest());
+        }
         if (dialog == null) {
-            dialog = tu.findOrCreateDialog(message);
-            dialog.setConsumer(this);
+            throw new IllegalStateException("No dialog available");
         }
         return dialog;
     }
@@ -83,10 +77,16 @@ public class DefaultUA implements UA, Consumer<TransactionUserEvent> {
     }
 
     @Override
-    public void accept(final TransactionUserEvent event) {
-        final SipMessage message = event.message();
+    public SipRequest.Builder createBye() {
+        PreConditions.assertArgument(dialog != null, "No dialog created");
+        return dialog.createBye();
+    }
+
+    @Override
+    public void accept(final DialogEvent event) {
+        final SipMessage message = event.transaction().message();
         log(message, " <- ");
-        handlers.forEach(h -> h.accept(event.message()));
+        handlers.forEach(h -> h.accept(message));
     }
 
     private void log(final SipMessage message, final String direction) {
@@ -98,5 +98,9 @@ public class DefaultUA implements UA, Consumer<TransactionUserEvent> {
             sb.append(message.toResponse().getStatus());
         }
         logger.info(sb.toString());
+    }
+
+    public SipRequest getRequest() {
+        return request.message();
     }
 }

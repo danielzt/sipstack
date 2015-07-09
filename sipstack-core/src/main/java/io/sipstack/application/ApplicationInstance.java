@@ -4,7 +4,6 @@ import java.io.IOException;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
-import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipParseException;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.transactionuser.Proxy;
@@ -56,10 +55,18 @@ public abstract class ApplicationInstance {
     }
 
     /**
-     * Default message handler.
-     * @param message Message
+     * Default event handler.
+     * @param request Event
      */
-    public void onMessage(final SipMessage message) {
+    public void onRequest(final SipRequestEvent request) {
+        // do nothing by default
+    }
+
+    /**
+     * Default event handler.
+     * @param response Event
+     */
+    public void onResponse(final SipResponseEvent response) {
         // do nothing by default
     }
 }

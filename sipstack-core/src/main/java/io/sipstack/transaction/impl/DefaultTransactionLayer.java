@@ -228,6 +228,12 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
     }
 
     @Override
+    public TransactionHolder createNonInviteClientTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
+        final TransactionActor actor = new NonInviteClientTransactionActor(id, request, config);
+        return new DefaultTransactionHolder(flow, actor);
+    }
+
+    @Override
     public TransactionHolder createAckTransaction(final TransactionId id, final boolean isServer,
                                                   final Flow flow, final SipRequest request,
                                                   final TransactionLayerConfiguration config) {

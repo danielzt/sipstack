@@ -56,7 +56,7 @@ public class DefaultTransactionStore implements TransactionStore {
             if (isUpstream) {
                 return factory.createNonInviteServerTransaction(id, flow, sipMsg.toRequest(), config);
             } else {
-                throw new RuntimeException("Haven't done the NonInviteClientTransaction just yet");
+                return factory.createNonInviteClientTransaction(id, flow, sipMsg.toRequest(), config);
             }
         });
     }

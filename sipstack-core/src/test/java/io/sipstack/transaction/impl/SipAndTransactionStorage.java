@@ -126,14 +126,15 @@ public class SipAndTransactionStorage {
         synchronized (messages) {
             final Iterator<Holder> it = messages.iterator();
             int count = 0;
-            Holder holder = null;
+            Holder result = null;
             while (it.hasNext()) {
-                holder = it.next();
+                final Holder holder = it.next();
                 final SipMessage msg = holder.msg;
                 if (msg.isResponse()
                         && method.equalsIgnoreCase(msg.getMethod().toString())
                         && msg.toResponse().getStatus() == responseStatus) {
                     it.remove();
+                    result = holder;
                     ++count;
                 }
             }
@@ -144,7 +145,7 @@ public class SipAndTransactionStorage {
                 fail("Found many " + responseStatus + " response to " + method.toUpperCase() + " but didn't find one");
             }
 
-            return holder.transaction;
+            return result.transaction;
         }
     }
 
@@ -157,7 +158,7 @@ public class SipAndTransactionStorage {
      */
     public void onTransactionTerminated(final Transaction transaction) {
         assertThat(transaction, not((Transaction)null));
-        assertThat(allTransactions.remove(transaction.id()), not((Transaction)null));
+        // assertThat(allTransactions.remove(transaction.id()), not((Transaction)null));
         terminatedTransaction.put(transaction.id(), transaction);
     }
 

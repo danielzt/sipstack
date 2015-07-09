@@ -27,12 +27,24 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
     }
 
     /**
+     * Ack doesn't go in the same transaction but let's make sure it works...
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testSendAckOn200() throws Exception {
+        final Holder holder = initiateTransition(200);
+        transports.assertAndConsumeRequest("ack");
+    }
+
+    /**
      * While in the accepted state, any 2xx responses will simply be forwarded
      * up to the TU.
      *
      * @throws Exception
      */
-    @Test(timeout = 1000)
+    // @Test(timeout = 1000)
+    @Test
     public void testRetransmittedWhileInAccepted() throws Exception {
         final Holder holder = initiateTransition(200);
         reset();

@@ -30,8 +30,7 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
      *
      * @throws Exception
      */
-    // @Test(timeout = 500)
-    @Test
+    @Test(timeout = 500)
     public void testAckTo200() throws Exception {
         final Transaction transaction = transitionToAccepted(200);
 

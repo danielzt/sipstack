@@ -121,6 +121,10 @@ public class NonInviteClientTransactionActor extends ActorSupport<Event, Transac
         onEnter(TransactionState.TRYING, this::onEnterTrying);
         onExit(TransactionState.TRYING, this::onExitTrying);
 
+        when(TransactionState.PROCEEDING, this::onProceeding);
+        onEnter(TransactionState.PROCEEDING, this::onEnterProceeding);
+        onExit(TransactionState.PROCEEDING, this::onExitProceeding);
+
         // Note: not onExit needed for completed because
         // we have nothing to do.
         when(TransactionState.COMPLETED, this::onCompleted);
@@ -171,6 +175,33 @@ public class NonInviteClientTransactionActor extends ActorSupport<Event, Transac
         timerF.cancel();
     };
 
+    private void onProceeding(final Event event) {
+        if (event.isSipResponseEvent()) {
+            ctx().forwardUpstream(event);
+            final SipResponse response = event.response();
+            if (response.isFinal()) {
+                become(TransactionState.COMPLETED);
+            }
+        } else if (event.isSipTimerE()) {
+            ++timerECount;
+            timerE = scheduleTimer(SipTimer.E, calculateNextTimerE());
+            retransmitOriginalRequest();
+        } else if (event.isSipTimerF()) {
+            become(TransactionState.TERMINATED);
+        }
+    }
+
+    private void onEnterProceeding(final Event event) {
+        timerECount = 0;
+        timerE = scheduleTimer(SipTimer.E, calculateNextTimerE());
+        timerF = scheduleTimer(SipTimer.F, timersConfig.getTimerF());
+    }
+
+    private void onExitProceeding(final Event event) {
+        timerE.cancel();
+        timerF.cancel();
+    }
+
     /**
      * Nothing really to do in the completed state. Any responses that
      * gets re-transmitted should just be consumed and the easiest way to
@@ -192,7 +223,6 @@ public class NonInviteClientTransactionActor extends ActorSupport<Event, Transac
         if (event.isSipTimerK()) {
             become(TransactionState.TERMINATED);
         }
-
     }
 
     private void onEnterCompleted(final Event event) {

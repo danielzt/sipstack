@@ -5,19 +5,20 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.pkts.packet.sip.SipMessage;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.application.impl.DefaultApplicationInstanceStore;
+import io.sipstack.application.impl.DefaultSipRequestEvent;
+import io.sipstack.application.impl.DefaultSipResponseEvent;
 import io.sipstack.application.impl.InternalApplicationContext;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
-import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.TransactionEvent;
 import io.sipstack.transactionuser.TransactionUserLayer;
 
 /**
  * @author jonas@jonasborjesson.com
  */
-public class ApplicationController implements Consumer<TransactionUserEvent> {
+public class ApplicationController implements Consumer<TransactionEvent> {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
@@ -41,7 +42,7 @@ public class ApplicationController implements Consumer<TransactionUserEvent> {
         applicationStore = new DefaultApplicationInstanceStore(tu, creator);
     }
 
-    private void invokeApplication(final ApplicationInstance app, final InternalApplicationContext appCtx, final TransactionUserEvent event) {
+    private void invokeApplication(final ApplicationInstance app, final InternalApplicationContext appCtx, final TransactionEvent tx) {
 
         // Note that it is utterly important that the lock
         // for both the io.sipstack.application.application and the io.sipstack.application.application context
@@ -54,12 +55,11 @@ public class ApplicationController implements Consumer<TransactionUserEvent> {
         synchronized(appCtx) {
             app._ctx.set(appCtx);
             try {
-                appCtx.preInvoke(event);
-                if (event.dialog().getConsumer() != null) {
-                    event.dialog().getConsumer().accept(event);
+                appCtx.preInvoke(tx);
+                if (tx.message().isRequest()) {
+                    app.onRequest(new DefaultSipRequestEvent(tx.transaction(), tx.message().toRequest()));
                 } else {
-                    final SipMessage message = event.message();
-                    app.onMessage(message);
+                    app.onResponse(new DefaultSipResponseEvent(tx.transaction(), tx.message().toResponse()));
                 }
             } catch (final Throwable t) {
                 t.printStackTrace();
@@ -74,7 +74,7 @@ public class ApplicationController implements Consumer<TransactionUserEvent> {
     }
 
     @Override
-    public void accept(final TransactionUserEvent event) {
+    public void accept(final TransactionEvent event) {
         final ApplicationInstance app = applicationStore.ensureApplication(event.message());
         final InternalApplicationContext appContext = applicationStore.ensureApplicationContext(app.id());
         invokeApplication(app, appContext, event);

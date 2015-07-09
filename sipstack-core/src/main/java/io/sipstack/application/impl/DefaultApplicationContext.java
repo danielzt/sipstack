@@ -1,7 +1,6 @@
 package io.sipstack.application.impl;
 
 import io.pkts.buffer.Buffer;
-import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.address.Address;
 import io.pkts.packet.sip.address.SipURI;
@@ -10,6 +9,8 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.application.ApplicationController;
 import io.sipstack.application.B2BUA;
+import io.sipstack.application.SipEvent;
+import io.sipstack.application.SipRequestEvent;
 import io.sipstack.application.UA;
 import io.sipstack.event.Event;
 import io.sipstack.transactionuser.DefaultProxy;
@@ -17,7 +18,7 @@ import io.sipstack.transactionuser.DefaultProxyBranch;
 import io.sipstack.transactionuser.Dialog;
 import io.sipstack.transactionuser.Proxy;
 import io.sipstack.transactionuser.ProxyBranch;
-import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.TransactionEvent;
 import io.sipstack.transactionuser.TransactionUserLayer;
 
 import java.util.ArrayList;
@@ -27,8 +28,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-
-import javax.validation.constraints.AssertTrue;
 
 /**
  * NOTE: everything within this class ASSUMES that while invoked the invoker, which
@@ -55,7 +54,7 @@ public class DefaultApplicationContext implements InternalApplicationContext {
     private Map<String, DefaultUA> uaStore;
     private Map<String, DefaultB2BUA> b2buaStore;
 
-    private TransactionUserEvent currentEvent;
+    private TransactionEvent currentEvent;
 
     private final TransactionUserLayer tu;
 
@@ -156,7 +155,7 @@ public class DefaultApplicationContext implements InternalApplicationContext {
     }
 
     @Override
-    public void preInvoke(final TransactionUserEvent event) {
+    public void preInvoke(final TransactionEvent event) {
         this.currentEvent = event;
     }
 
@@ -280,7 +279,7 @@ public class DefaultApplicationContext implements InternalApplicationContext {
 
         private final String friendlyName;
         private URI target;
-        private SipRequest request;
+        private DefaultSipRequestEvent request;
 
         private UABuilder(final String friendlyName) {
             this.friendlyName = friendlyName;
@@ -293,8 +292,8 @@ public class DefaultApplicationContext implements InternalApplicationContext {
         }
 
         @Override
-        public UA.Builder withRequest(final SipRequest request) {
-            this.request = request;
+        public UA.Builder withRequest(final SipRequestEvent request) {
+            this.request = (DefaultSipRequestEvent) request;
             return this;
         }
 
@@ -304,9 +303,6 @@ public class DefaultApplicationContext implements InternalApplicationContext {
 //            PreConditions.assertArgument(request == null && target != null, "Must not set both request and target");
 
             final DefaultUA ua = new DefaultUA(tu, friendlyName, request, target);
-            if (request == currentEvent.message()) {
-                currentEvent.dialog().setConsumer(ua);
-            }
             registerUA(ua);
             return ua;
         }

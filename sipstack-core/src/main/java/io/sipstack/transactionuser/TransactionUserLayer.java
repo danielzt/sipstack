@@ -1,11 +1,14 @@
 package io.sipstack.transactionuser;
 
-import io.pkts.packet.sip.SipMessage;
+import java.util.function.Consumer;
+
+import io.pkts.packet.sip.SipRequest;
+import io.sipstack.transaction.Transaction;
 
 /**
  * @author jonas@jonasborjesson.com
  */
 public interface TransactionUserLayer {
-
-    Dialog findOrCreateDialog(SipMessage message);
+    Dialog createDialog(Consumer<DialogEvent> consumer, Transaction tx, SipRequest request);
+    Dialog createDialog(Consumer<DialogEvent> consumer, SipRequest request);
 }

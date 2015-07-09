@@ -1,9 +1,10 @@
 package io.sipstack.example.application;
 
 import io.pkts.buffer.Buffer;
-import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.application.ApplicationInstance;
+import io.sipstack.application.SipEvent;
+import io.sipstack.application.SipRequestEvent;
 import io.sipstack.event.Event;
 import io.sipstack.transactionuser.Proxy;
 import io.sipstack.transactionuser.ProxyBranch;
@@ -18,7 +19,7 @@ public class MyApplicationInstance extends ApplicationInstance {
     }
 
     @Override
-    public void onMessage(final SipMessage message) {
+    public void onRequest(final SipRequestEvent request) {
 
         System.err.println("yeah! My application instance got the request!");
         final SipURI to = SipURI.withUser("hello").withHost("127.0.0.1").withPort(5090).build();

@@ -17,11 +17,13 @@ public interface UA {
 
     SipRequest.Builder createAck();
 
+    SipRequest.Builder createBye();
+
     interface Builder {
 
         Builder withTarget(URI target);
 
-        Builder withRequest(SipRequest request);
+        Builder withRequest(SipRequestEvent event);
 
         UA build();
     }

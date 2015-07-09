@@ -1,10 +1,15 @@
 package io.sipstack.application.impl;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
+import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
@@ -16,11 +21,29 @@ import io.sipstack.application.B2BUA;
  */
 public class DefaultB2BUA implements B2BUA {
 
+    private static final String LOCAL_HOST = System.getProperty("localhost", "127.0.0.1");
+
+    private static final Set<Buffer> COPY_HEADERS = new HashSet<>();
+    static {
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-Orig-Call-ID"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-Media-Features"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-Zone"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-AccountSid"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-ProviderSid"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-PhoneNumberSid"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-ApiVersion"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-OutboundMediaSecurity"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-TrunkSid"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-Original-Request-URI"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-CallSid"));
+    }
+
     private final String friendlyName;
     private final DefaultUA uaA;
     private final DefaultUA uaB;
     private final List<RequestHandler> requestHandlers = new ArrayList<>();
     private final List<ResponseHandler> responseHandlers = new ArrayList<>();
+    private SipRequest byeRequest;
 
     public DefaultB2BUA(final String friendlyName, final DefaultUA uaA, final DefaultUA uaB) {
         this.friendlyName = friendlyName;
@@ -75,11 +98,13 @@ public class DefaultB2BUA implements B2BUA {
                     .to(request.getToHeader())
                     .contact(request.getContactHeader());
 
+            COPY_HEADERS.forEach(name -> request.getHeader(name).ifPresent(builder::header));
+
             requestHandlers.forEach(h -> h.accept(request, builder));
 
             final SipRequest requestB = builder.build();
             final ViaHeader via = ViaHeader.with()
-                    .host("127.0.0.1")
+                    .host(LOCAL_HOST)
                     .port(5060)
                     .transportUDP()
                     .branch(ViaHeader.generateBranch())
@@ -93,7 +118,7 @@ public class DefaultB2BUA implements B2BUA {
 
             final SipRequest requestB = builder.build();
             final ViaHeader via = ViaHeader.with()
-                    .host("127.0.0.1")
+                    .host(LOCAL_HOST)
                     .port(5060)
                     .transportUDP()
                     .branch(ViaHeader.generateBranch())
@@ -101,6 +126,22 @@ public class DefaultB2BUA implements B2BUA {
             requestB.addHeaderFirst(via);
             target.send(requestB);
         } else if (request.isBye()) {
+            // TODO ugly correlation
+            byeRequest = request;
+
+            final SipRequest.Builder builder = target.createBye();
+
+            requestHandlers.forEach(h -> h.accept(request, builder));
+
+            final SipRequest requestB = builder.build();
+            final ViaHeader via = ViaHeader.with()
+                    .host(LOCAL_HOST)
+                    .port(5060)
+                    .transportUDP()
+                    .branch(ViaHeader.generateBranch())
+                    .build();
+            requestB.addHeaderFirst(via);
+            target.send(requestB);
 
         } else {
             throw new RuntimeException("TODO");
@@ -108,7 +149,8 @@ public class DefaultB2BUA implements B2BUA {
     }
 
     private void processResponse(final DefaultUA target, final SipResponse response) {
-        final SipResponse builder = target.getRequest().createResponse(response.getStatus());
+        final SipRequest linkedRequest = response.isInvite() ? target.getRequest() : byeRequest;
+        final SipResponse builder = linkedRequest.createResponse(response.getStatus());
 
         responseHandlers.forEach(h -> h.accept(response, builder));
 

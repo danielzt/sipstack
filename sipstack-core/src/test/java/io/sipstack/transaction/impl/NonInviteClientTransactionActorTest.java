@@ -93,6 +93,87 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     }
 
     /**
+     * Ensure we can go the path Trying -> Proceeding -> Completed
+     *
+     * @throws Exception
+     */
+    @Test(timeout = 500)
+    public void testTransitionToCompletedFromProceeding() throws Exception {
+        // TODO: test all combinations of provisional and all known SIP methods
+        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+    }
+
+    /**
+     * Test the full transition between:
+     * Trying -> Proceeding -> Completed -> Terminated
+     *
+     * @throws Exception
+     */
+    @Test(timeout = 500)
+    public void testTransitionTryingProceedingCompletedTerminated() throws Exception {
+        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        final SipRequest request = holder.message().toRequest();
+        final SipResponse response = request.createResponse(200);
+        transactionLayer.onMessage(mock(Flow.class), response);
+        myApplication.assertAndConsumeResponse("bye", 200);
+
+        // should now be in completed so timer K should have been
+        // scheduled
+        assertTimerScheduled(SipTimer.K);
+
+        // fire timer K which then takes us to terminated
+        defaultScheduler.fire(SipTimer.K);
+        myApplication.ensureTransactionTerminated(holder.transaction().id());
+    }
+
+    /**
+     * While in proceeding, any provisional responses should be passed to the TU
+     * and that's it...
+     */
+    @Test(timeout = 500)
+    public void test1xxResponsesWhileInProceedingState() throws Exception {
+        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        final SipRequest request = holder.message().toRequest();
+        final SipResponse response = request.createResponse(180);
+        transactionLayer.onMessage(mock(Flow.class), response);
+        myApplication.assertAndConsumeResponse("bye", 180);
+    }
+
+    /**
+     * Timer E will always control re-transmission so ensure this is true in
+     * the proceeding state as well.
+     *
+     * @throws Exception
+     */
+    @Test(timeout = 500)
+    public void testTimerEWhileInProceedingState() throws Exception {
+        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        defaultScheduler.fire(SipTimer.E);
+
+        transports.assertRequest("bye");
+
+        // timer E should have been re-scheduled.
+        assertTimerScheduled(SipTimer.E);
+    }
+
+    /**
+     * Timer F will always take us over to the terminated state no matter
+     * which state we are in. In this case, we are in proceeding so ensure
+     * that we will transition over to the TERMINATED state.
+     *
+     * @throws Exception
+     */
+    @Test(timeout = 500)
+    public void testTimerFWhileInProceedingState() throws Exception {
+        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        defaultScheduler.fire(SipTimer.F);
+        assertTimerCancelled(SipTimer.E);
+        myApplication.ensureTransactionTerminated(holder.transaction().id());
+    }
+
+
+
+    /**
      * Helper method to transition Trying -> Completed.
      *
      * @param responseCode
@@ -111,6 +192,25 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
 
         assertTimerScheduled(SipTimer.K);
         return holder;
+    }
+
+    /**
+     * Helper method to transition Trying -> Proceeding
+     */
+    private Holder transitionFromTryingToProceeding(final String method, final int responseStatus) throws Exception {
+        // ensure no one is using this method wrong
+        assertThat("Only provisional responses pls!", responseStatus / 100 == 1, is(true));
+
+        final Holder holder = initiateNewTransaction(method);
+        final SipRequest request = holder.message().toRequest();
+        final SipResponse response = request.createResponse(responseStatus);
+        transactionLayer.onMessage(mock(Flow.class), response);
+        myApplication.assertAndConsumeResponse(method, responseStatus);
+
+        assertTimerScheduled(SipTimer.E);
+        assertTimerScheduled(SipTimer.F);
+        return holder;
+
     }
 
     /**

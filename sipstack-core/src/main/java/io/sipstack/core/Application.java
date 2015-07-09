@@ -154,7 +154,7 @@ public abstract class Application<T extends Configuration> {
             final SipStack stack = SipStack.withConfiguration(sipConfig)
                     .withClock(clock)
                     .withScheduler(scheduler)
-                    .withTransactionUser(controller)
+                    .withConsumer(controller)
                     .build();
             networkBuilder.withHandler(stack.handler());
 
@@ -162,6 +162,8 @@ public abstract class Application<T extends Configuration> {
             server.start();
 
             stack.useNetworkLayer(server);
+
+            controller.start(stack.getTransactionUserLayer());
 
             // will wait until server shuts down again.
             server.sync();

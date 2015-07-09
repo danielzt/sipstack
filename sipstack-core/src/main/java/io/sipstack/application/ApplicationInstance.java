@@ -1,16 +1,13 @@
 package io.sipstack.application;
 
+import java.io.IOException;
+
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
+import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipParseException;
-import io.pkts.packet.sip.SipRequest;
-import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.transactionuser.B2BUA;
 import io.sipstack.transactionuser.Proxy;
-import io.sipstack.transactionuser.UA;
-
-import java.io.IOException;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -58,12 +55,11 @@ public abstract class ApplicationInstance {
         return ctx().proxyWithFriendlyName(friendlyName);
     }
 
-    public void onRequest(final SipRequest request) {
+    /**
+     * Default message handler.
+     * @param message Message
+     */
+    public void onMessage(final SipMessage message) {
         // do nothing by default
     }
-
-    public void onResponse(final SipResponse response) {
-        // do nothing by default
-    }
-
 }

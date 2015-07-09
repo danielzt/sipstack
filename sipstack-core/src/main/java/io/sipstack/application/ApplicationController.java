@@ -1,27 +1,23 @@
 package io.sipstack.application;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPromise;
-import io.pkts.packet.sip.SipMessage;
-import io.pkts.packet.sip.SipRequest;
-import io.pkts.packet.sip.SipResponse;
-import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.actor.InternalScheduler;
-import io.sipstack.event.Event;
-import io.sipstack.netty.codec.sip.Clock;
-import io.sipstack.net.InboundOutboundHandlerAdapter;
-import io.sipstack.netty.codec.sip.Transport;
-import io.sipstack.transaction.Transaction;
-import io.sipstack.transaction.TransactionUser;
-import io.sipstack.transaction.Transactions;
-import io.sipstack.transaction.impl.DefaultTransactionLayer;
+import java.util.function.Consumer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.pkts.packet.sip.SipMessage;
+import io.sipstack.actor.InternalScheduler;
+import io.sipstack.application.impl.DefaultApplicationInstanceStore;
+import io.sipstack.application.impl.InternalApplicationContext;
+import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
+import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.TransactionUserLayer;
 
 /**
  * @author jonas@jonasborjesson.com
  */
-public class ApplicationController extends InboundOutboundHandlerAdapter implements TransactionUser {
+public class ApplicationController implements Consumer<TransactionUserEvent> {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
@@ -29,51 +25,23 @@ public class ApplicationController extends InboundOutboundHandlerAdapter impleme
 
     private final Clock clock;
 
-    private final ApplicationInstanceCreator appCreator;
+    private final ApplicationInstanceCreator creator;
 
-    private final ApplicationInstanceStore applicationStore;
+    private TransactionUserLayer tu;
 
-    private Transactions transactionLayer;
+    private ApplicationInstanceStore applicationStore;
 
     public ApplicationController(final Clock clock, final InternalScheduler scheduler, final ApplicationInstanceCreator creator) {
         this.clock = clock;
         this.scheduler = scheduler;
-        this.appCreator = creator;
-        applicationStore = new DefaultApplicationInstanceStore(this, creator);
+        this.creator = creator;
     }
 
-    /**
-     * We only expect {@link SipMessageEvent}s here since there will always be a
-     * decoder in-front of this one.
-     */
-    @Override
-    public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
-        processEvent(ctx, msg);
+    public void start(final TransactionUserLayer tu) {
+        applicationStore = new DefaultApplicationInstanceStore(tu, creator);
     }
 
-    /**
-     * From ChannelOutboundHandler
-     */
-    @Override
-    public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
-        processEvent(ctx, msg);
-    }
-
-    private void processEvent(final ChannelHandlerContext ctx, final Object msg) {
-        try {
-            final Event event = (Event)msg;
-            // TODO: has changed now
-            final SipMessage sipMsg = event.toSipRequestEvent().request();
-            final ApplicationInstance app = applicationStore.ensureApplication(sipMsg);
-            final InternalApplicationContext appContext = applicationStore.ensureApplicationContext(app.id());
-            invokeApplication(app, appContext, sipMsg);
-        } catch (final ClassCastException e) {
-            // strange...
-            logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
-        }
-    }
-
-    private void invokeApplication(final ApplicationInstance app, final InternalApplicationContext appCtx, final SipMessage message) {
+    private void invokeApplication(final ApplicationInstance app, final InternalApplicationContext appCtx, final TransactionUserEvent event) {
 
         // Note that it is utterly important that the lock
         // for both the io.sipstack.application.application and the io.sipstack.application.application context
@@ -86,11 +54,12 @@ public class ApplicationController extends InboundOutboundHandlerAdapter impleme
         synchronized(appCtx) {
             app._ctx.set(appCtx);
             try {
-                appCtx.preInvoke(message);
-                if (message.isRequest()) {
-                    app.onRequest(message.toRequest());
+                appCtx.preInvoke(event);
+                if (event.dialog().getConsumer() != null) {
+                    event.dialog().getConsumer().accept(event);
                 } else {
-                    app.onResponse(message.toResponse());
+                    final SipMessage message = event.message();
+                    app.onMessage(message);
                 }
             } catch (final Throwable t) {
                 t.printStackTrace();
@@ -105,40 +74,9 @@ public class ApplicationController extends InboundOutboundHandlerAdapter impleme
     }
 
     @Override
-    public void init(final Transactions transactionLayer) {
-        this.transactionLayer = transactionLayer;
-    }
-
-    @Override
-    public void onRequest(final Transaction transaction, final SipRequest request) {
-        final ApplicationInstance app = applicationStore.ensureApplication(request);
+    public void accept(final TransactionUserEvent event) {
+        final ApplicationInstance app = applicationStore.ensureApplication(event.message());
         final InternalApplicationContext appContext = applicationStore.ensureApplicationContext(app.id());
-        invokeApplication(app, appContext, request);
-    }
-
-    @Override
-    public void onResponse(final Transaction transaction, final SipResponse response) {
-        final ApplicationInstance app = applicationStore.ensureApplication(response);
-        final InternalApplicationContext appContext = applicationStore.ensureApplicationContext(app.id());
-        invokeApplication(app, appContext, response);
-    }
-
-    @Override
-    public void onTransactionTerminated(final Transaction transaction) {
-        // TODO
-    }
-
-    @Override
-    public void onIOException(final Transaction transaction, final SipMessage msg) {
-        // TODO
-    }
-
-    public void send(final SipMessage message) {
-        final SipURI target = (SipURI) message.toRequest().getRequestUri();
-        transactionLayer.createFlow(target.getHost())
-                .withPort(target.getPort())
-                .withTransport(Transport.udp)
-                .onSuccess(f -> transactionLayer.send(f, message))
-                .connect();
+        invokeApplication(app, appContext, event);
     }
 }

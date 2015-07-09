@@ -82,7 +82,7 @@ public class MockTransactionUser implements TransactionUser {
     }
 
     @Override
-    public void init(final Transactions transactionLayer) {
+    public void start(final Transactions transactionLayer) {
         this.transactionLayer = transactionLayer;
     }
 

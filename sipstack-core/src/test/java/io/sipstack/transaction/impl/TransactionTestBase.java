@@ -46,7 +46,7 @@ public class TransactionTestBase extends SipStackTestBase {
         transactionLayer = new DefaultTransactionLayer(clock, defaultScheduler, myApplication, config);
         transactionLayer.start(transports);
 
-        myApplication.init(transactionLayer);
+        myApplication.start(transactionLayer);
     }
 
     public void reset() {

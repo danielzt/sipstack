@@ -14,7 +14,7 @@ import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.Transactions;
-import io.sipstack.transactionuser.DefaultTransactionUser;
+import io.sipstack.transactionuser.TransactionUserLayer;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportUser;
 import io.sipstack.transport.Transports;
@@ -38,7 +38,7 @@ public class DefaultTransactionLayer implements TransportUser, Transactions, Tra
 
     /**
      * All {@link Transaction}s will forward all their events to a particular
-     * {@link TransactionUser}, which by default is the {@link DefaultTransactionUser}.
+     * {@link TransactionUser}, which by default is the {@link TransactionUserLayer}.
      */
     private TransactionUser defaultTransactionListener;
 

@@ -1,4 +1,4 @@
-package io.sipstack.application;
+package io.sipstack.application.impl;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
@@ -8,15 +8,17 @@ import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.pkts.packet.sip.impl.PreConditions;
+import io.sipstack.application.ApplicationController;
+import io.sipstack.application.B2BUA;
+import io.sipstack.application.UA;
 import io.sipstack.event.Event;
-import io.sipstack.transactionuser.B2BUA;
-import io.sipstack.transactionuser.DefaultB2BUA;
 import io.sipstack.transactionuser.DefaultProxy;
 import io.sipstack.transactionuser.DefaultProxyBranch;
-import io.sipstack.transactionuser.DefaultUA;
+import io.sipstack.transactionuser.Dialog;
 import io.sipstack.transactionuser.Proxy;
 import io.sipstack.transactionuser.ProxyBranch;
-import io.sipstack.transactionuser.UA;
+import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.TransactionUserLayer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +27,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+
+import javax.validation.constraints.AssertTrue;
 
 /**
  * NOTE: everything within this class ASSUMES that while invoked the invoker, which
@@ -51,12 +55,12 @@ public class DefaultApplicationContext implements InternalApplicationContext {
     private Map<String, DefaultUA> uaStore;
     private Map<String, DefaultB2BUA> b2buaStore;
 
-    private SipMessage currentMessage;
+    private TransactionUserEvent currentEvent;
 
-    private final ApplicationController parent;
+    private final TransactionUserLayer tu;
 
-    public DefaultApplicationContext(final ApplicationController parent) {
-        this.parent = parent;
+    public DefaultApplicationContext(final TransactionUserLayer tu) {
+        this.tu = tu;
     }
 
     @Override
@@ -70,7 +74,7 @@ public class DefaultApplicationContext implements InternalApplicationContext {
             throw new IllegalArgumentException(String.format("A proxy with name {} already exists", friendlyName));
         }
 
-        return new ProxyBuilder(friendlyName, currentMessage.toRequest());
+        return new ProxyBuilder(friendlyName, currentEvent.message().toRequest());
     }
 
     @Override
@@ -152,8 +156,8 @@ public class DefaultApplicationContext implements InternalApplicationContext {
     }
 
     @Override
-    public void preInvoke(final SipMessage message) {
-        this.currentMessage = message;
+    public void preInvoke(final TransactionUserEvent event) {
+        this.currentEvent = event;
     }
 
     /**
@@ -166,13 +170,9 @@ public class DefaultApplicationContext implements InternalApplicationContext {
 
         // start any proxy objects that hasn't been started yet
         if (proxies != null) {
-            proxies.values().stream().forEach(DefaultProxy::actuallyStart);
+            proxies.values().forEach(DefaultProxy::actuallyStart);
         }
 
-    }
-
-    public void send(final SipMessage message) {
-        parent.send(message);
     }
 
     private class ProxyBranchBuilder implements ProxyBranch.Builder {
@@ -300,7 +300,13 @@ public class DefaultApplicationContext implements InternalApplicationContext {
 
         @Override
         public UA build() {
-            final DefaultUA ua = new DefaultUA(DefaultApplicationContext.this, friendlyName, request, target);
+//            PreConditions.assertArgument(request != null && target == null, "Must set request or target");
+//            PreConditions.assertArgument(request == null && target != null, "Must not set both request and target");
+
+            final DefaultUA ua = new DefaultUA(tu, friendlyName, request, target);
+            if (request == currentEvent.message()) {
+                currentEvent.dialog().setConsumer(ua);
+            }
             registerUA(ua);
             return ua;
         }

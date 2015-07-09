@@ -17,16 +17,10 @@ import io.pkts.packet.sip.header.AddressParametersHeader;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.SipHeader;
 import io.sipstack.application.ApplicationInstance;
-import io.sipstack.transactionuser.B2BUA;
-import io.sipstack.transactionuser.UA;
+import io.sipstack.application.B2BUA;
+import io.sipstack.application.UA;
 
 public class TrunkingServiceApplicationInstance extends ApplicationInstance {
-
-    /**
-     * The attribute name under which we will store the original request that
-     * initiated this transaction.
-     */
-    public static final String ORIGINAL_REQ = "original_req";
 
     private static final Logger logger = LoggerFactory.getLogger(TrunkingServiceApplicationInstance.class);
 
@@ -43,17 +37,12 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
     }
 
     @Override
-    public void onRequest(final SipRequest request) {
-        if (request.isInitial() && request.isInvite()) {
-            doInitialInvite(request);
+    public void onMessage(final SipMessage message) {
+        if (message.isRequest() && message.isInitial() && message.isInvite()) {
+            doInitialInvite(message.toRequest());
         } else {
-            super.onRequest(request);
+            super.onMessage(message);
         }
-    }
-
-    @Override
-    public void onResponse(final SipResponse response) {
-        super.onResponse(response);
     }
 
     private void doInitialInvite(final SipRequest request) {
@@ -70,7 +59,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         final UA uaB = uaWithFriendlyName("B").withTarget(request.getRequestUri()).build();
         final B2BUA b2b = b2buaWithFriendlyName("b2bua").withA(uaA).withB(uaB).build();
 
-        b2b.onRequest().filter(SipRequest::isInitial).doProcess(this::onInitialRequest);
+        b2b.onRequest().filter(r -> r.isInitial() && r.isInvite()).doProcess(this::onInitialInvite);
         b2b.onRequest().filter(SipRequest::isCancel).doProcess(this::onCancelRequest);
         b2b.onRequest().filter(SipRequest::isBye).doProcess(this::onByeRequest);
 
@@ -83,7 +72,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         b2b.start();
     }
 
-    private void onInitialRequest(final B2BUA b2bua, final SipRequest request, final SipRequest.Builder builder) {
+    private void onInitialInvite(final B2BUA b2bua, final SipRequest request, final SipRequest.Builder builder) {
 
         try {
             request.getHeader(TwilioHeaders.X_TWILIO_ACCOUNT_SID_HEADER).ifPresent(callLog::setAccountSid);

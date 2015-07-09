@@ -8,15 +8,21 @@ import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.transaction.TransactionUser;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
-import io.sipstack.transactionuser.DefaultTransactionUser;
+import io.sipstack.transactionuser.TransactionUserEvent;
+import io.sipstack.transactionuser.TransactionUserLayer;
+import io.sipstack.transactionuser.impl.DefaultTransactionUserLayer;
 import io.sipstack.transport.TransportLayer;
 
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
+
+import java.util.function.Consumer;
 
 /**
  * @author jonas@jonasborjesson.com
  */
 public interface SipStack {
+
+    TransactionUserLayer getTransactionUserLayer();
 
     /**
      * Get the handler, which is the entry way into the stack.
@@ -45,7 +51,8 @@ public interface SipStack {
         private final SipConfiguration config;
         private Clock clock;
         private InternalScheduler scheduler;
-        private TransactionUser transactionUser;
+        private DefaultTransactionUserLayer transactionUserLayer;
+        private Consumer<TransactionUserEvent> consumer;
 
         private Builder(final SipConfiguration config) {
             this.config = config;
@@ -61,8 +68,8 @@ public interface SipStack {
             return this;
         }
 
-        public Builder withTransactionUser(final TransactionUser transactionUser) {
-            this.transactionUser = transactionUser;
+        public Builder withConsumer(final Consumer<TransactionUserEvent> consumer) {
+            this.consumer = consumer;
             return this;
         }
 
@@ -70,17 +77,16 @@ public interface SipStack {
             ensureNotNull(scheduler, "You must specify the scheduler");
             final Clock clock = this.clock != null ? this.clock : new SystemClock();
 
-            if (this.transactionUser == null) {
-                this.transactionUser = new DefaultTransactionUser();
-            }
+            this.transactionUserLayer = new DefaultTransactionUserLayer(consumer);
 
-            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler, transactionUser, config.getTransaction());
-            transactionUser.init(transaction);
+            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler,
+                    transactionUserLayer, config.getTransaction());
+            transactionUserLayer.start(transaction);
 
             final TransportLayer transport = new TransportLayer(config.getTransport(), transaction);
             transaction.start(transport);
 
-            return new DefaultSipStack(transport, transaction, transactionUser);
+            return new DefaultSipStack(transport, transaction, transactionUserLayer);
         }
     }
 }

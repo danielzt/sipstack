@@ -1,6 +1,10 @@
-package io.sipstack.application;
+package io.sipstack.application.impl;
 
 import io.pkts.packet.sip.SipMessage;
+import io.sipstack.application.ApplicationContext;
+import io.sipstack.application.ApplicationController;
+import io.sipstack.transactionuser.Dialog;
+import io.sipstack.transactionuser.TransactionUserEvent;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -11,9 +15,9 @@ public interface InternalApplicationContext extends ApplicationContext {
      * Will be called by the io.sipstack.application.application controller ({@link ApplicationController}) before
      * the actual io.sipstack.application.application is invoked.
      *
-     * @param message
+     * @param event
      */
-    void preInvoke(SipMessage message);
+    void preInvoke(TransactionUserEvent event);
 
     /**
      * Will be called by the io.sipstack.application.application controller after the actual

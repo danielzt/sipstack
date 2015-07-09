@@ -2,6 +2,7 @@ package io.sipstack.application;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
+import io.sipstack.application.impl.InternalApplicationContext;
 
 /**
  * @author jonas@jonasborjesson.com

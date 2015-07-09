@@ -24,6 +24,12 @@ public interface TransactionFactory {
                                                        Flow flow,
                                                        SipRequest request,
                                                        TransactionLayerConfiguration config);
+
+    TransactionHolder createNonInviteClientTransaction(TransactionId id,
+                                                       Flow flow,
+                                                       SipRequest request,
+                                                       TransactionLayerConfiguration config);
+
     TransactionHolder createAckTransaction(TransactionId id,
                                            boolean isServer,
                                            Flow flow,

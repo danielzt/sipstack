@@ -4,6 +4,7 @@ import java.util.function.Consumer;
 
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.address.URI;
 
 /**
@@ -11,7 +12,9 @@ import io.pkts.packet.sip.address.URI;
  */
 public interface UA {
 
-    void send(SipMessage message);
+    void send(SipRequest.Builder message);
+
+    void send(SipResponse message);
 
     void addHandler(Consumer<SipMessage> handler);
 

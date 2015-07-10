@@ -12,18 +12,14 @@ import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
-import io.pkts.packet.sip.header.CSeqHeader;
 import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.SipHeader;
-import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.application.B2BUA;
 
 /**
  * @author ajansson@twilio.com
  */
 public class DefaultB2BUA implements B2BUA {
-
-    private static final String LOCAL_HOST = System.getProperty("localhost", "127.0.0.1");
 
     private static final Set<Buffer> COPY_HEADERS = new HashSet<>();
     static {
@@ -103,9 +99,7 @@ public class DefaultB2BUA implements B2BUA {
         if (request.isInvite()) {
             final SipRequest.Builder builder = SipRequest.invite(target.getTarget())
                     .from(request.getFromHeader())
-                    .to(request.getToHeader())
-                    .contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build())
-                    .cseq(CSeqHeader.with().cseq(1).method("INVITE").build());
+                    .to(request.getToHeader());
 
             COPY_HEADERS.forEach(name -> request.getHeader(name).ifPresent(builder::header));
 
@@ -117,47 +111,22 @@ public class DefaultB2BUA implements B2BUA {
             requestHandlers.forEach(h -> h.accept(request, builder));
 
             final SipRequest requestB = builder.build();
-            final ViaHeader via = ViaHeader.with()
-                    .host(LOCAL_HOST)
-                    .port(5060)
-                    .transportUDP()
-                    .branch(ViaHeader.generateBranch())
-                    .build();
-            requestB.addHeaderFirst(via);
-            target.send(requestB);
+            target.send(builder);
         } else if (request.isAck()) {
-            final SipRequest.Builder builder = target.createAck()
-                    .contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
+            final SipRequest.Builder builder = target.createAck();
 
             requestHandlers.forEach(h -> h.accept(request, builder));
 
-            final SipRequest requestB = builder.build();
-            final ViaHeader via = ViaHeader.with()
-                    .host(LOCAL_HOST)
-                    .port(5060)
-                    .transportUDP()
-                    .branch(ViaHeader.generateBranch())
-                    .build();
-            requestB.addHeaderFirst(via);
-            target.send(requestB);
+            target.send(builder);
         } else if (request.isBye()) {
             // TODO ugly correlation
             byeRequest = request;
 
-            final SipRequest.Builder builder = target.createBye()
-                    .contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
+            final SipRequest.Builder builder = target.createBye();
 
             requestHandlers.forEach(h -> h.accept(request, builder));
 
-            final SipRequest requestB = builder.build();
-            final ViaHeader via = ViaHeader.with()
-                    .host(LOCAL_HOST)
-                    .port(5060)
-                    .transportUDP()
-                    .branch(ViaHeader.generateBranch())
-                    .build();
-            requestB.addHeaderFirst(via);
-            target.send(requestB);
+            target.send(builder);
 
         } else {
             throw new RuntimeException("TODO");
@@ -167,7 +136,6 @@ public class DefaultB2BUA implements B2BUA {
     private void processResponse(final DefaultUA target, final SipResponse response) {
         final SipRequest linkedRequest = response.isInvite() ? target.getRequest() : byeRequest;
         final SipResponse builder = linkedRequest.createResponse(response.getStatus(), response.getRawContent());
-        builder.setHeader(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
 
         if (response.hasContent()) {
             // Copy content

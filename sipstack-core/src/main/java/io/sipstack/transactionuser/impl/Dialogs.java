@@ -6,7 +6,12 @@ import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.address.SipURI;
+import io.pkts.packet.sip.header.CSeqHeader;
+import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.ToHeader;
+import io.pkts.packet.sip.header.ViaHeader;
 import io.pkts.packet.sip.header.impl.AddressParametersHeaderImpl;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
@@ -62,6 +67,7 @@ import io.sipstack.transport.Flow;
 
 public class Dialogs {
 
+    private static final String LOCAL_HOST = System.getProperty("localhost", "127.0.0.1");
     private static final String REMOTE_HOST = System.getProperty("remotehost", "127.0.0.1");
     private static final int REMOTE_PORT = Integer.getInteger("remoteport", 5060);
 
@@ -72,7 +78,7 @@ public class Dialogs {
     private final SipRequest request;
     private final Buffer callId;
     private final Buffer localTag;
-    private Flow flow;
+    private Flow lastFlow;
 
     // For now support only one dialog
     private final MyDialog dialog = new MyDialog();
@@ -85,7 +91,10 @@ public class Dialogs {
         this.callId = request.getCallIDHeader().getCallId();
         this.localTag = getLocalTag(request, isUpstream);
         if (tx != null) {
-            this.flow = tx.flow();
+            this.lastFlow = tx.flow();
+        }
+        if (isUpstream) {
+            dialog.update(request);
         }
     }
 
@@ -141,25 +150,71 @@ public class Dialogs {
     public class MyDialog implements Dialog {
         private State state = State.TRYING;
         private Buffer remoteTag;
-        private Buffer id;
+        private SipURI remoteContact;
+        private int cseqNr = 1;
 
         public MyDialog() {
         }
 
         @Override
-        public void send(final SipMessage message) {
-            if (flow == null) {
+        public void send(final SipRequest.Builder builder) {
+            if (!builder.method().toString().equals("ACK")) {
+                cseqNr++;
+            }
+            builder.contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build())
+                    .cseq(CSeqHeader.with().cseq(cseqNr).method(builder.method()).build());
+
+            final SipRequest request = builder.build();
+            final ViaHeader via = ViaHeader.with()
+                    .host(LOCAL_HOST)
+                    .port(5060)
+                    .transportUDP()
+                    .branch(ViaHeader.generateBranch())
+                    .build();
+            request.addHeaderFirst(via);
+
+            if (remoteContact != null) {
+                transactions.createFlow(remoteContact.getHost())
+                        .withPort(remoteContact.getPort())
+                        .withTransport(Transport.udp)
+                        .onSuccess(f -> {
+                            lastFlow = f;
+                            final Transaction t = transactions.send(f, request);
+                        })
+                        .connect();
+            } else {
                 transactions.createFlow(REMOTE_HOST)
                         .withPort(REMOTE_PORT)
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
-                            flow = f;
+                            lastFlow = f;
+                            final Transaction t = transactions.send(f, request);
+                        })
+                        .connect();
+            }
+        }
+
+        @Override
+        public void send(final SipResponse message) {
+            message.setHeader(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
+            if (remoteContact != null) {
+                transactions.createFlow(remoteContact.getHost())
+                        .withPort(remoteContact.getPort())
+                        .withTransport(Transport.udp)
+                        .onSuccess(f -> {
+                            lastFlow = f;
                             final Transaction t = transactions.send(f, message);
                         })
                         .connect();
-
             } else {
-                final Transaction t = transactions.send(flow, message);
+                transactions.createFlow(REMOTE_HOST)
+                        .withPort(REMOTE_PORT)
+                        .withTransport(Transport.udp)
+                        .onSuccess(f -> {
+                            lastFlow = f;
+                            final Transaction t = transactions.send(f, message);
+                        })
+                        .connect();
             }
         }
 
@@ -189,11 +244,18 @@ public class Dialogs {
                     .callId(request.getCallIDHeader());
         }
 
-        public void dispatchUpstream(final TransactionEvent event) {
-            final Buffer remoteTag = getRemoteTag(event.message(), true);
-            if (event.message().isResponse() && remoteTag != null) {
+        public void update(final SipMessage message) {
+            final Buffer remoteTag = getRemoteTag(message, true);
+            if (remoteContact == null && message.getContactHeader() != null) {
+                remoteContact = (SipURI) message.getContactHeader().getAddress().getURI();
+            }
+            if (message.isResponse() && remoteTag != null) {
                 this.remoteTag = remoteTag;
             }
+
+        }
+        public void dispatchUpstream(final TransactionEvent event) {
+            update(event.message());
             upstream.accept(new DefaultDialogEvent(this, event));
         }
     }

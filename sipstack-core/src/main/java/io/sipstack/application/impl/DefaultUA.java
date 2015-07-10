@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.application.UA;
@@ -49,9 +50,11 @@ public class DefaultUA implements UA, Consumer<DialogEvent> {
     }
 
     @Override
-    public void send(final SipMessage message) {
-        log(message, " -> ");
+    public void send(SipRequest.Builder message) {
+        assertDialog(message.build()).send(message);
+    }
 
+    public void send(SipResponse message) {
         assertDialog(message).send(message);
     }
 
@@ -85,19 +88,7 @@ public class DefaultUA implements UA, Consumer<DialogEvent> {
     @Override
     public void accept(final DialogEvent event) {
         final SipMessage message = event.transaction().message();
-        log(message, " <- ");
         handlers.forEach(h -> h.accept(message));
-    }
-
-    private void log(final SipMessage message, final String direction) {
-        final StringBuilder sb = new StringBuilder();
-        sb.append(friendlyName).append(direction);
-        if (message.isRequest()) {
-            sb.append(message);
-        } else {
-            sb.append(message);
-        }
-        logger.info(sb.toString());
     }
 
     public SipRequest getRequest() {

@@ -95,15 +95,17 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
             final Optional<SipHeader> remotePartyIdHeader = request.getHeader("Remote-Party-ID");
             final Address remoteAddress;
             if (remotePartyIdHeader.isPresent()) {
-                remoteAddress = ((AddressParametersHeader) remotePartyIdHeader.get()).getAddress();
-                patchCallerId(remoteAddress, request, builder);
+                //TODO
+                //remoteAddress = ((AddressParametersHeader) remotePartyIdHeader.get()).getAddress();
+                //patchCallerId(remoteAddress, request, builder);
             } else {
                 remoteAddress = request.getFromHeader().getAddress();
             }
 
-            callLog.setFrom(parseCallerId(remoteAddress));
-            callLog.setFromUser(((SipURI) remoteAddress.getURI()).getUser().toString());
-            callLog.setCallerIdName(remoteAddress.getDisplayName().toString());
+            //TODO
+            //callLog.setFrom(parseCallerId(remoteAddress));
+            //callLog.setFromUser(((SipURI) remoteAddress.getURI()).getUser().toString());
+            //callLog.setCallerIdName(remoteAddress.getDisplayName().toString());
 
             final EdgeType edgeType = parseEdgeType(request);
             if (edgeType == EdgeType.PHONE) {
@@ -203,9 +205,10 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         // Set calledvia if there is Diversion header. This is twilio number and used as To field in billing.
         if (request.getHeader("Diversion").isPresent()) {
             try {
-                final String user = getSipURIFromHeader(request, "Diversion").getUser().toString();
-                callLog.setCalledVia(user);
-                logInfo(request, "Processing trunking-originating to " + user);
+                //TODO
+                //final String user = getSipURIFromHeader(request, "Diversion").getUser().toString();
+                //callLog.setCalledVia(user);
+                //logInfo(request, "Processing trunking-originating to " + user);
             } catch (final Exception e) {
                 logger.warn("Unable to parse the Diversion header. Pls check so that the billing for this call "
                         + callLog.getSid() + " is correct", e);
@@ -225,12 +228,15 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
         // Set To, user part (PSTN) in X-Twilio-Request-URI
         final Optional<SipHeader> toAddress = request.getHeader(TwilioHeaders.X_TWILIO_REQUEST_URI);
         toAddress.ifPresent(h -> {
-            final AddressParametersHeader addressHeader = (AddressParametersHeader) h;
-            this.callLog.setTo(parseCallerId(addressHeader.getAddress()));
+            // TODO
+            //final AddressParametersHeader addressHeader = (AddressParametersHeader) h;
+            //this.callLog.setTo(parseCallerId(addressHeader.getAddress()));
         });
         this.callLog.setFlag(CallLog.TRUNKING_TERMINATING_FLAG);
 
-//        ((SipURI) linked.getRequestUri()).setUserParam("phone");
+//        final SipURI uri = (SipURI) request.getRequestUri().clone();
+//        uri.setParameter("user", "phone");
+        linked.requestURI().setParameter("user", "phone");
     }
 
     /**
@@ -607,7 +613,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
      * @throws IllegalArgumentException
      */
     private EdgeType parseEdgeType(final SipMessage sipMessage) throws IllegalArgumentException {
-        final String user = sipMessage.getFromHeader().getParameter("user").toString();
+        final String user = ((SipURI) sipMessage.getFromHeader().getAddress().getURI()).getUserParam().toString();
         return EdgeType.parse(user);
     }
 

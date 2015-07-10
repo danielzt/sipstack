@@ -3,7 +3,6 @@ package io.sipstack.application.impl;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
@@ -13,6 +12,9 @@ import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.header.CSeqHeader;
+import io.pkts.packet.sip.header.ContactHeader;
+import io.pkts.packet.sip.header.SipHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.application.B2BUA;
 
@@ -36,6 +38,12 @@ public class DefaultB2BUA implements B2BUA {
         COPY_HEADERS.add(Buffers.wrap("X-Twilio-TrunkSid"));
         COPY_HEADERS.add(Buffers.wrap("X-Twilio-Original-Request-URI"));
         COPY_HEADERS.add(Buffers.wrap("X-Twilio-CallSid"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-Request-URI"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-SrcIp"));
+        //COPY_HEADERS.add(Buffers.wrap("X-Twilio-AccountFlags"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-VoiceTrace"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-MediaGateway"));
+        COPY_HEADERS.add(Buffers.wrap("X-Twilio-MediaFeatures"));
     }
 
     private final String friendlyName;
@@ -96,9 +104,15 @@ public class DefaultB2BUA implements B2BUA {
             final SipRequest.Builder builder = SipRequest.invite(target.getTarget())
                     .from(request.getFromHeader())
                     .to(request.getToHeader())
-                    .contact(request.getContactHeader());
+                    .contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build())
+                    .cseq(CSeqHeader.with().cseq(1).method("INVITE").build());
 
             COPY_HEADERS.forEach(name -> request.getHeader(name).ifPresent(builder::header));
+
+            // Copy content
+            builder.header(SipHeader.create("Content-Type", "application/sdp"));
+            builder.header(request.getHeader("Content-Length").get());
+            builder.content(request.getRawContent());
 
             requestHandlers.forEach(h -> h.accept(request, builder));
 
@@ -112,7 +126,8 @@ public class DefaultB2BUA implements B2BUA {
             requestB.addHeaderFirst(via);
             target.send(requestB);
         } else if (request.isAck()) {
-            final SipRequest.Builder builder = target.createAck();
+            final SipRequest.Builder builder = target.createAck()
+                    .contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
 
             requestHandlers.forEach(h -> h.accept(request, builder));
 
@@ -129,7 +144,8 @@ public class DefaultB2BUA implements B2BUA {
             // TODO ugly correlation
             byeRequest = request;
 
-            final SipRequest.Builder builder = target.createBye();
+            final SipRequest.Builder builder = target.createBye()
+                    .contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
 
             requestHandlers.forEach(h -> h.accept(request, builder));
 
@@ -150,7 +166,14 @@ public class DefaultB2BUA implements B2BUA {
 
     private void processResponse(final DefaultUA target, final SipResponse response) {
         final SipRequest linkedRequest = response.isInvite() ? target.getRequest() : byeRequest;
-        final SipResponse builder = linkedRequest.createResponse(response.getStatus());
+        final SipResponse builder = linkedRequest.createResponse(response.getStatus(), response.getRawContent());
+        builder.setHeader(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
+
+        if (response.hasContent()) {
+            // Copy content
+            builder.setHeader(SipHeader.create("Content-Type", "application/sdp"));
+            builder.setHeader(response.getHeader("Content-Length").get());
+        }
 
         responseHandlers.forEach(h -> h.accept(response, builder));
 

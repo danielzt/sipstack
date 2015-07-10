@@ -93,9 +93,9 @@ public class DefaultUA implements UA, Consumer<DialogEvent> {
         final StringBuilder sb = new StringBuilder();
         sb.append(friendlyName).append(direction);
         if (message.isRequest()) {
-            sb.append(message.getMethod());
+            sb.append(message);
         } else {
-            sb.append(message.toResponse().getStatus());
+            sb.append(message);
         }
         logger.info(sb.toString());
     }

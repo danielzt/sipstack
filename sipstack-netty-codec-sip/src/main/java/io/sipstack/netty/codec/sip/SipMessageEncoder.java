@@ -29,8 +29,8 @@ public class SipMessageEncoder extends MessageToMessageEncoder<SipMessageEvent> 
             for (int i = 0; i < b.getReadableBytes(); ++i) {
                 out.writeByte(b.getByte(i));
             }
-            out.writeByte(SipParser.CR);
-            out.writeByte(SipParser.LF);
+            //out.writeByte(SipParser.CR);
+            //out.writeByte(SipParser.LF);
         } catch (final IOException e) {
             e.printStackTrace();
         }
@@ -53,8 +53,8 @@ public class SipMessageEncoder extends MessageToMessageEncoder<SipMessageEvent> 
             for (int i = 0; i < b.getReadableBytes(); ++i) {
                 buffer.writeByte(b.getByte(i));
             }
-            buffer.writeByte(SipParser.CR);
-            buffer.writeByte(SipParser.LF);
+            //buffer.writeByte(SipParser.CR);
+            //buffer.writeByte(SipParser.LF);
             return buffer;
         } catch (final IOException e) {
             // shouldn't be possible since the underlying buffer

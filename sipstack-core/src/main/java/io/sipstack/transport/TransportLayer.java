@@ -1,5 +1,6 @@
 package io.sipstack.transport;
 
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
@@ -10,6 +11,7 @@ import io.sipstack.core.SipStack;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Connection;
+import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SipMessageEvent;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transport.impl.DefaultFlow;
@@ -18,14 +20,16 @@ import io.sipstack.transport.impl.InternalFlow;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
  * The {@link TransportLayer} is responsible for maintaining {@link Flow}s, which represents
  * the connection between two endpoints.
  *
- * This layer also acts as the bridge between Netty and the rest of the {@link SipStack}
+ * This layer also acts as the bridge between Netty and the rest of the {@link SipStack} (may change)
  *
  * @author jonas@jonasborjesson.com
  */
@@ -34,6 +38,9 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
     private final TransportLayerConfiguration config;
 
     private final TransportUser transportUser;
+
+    // TODO: make the initial size configurable
+    private final Map<ConnectionId, Flow> flows = new ConcurrentHashMap<>(1024);
 
     /**
      * The {@link TransportLayer} is the only one that actually
@@ -84,6 +91,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
      */
     @Override
     public void channelRegistered(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("Channel registered: " + ctx.channel());
         ctx.fireChannelRegistered();
     }
     /**
@@ -91,14 +99,15 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
      */
     @Override
     public void channelUnregistered(ChannelHandlerContext ctx) throws Exception {
+        System.err.println("Channel un-registered " + ctx.channel());
         ctx.fireChannelUnregistered();
-
     }
     /**
      * From ChannelInboundHandler
      */
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        System.err.println("Channel active " + ctx.channel());
         ctx.fireChannelActive();
     }
 
@@ -107,6 +116,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
      */
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        System.err.println("Channel in-active " + ctx.channel());
         ctx.fireChannelInactive();
     }
 
@@ -115,6 +125,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
      */
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+        System.err.println("Channel writability changed");
         ctx.fireChannelWritabilityChanged();
     }
 
@@ -132,6 +143,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
      */
     @Override
     public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) throws Exception {
+        System.err.println("connecting to " + remoteAddress + " from local " + localAddress);
         ctx.connect(remoteAddress, localAddress, promise);
     }
 
@@ -140,6 +152,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
      */
     @Override
     public void disconnect(ChannelHandlerContext ctx, ChannelPromise promise) throws Exception {
+        System.err.println("disconnecting...");
         ctx.disconnect(promise);
     }
 
@@ -148,7 +161,6 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
      */
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
-        // we should never end up here...
         ctx.write(msg, promise);
     }
 
@@ -218,7 +230,7 @@ public class TransportLayer extends InboundOutboundHandlerAdapter implements Tra
             // TODO: we need to figure out if we already have a flow pointing
             // to the same remote:local:transport. May have to ask the network layer
             // if it knows what local ip:port we will be using.
-            final Future<Connection> future = network.connect(remoteAddress, transport == null ? Transport.udp : transport);
+            final ChannelFuture future = network.connect(remoteAddress, transport == null ? Transport.udp : transport);
             final FlowFutureImpl flowFuture = new FlowFutureImpl(future, onSuccess, onFailure, onCancelled);
             future.addListener(flowFuture);
             return flowFuture;

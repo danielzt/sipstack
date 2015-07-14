@@ -12,7 +12,6 @@ import io.sipstack.transaction.Transaction;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 import io.sipstack.transport.Transports;
-import io.sipstack.transport.impl.FlowFutureImpl;
 import org.mockito.Mockito;
 
 import java.net.InetSocketAddress;
@@ -147,10 +146,11 @@ public class MockTransportLayer implements Transports {
                 connection = new TcpConnection(channel, remoteAddress);
             }
 
-            final MockFuture<Connection> mockFuture = new MockFuture<>(connection);
-            final FlowFutureImpl flowFuture = new FlowFutureImpl(mockFuture, onSuccess, onFailure, onCancelled);
-            mockFuture.addListener(flowFuture);
-            return flowFuture;
+            // final MockFuture<Connection> mockFuture = new MockFuture<>(connection);
+            // final FlowFutureImpl flowFuture = new FlowFutureImpl(mockFuture, onSuccess, onFailure, onCancelled);
+            // mockFuture.addListener(flowFuture);
+            // return flowFuture;
+            throw new RuntimeException("TODO again");
         }
 
         /**

@@ -1,10 +1,5 @@
 package io.sipstack.application;
 
-import java.util.function.Consumer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.application.impl.DefaultApplicationInstanceStore;
 import io.sipstack.application.impl.DefaultSipRequestEvent;
@@ -14,6 +9,10 @@ import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transactionuser.TransactionEvent;
 import io.sipstack.transactionuser.TransactionUserLayer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.function.Consumer;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -45,7 +44,7 @@ public class ApplicationController implements Consumer<TransactionEvent> {
     private void invokeApplication(final ApplicationInstance app, final InternalApplicationContext appCtx, final TransactionEvent tx) {
 
         // Note that it is utterly important that the lock
-        // for both the io.sipstack.application.application and the io.sipstack.application.application context
+        // for both the .sipstack.application.application and the io.sipstack.application.application context
         // is "on" for all interactions with these two objects.
         // The entire design are dependent on it!
         // Also note that we are using the io.sipstack.application.application context since

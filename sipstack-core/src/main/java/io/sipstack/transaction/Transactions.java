@@ -38,7 +38,7 @@ public interface Transactions {
 
     Flow.Builder createFlow(String host) throws IllegalArgumentException;
 
-    default Flow.Builder createFlow(Buffer host) throws IllegalArgumentException {
+    default Flow.Builder createFlow(final Buffer host) throws IllegalArgumentException {
         return createFlow(host.toString());
     }
 }

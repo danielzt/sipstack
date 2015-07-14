@@ -26,7 +26,7 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
      * persist to disk, as a distributed cache but for our purposes we'll just keep it here.
      * 
      * And yes, Google Guava Table is better suited but didn't want to pull in too many
-     * dependences...
+     * dependencies...
      */
     private final Map<SipURI, List<Binding>> locationStore = new HashMap<SipURI, List<Binding>>();
 

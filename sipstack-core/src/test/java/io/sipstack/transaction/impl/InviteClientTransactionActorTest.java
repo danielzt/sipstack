@@ -75,18 +75,37 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
     }
 
     /**
+     * Test to transition Calling -> Completed
+     *
+     * @throws Exception
+     */
+    @Test(timeout = 500)
+    public void testTransitionCallingToCompleted() throws Exception {
+
+        final int provisionalResponse = PROVISIONAL[0];
+        final int failureResponse = CLIENT_FAILURES[0];
+
+        final Holder holder = initiateTransition(provisionalResponse);
+        final SipResponse response = holder.message().createResponse(failureResponse);
+        final Flow flow = Mockito.mock(Flow.class);
+        transactionLayer.onMessage(flow, response);
+
+        assertTimerScheduled(SipTimer.D);
+        reset();
+
+    }
+
+    /**
      * Test to go Calling --> Proceeding --> Accepted for every combination
      * of provisional and success responses.
      */
     @Test(timeout = 500)
     public void testProceedingToAccepted() throws Exception {
-        final int[] provisional = new int[]{100, 180, 181, 182, 183, 199};
-        final int[] successful = new int[]{200, 202, 204};
 
-        for (int i = 0; i < provisional.length; ++i) {
-            for (int j = 0; j < successful.length; ++j) {
-                final int provisionalResponse = provisional[i];
-                final int successfulResponse = successful[j];
+        for (int i = 0; i < PROVISIONAL.length; ++i) {
+            for (int j = 0; j < SUCCESSFUL.length; ++j) {
+                final int provisionalResponse = PROVISIONAL[i];
+                final int successfulResponse = SUCCESSFUL[j];
                 System.out.println("Testing provisional " + provisionalResponse + " then final " + successfulResponse);
                 final Holder holder = initiateTransition(provisionalResponse);
                 final SipResponse response = holder.message().createResponse(successfulResponse);

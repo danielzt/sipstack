@@ -99,7 +99,22 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
      */
     private Cancellable timerB;
 
+    /**
+     * Timer D is only scheduled for unreliable transports and is what takes us
+     * from COMPLETED to TERMINATED.
+     */
+    private Cancellable timerD;
+
+    /**
+     * Timer M is the timer that takes us from ACCEPTED to TERMINATED
+     * and was introduced by RFC 6026
+     */
     private Cancellable timerM;
+
+    /**
+     * TODO: needs to be passed in.
+     */
+    private final boolean isUsingUnreliableTransport = true;
 
     protected InviteClientTransactionActor(final TransactionId id,
                                            final SipRequest invite,
@@ -121,6 +136,16 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
         when(TransactionState.ACCEPTED, this::onAccepted);
         onEnter(TransactionState.ACCEPTED, this::onEnterAccepted);
         onExit(TransactionState.ACCEPTED, this::onExitAccepted);
+
+        when(TransactionState.COMPLETED, this::onCompleted);
+        onExit(TransactionState.COMPLETED, this::onExitCompleted);
+
+        // only need onEnterCompleted if unreliable because otherwise
+        // we won't actually schedule Timer D and there is nothing else
+        // to do so...
+        if (isUsingUnreliableTransport) {
+            onEnter(TransactionState.COMPLETED, this::onEnterCompleted);
+        }
     }
 
     /**
@@ -307,6 +332,58 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
 
     private final void onExitAccepted(final Event event) {
         timerM.cancel();
+    }
+
+    /**
+     *
+     * Implements the completed state as follows:
+     *
+     * <pre>
+     *
+     *                +-----------+
+     *                |           |Transport Err.
+     *                | Completed |Inform TU
+     *             +--|           |-------+
+     *     300-699 |  +-----------+       |
+     *     ACK sent|    ^  |              |
+     *             |    |  |              |
+     *             +----+  |              |
+     *                     |Timer D fires |
+     *                     |-             |
+     *                     +--------+     |
+     *                              V     V
+     *                             +------------+
+     *                             |            |
+     *                             | Terminated |
+     *                             |            |
+     *                             +------------+
+     * </pre>
+     * @param event
+     */
+    private final void onCompleted(final Event event) {
+        if (event.isSipResponseEvent()) {
+            final SipResponse response = event.response();
+            if (response.getStatus() >= 300) {
+                ctx().forwardUpstream(event);
+                ack();
+            }
+
+            // If this was a 2xx response then
+            // this isn't supposed to happen. Don't have
+            // a great way of handling it and it is against
+            // the RFC so silently ignore it.
+
+        }
+    }
+
+    private final void onEnterCompleted(final Event event) {
+        timerD = scheduleTimer(SipTimer.D, timersConfig.getTimerD());
+    }
+
+    private final void onExitCompleted(final Event event) {
+        if (timerD != null) {
+            timerD.cancel();
+        }
     }
 
     /**

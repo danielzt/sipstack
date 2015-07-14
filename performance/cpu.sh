@@ -1,3 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-top -p `ps -edalf | grep [s]ipstack.yaml | awk '{print $4}'`,`pidof sipp`
+# thank you http://stackoverflow.com/questions/1527049/bash-join-elements-of-an-array
+function join { local IFS="$1"; shift; echo "$*"; }
+
+top -p `ps -edalf | grep [s]ipstack.yaml | awk '{print $4}'`,$(join , `pidof sipp`)

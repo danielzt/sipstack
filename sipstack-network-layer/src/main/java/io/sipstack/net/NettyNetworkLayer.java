@@ -6,6 +6,7 @@ package io.sipstack.net;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
@@ -15,9 +16,7 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.util.concurrent.Future;
 import io.sipstack.config.NetworkInterfaceConfiguration;
-import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
 import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
@@ -82,7 +81,7 @@ public class NettyNetworkLayer implements NetworkLayer {
     }
 
     @Override
-    public Future<Connection> connect(final InetSocketAddress address, final Transport transport) {
+    public ChannelFuture connect(final InetSocketAddress address, final Transport transport) {
         return this.defaultInterface.connect(address, transport);
     }
 
@@ -98,8 +97,6 @@ public class NettyNetworkLayer implements NetworkLayer {
     public static class Builder {
 
         private final List<NetworkInterfaceConfiguration> ifs;
-
-        private List<InboundOutboundHandlerAdapter> sipChannels = new ArrayList<>();
 
         private EventLoopGroup bossGroup;
         private EventLoopGroup workerGroup;
@@ -187,6 +184,7 @@ public class NettyNetworkLayer implements NetworkLayer {
         private Bootstrap ensureUDPBootstrap() {
             if (this.bootstrap == null) {
                 final Bootstrap b = new Bootstrap();
+                b.channelFactory()
                 b.group(this.udpGroup)
                 .channel(NioDatagramChannel.class)
                 .handler(new ChannelInitializer<DatagramChannel>() {
@@ -197,7 +195,7 @@ public class NettyNetworkLayer implements NetworkLayer {
                         pipeline.addLast("encoder", new SipMessageEncoder());
                         handler.ifPresent(handler -> pipeline.addLast("handler", handler));
                     }
-                });
+                }).option(ChannelOption.SO_REUSEADDR, true);
 
                 this.bootstrap = b;
             }

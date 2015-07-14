@@ -1,7 +1,6 @@
 package io.sipstack.net;
 
-import io.netty.util.concurrent.Future;
-import io.sipstack.netty.codec.sip.Connection;
+import io.netty.channel.ChannelFuture;
 import io.sipstack.netty.codec.sip.Transport;
 
 import java.net.InetSocketAddress;
@@ -25,7 +24,7 @@ public interface NetworkLayer {
      * @param transport
      * @return
      */
-    Future<Connection> connect(InetSocketAddress address, Transport transport);
+    ChannelFuture connect(InetSocketAddress address, Transport transport);
 
     /**
      * Hang on this network layer until all interfaces have been shutdown and as such

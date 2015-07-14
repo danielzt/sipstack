@@ -1,20 +1,19 @@
 package io.sipstack.application.impl;
 
+import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
+import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.header.SipHeader;
+import io.sipstack.application.B2BUA;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
-
-import io.pkts.buffer.Buffer;
-import io.pkts.buffer.Buffers;
-import io.pkts.packet.sip.SipMessage;
-import io.pkts.packet.sip.SipRequest;
-import io.pkts.packet.sip.SipResponse;
-import io.pkts.packet.sip.header.ContactHeader;
-import io.pkts.packet.sip.header.SipHeader;
-import io.sipstack.application.B2BUA;
 
 /**
  * @author ajansson@twilio.com
@@ -129,7 +128,7 @@ public class DefaultB2BUA implements B2BUA {
             target.send(builder);
 
         } else {
-            throw new RuntimeException("TODO");
+            // throw new RuntimeException("TODO");
         }
     }
 

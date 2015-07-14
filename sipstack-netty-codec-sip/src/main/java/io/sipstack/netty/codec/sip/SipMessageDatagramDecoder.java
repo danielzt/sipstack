@@ -49,6 +49,7 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
     @Override
     protected void decode(final ChannelHandlerContext ctx, final DatagramPacket msg, final List<Object> out)
             throws Exception {
+        ctx.channel().connect(msg.sender(), ctx.channel().localAddress());
         final long arrivalTime = this.clock.getCurrentTimeMillis();
         final ByteBuf content = msg.content();
 

@@ -57,6 +57,37 @@ public class SipStackTestBase {
 
     protected MockScheduler defaultScheduler;
 
+    /**
+     * All known provisional responses in SIP
+     */
+    protected static final int[] PROVISIONAL = new int[]{100, 180, 181, 182, 183, 199};
+
+    /**
+     * All known successful responses in SIP
+     */
+    protected static final int[] SUCCESSFUL = new int[]{200, 202, 204};
+
+    /**
+     * All known redirect responses in SIP
+     */
+    protected static final int[] REDIRECT = new int[]{300, 301, 302, 305, 380};
+
+    /**
+     * All known client error responses in SIP
+     */
+    protected static final int[] CLIENT_FAILURES = new int[]{400, 401, 402, 403, 404, 405, 406, 407,
+            408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 420, 421, 422, 423, 424, 428, 429, 430,
+            433, 436, 437, 438, 439, 470, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 491, 493, 494};
+
+    /**
+     * All known server error responses in SIP
+     */
+    protected static final int[] SERVER_FAILURES = new int[]{500, 501, 502, 503, 504, 505, 513, 580};
+
+    /**
+     * All known global error responses in SIP
+     */
+    protected static final int[] GLOBAL_FAILURES = new int[]{600, 603, 604, 606};
 
     @Before
     public void setUp() throws Exception {

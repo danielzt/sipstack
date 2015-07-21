@@ -11,7 +11,7 @@ import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.ExpiresHeader;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,7 +19,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     /**
      * Our "location store". Normally you would hide this behind some interface that probably
@@ -31,7 +31,7 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
     private final Map<SipURI, List<Binding>> locationStore = new HashMap<SipURI, List<Binding>>();
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
         final Connection connection = event.connection();
         final SipMessage msg = event.message();
 

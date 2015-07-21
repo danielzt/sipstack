@@ -8,6 +8,7 @@ import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.SipParser;
+import io.sipstack.netty.codec.sip.event.IOEvent;
 
 import java.util.List;
 
@@ -49,7 +50,7 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
     @Override
     protected void decode(final ChannelHandlerContext ctx, final DatagramPacket msg, final List<Object> out)
             throws Exception {
-        ctx.channel().connect(msg.sender(), ctx.channel().localAddress());
+        // ctx.channel().connect(msg.sender(), ctx.channel().localAddress());
         final long arrivalTime = this.clock.getCurrentTimeMillis();
         final ByteBuf content = msg.content();
 
@@ -82,8 +83,11 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
         // }
 
         final Connection connection = new UdpConnection(ctx.channel(), msg.sender());
-        final SipMessageEvent event = new SipMessageEvent(connection, sipMessage, arrivalTime);
-        out.add(event);
+        if (sipMessage.isRequest()) {
+            out.add(IOEvent.create(connection, sipMessage.toRequest()));
+        } else {
+            out.add(IOEvent.create(connection, sipMessage.toResponse()));
+        }
     }
 
 }

@@ -1,15 +1,17 @@
 /**
  * 
  */
-package io.sipstack.netty.codec.sip;
+package io.sipstack.netty.codec.sip.event.impl;
 
 import io.netty.channel.ChannelPipeline;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.header.ViaHeader;
+import io.sipstack.netty.codec.sip.Connection;
+import io.sipstack.netty.codec.sip.event.SipMessageIOEvent;
 
 /**
  * Whenever a {@link SipMessage} is received it will be framed and a
- * {@link SipMessageEvent} will be created and passed up through the
+ * {@link SipMessageIOEventImpl} will be created and passed up through the
  * {@link ChannelPipeline}. The main reason for this object is the need to
  * encapsulate stream based and datagram based connections in Netty 4 (worked
  * differently in Netty 3) as well as to provide a time stamp for when the
@@ -17,19 +19,16 @@ import io.pkts.packet.sip.header.ViaHeader;
  * 
  * @author jonas@jonasborjesson.com
  */
-public class SipMessageEvent {
+public class SipMessageIOEventImpl extends IOEventImpl implements SipMessageIOEvent {
 
-    private final Connection connection;
     private final SipMessage msg;
-    private final long arrivalTime;
 
     /**
      *
      */
-    public SipMessageEvent(final Connection connection, final SipMessage msg, final long arrivalTime) {
-        this.connection = connection;
+    public SipMessageIOEventImpl(final Connection connection, final SipMessage msg, final long arrivalTime) {
+        super(connection, arrivalTime);
         this.msg = msg;
-        this.arrivalTime = arrivalTime;
     }
 
     /**
@@ -46,7 +45,7 @@ public class SipMessageEvent {
         }
 
         try {
-            final SipMessage otherMsg = ((SipMessageEvent)other).msg;
+            final SipMessage otherMsg = ((SipMessageIOEventImpl)other).msg;
             if ((msg.isRequest() && otherMsg.isRequest() || msg.isResponse() && otherMsg.isResponse()) && msg.getMethod().equals(otherMsg.getMethod())) {
                 if (!msg.getCallIDHeader().equals(otherMsg.getCallIDHeader())) {
                     return false;
@@ -64,28 +63,14 @@ public class SipMessageEvent {
         }
     }
 
-
-    /**
-     * The {@link Connection} over which this {@link SipMessage} was received.
-     *
-     * @return
-     */
-    public Connection connection() {
-        return this.connection;
-    }
-
     /**
      * The framed {@link SipMessage}.
      *
      * @return
      */
+    @Override
     public SipMessage message() {
         return this.msg;
     }
-
-    public long arrivalTime() {
-        return this.arrivalTime;
-    }
-
 
 }

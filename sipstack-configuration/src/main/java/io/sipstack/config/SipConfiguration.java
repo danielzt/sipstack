@@ -5,8 +5,11 @@ package io.sipstack.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.PreConditions;
+import io.sipstack.netty.codec.sip.Transport;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -38,6 +41,17 @@ public class SipConfiguration {
             return Collections.emptyList();
         }
         return networkInterfaces;
+    }
+
+    public void listen(final String ip, final int port, final Transport... transports) {
+        final SipURI listenAddress = SipURI.withHost(ip).withPort(port).build();
+        final NetworkInterfaceConfiguration ifConfig =
+                new NetworkInterfaceConfiguration("default", listenAddress, null, transports);
+        if (networkInterfaces == null) {
+            networkInterfaces = new ArrayList<>();
+        }
+
+        networkInterfaces.add(ifConfig);
     }
 
     /**

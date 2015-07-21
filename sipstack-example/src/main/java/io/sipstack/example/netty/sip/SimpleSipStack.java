@@ -20,7 +20,7 @@ import io.pkts.buffer.Buffer;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
 import io.sipstack.netty.codec.sip.UdpConnection;
 
@@ -57,7 +57,7 @@ public class SimpleSipStack {
 
     private Channel udpListeningPoint = null;
 
-    public SimpleSipStack(final SimpleChannelInboundHandler<SipMessageEvent> handler, final String ip, final int port) {
+    public SimpleSipStack(final SimpleChannelInboundHandler<SipMessageIOEventImpl> handler, final String ip, final int port) {
         this.ip = ip;
         this.port = port;
 
@@ -86,7 +86,7 @@ public class SimpleSipStack {
         }
     }
 
-    private Bootstrap createUDPListeningPoint(final SimpleChannelInboundHandler<SipMessageEvent> handler) {
+    private Bootstrap createUDPListeningPoint(final SimpleChannelInboundHandler<SipMessageIOEventImpl> handler) {
         final Bootstrap b = new Bootstrap();
         b.group(this.udpGroup)
         .channel(NioDatagramChannel.class)
@@ -102,7 +102,7 @@ public class SimpleSipStack {
         return b;
     }
 
-    private ServerBootstrap createTCPListeningPoint(final SimpleChannelInboundHandler<SipMessageEvent> handler) {
+    private ServerBootstrap createTCPListeningPoint(final SimpleChannelInboundHandler<SipMessageIOEventImpl> handler) {
         final ServerBootstrap b = new ServerBootstrap();
 
         b.group(this.bossGroup, this.workerGroup)

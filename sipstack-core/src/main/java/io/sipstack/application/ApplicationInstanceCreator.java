@@ -9,7 +9,7 @@ import io.pkts.packet.sip.SipMessage;
 public interface ApplicationInstanceCreator {
 
     /**
-     * Calculate the unique identifier representing the io.sipstack.application.application instance that
+     * Calculate the unique identifier representing the application instance that
      * should handle this message.
      *
      * @param message

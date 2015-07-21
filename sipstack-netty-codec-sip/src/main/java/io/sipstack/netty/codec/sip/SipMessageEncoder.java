@@ -10,7 +10,7 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.MessageToMessageEncoder;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
-import io.pkts.packet.sip.impl.SipParser;
+import io.sipstack.netty.codec.sip.event.IOEvent;
 
 import java.io.IOException;
 import java.util.List;
@@ -19,7 +19,7 @@ import java.util.List;
  * @author jonas
  *
  */
-public class SipMessageEncoder extends MessageToMessageEncoder<SipMessageEvent> {
+public class SipMessageEncoder extends MessageToMessageEncoder<IOEvent> {
 
     // this is when we do MessageToByteEncoder
     protected void encode(final ChannelHandlerContext ctx, final SipMessage msg, final ByteBuf out) {
@@ -29,6 +29,9 @@ public class SipMessageEncoder extends MessageToMessageEncoder<SipMessageEvent> 
             for (int i = 0; i < b.getReadableBytes(); ++i) {
                 out.writeByte(b.getByte(i));
             }
+
+            // Some confusion around who is doing this.
+            // Checkout io.pkts.packet.sip.impl.SipMessageImpl#toBuffer
             //out.writeByte(SipParser.CR);
             //out.writeByte(SipParser.LF);
         } catch (final IOException e) {
@@ -37,11 +40,14 @@ public class SipMessageEncoder extends MessageToMessageEncoder<SipMessageEvent> 
     }
 
     @Override
-    protected void encode(final ChannelHandlerContext ctx, final SipMessageEvent msg, List<Object> out) throws Exception {
-        final Connection connection = msg.connection();
-        final SipMessage sip = msg.message();
-        final DatagramPacket pkt = new DatagramPacket(toByteBuf(ctx.channel(), sip), connection.getRemoteAddress());
-        out.add(pkt);
+    protected void encode(final ChannelHandlerContext ctx, final IOEvent event, List<Object> out) throws Exception {
+        final Connection connection = event.connection();
+
+        if (event.isSipMessageIOEvent()) {
+            final SipMessage sip = event.toSipMessageIOEvent().message();
+            final DatagramPacket pkt = new DatagramPacket(toByteBuf(ctx.channel(), sip), connection.getRemoteAddress());
+            out.add(pkt);
+        }
     }
 
     protected ByteBuf toByteBuf(final Channel channel, final SipMessage msg) {

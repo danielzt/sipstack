@@ -8,12 +8,15 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.pkts.buffer.Buffer;
-import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.impl.SipInitialLine;
 import io.pkts.packet.sip.impl.SipRequestImpl;
 import io.pkts.packet.sip.impl.SipRequestLine;
 import io.pkts.packet.sip.impl.SipResponseImpl;
 import io.pkts.packet.sip.impl.SipResponseLine;
+import io.sipstack.netty.codec.sip.event.IOEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageIOEvent;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -82,22 +85,24 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
         if (this.message.isComplete()) {
             final long arrivalTime = this.clock.getCurrentTimeMillis();
-            final SipMessage msg = toSipMessage(this.message);
             final Channel channel = ctx.channel();
             final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress());
-            out.add(new SipMessageEvent(connection, msg, arrivalTime));
+            final SipMessageIOEvent msg = toSipMessageIOEvent(connection, this.message);
+            out.add(msg);
             reset();
         }
     }
 
-    private SipMessage toSipMessage(final RawMessage raw) {
+    private SipMessageIOEvent toSipMessageIOEvent(final Connection connection, final RawMessage raw) {
         final SipInitialLine initialLine = SipInitialLine.parse(raw.getInitialLine());
         final Buffer headers = raw.getHeaders();
         final Buffer payload = raw.getPayload();
         if (initialLine.isRequestLine()) {
-            return new SipRequestImpl((SipRequestLine) initialLine, headers, payload);
+            final SipRequest request = new SipRequestImpl((SipRequestLine) initialLine, headers, payload);
+            return IOEvent.create(connection, request);
         } else {
-            return new SipResponseImpl((SipResponseLine) initialLine, headers, payload);
+            final SipResponse response = new SipResponseImpl((SipResponseLine) initialLine, headers, payload);
+            return IOEvent.create(connection, response);
         }
     }
 

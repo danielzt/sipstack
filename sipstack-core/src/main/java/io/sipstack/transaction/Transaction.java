@@ -1,5 +1,6 @@
 package io.sipstack.transaction;
 
+import io.pkts.packet.sip.SipMessage;
 import io.sipstack.transport.Flow;
 
 /**
@@ -10,6 +11,16 @@ public interface Transaction {
     TransactionId id();
 
     TransactionState state();
+
+    /**
+     * Send a sip message within this {@link Transaction}. If the message that is about to be sent
+     * is not actually part of this transaction then an {@link IllegalArgumentException} will
+     * be thrown.
+     *
+     * @param msg
+     * @throws
+     */
+    void send(SipMessage msg) throws IllegalArgumentException;
 
     /**
      * The {@link Flow} associated with this {@link Transaction}.

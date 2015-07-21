@@ -64,7 +64,6 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
         final List<ListeningPoint> errors = Collections.synchronizedList(new ArrayList<ListeningPoint>());
         this.listeningPoints.forEach(lp -> {
             final ListeningPoint listeningPoint = lp;
-            // final SipURI listen = lp.getListenAddress();
             final Transport transport = lp.getTransport();
 
             ChannelFuture future = null;

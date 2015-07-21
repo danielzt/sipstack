@@ -3,13 +3,13 @@
  */
 package io.sipstack.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.netty.codec.sip.Transport;
 
+import java.util.Arrays;
 import java.util.List;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -39,6 +39,10 @@ public class NetworkInterfaceConfiguration {
         this.listen = listen;
         this.vipAddress = vipAddress;
         this.transports = transports;
+    }
+
+    public NetworkInterfaceConfiguration(final String name, final SipURI listen, final SipURI vipAddress, final Transport ... transports) {
+        this(name, listen, vipAddress, Arrays.asList(transports));
     }
 
     @JsonIgnore

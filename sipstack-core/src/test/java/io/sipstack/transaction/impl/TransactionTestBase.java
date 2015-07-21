@@ -4,7 +4,6 @@ import io.sipstack.SipStackTestBase;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
-import io.sipstack.transport.TransportUser;
 import org.junit.Before;
 
 /**
@@ -43,10 +42,11 @@ public class TransactionTestBase extends SipStackTestBase {
         myApplication = new MockTransactionUser();
         transports = new MockTransportLayer();
 
-        transactionLayer = new DefaultTransactionLayer(clock, defaultScheduler, myApplication, config);
-        transactionLayer.start(transports);
+        throw new RuntimeException("In the middle of re-writing this again");
+        // transactionLayer = new DefaultTransactionLayer(clock, defaultScheduler, myApplication, config);
+        // transactionLayer.start(transports);
 
-        myApplication.start(transactionLayer);
+        // myApplication.start(transactionLayer);
     }
 
     public void reset() {

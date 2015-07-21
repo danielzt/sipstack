@@ -2,11 +2,12 @@ package io.sipstack.transport.impl;
 
 import io.pkts.packet.sip.SipMessage;
 import io.sipstack.netty.codec.sip.ConnectionId;
+import io.sipstack.transport.Flow;
 
 /**
  * @author jonas@jonasborjesson.com
  */
-public class FailureFlow implements InternalFlow {
+public class FailureFlow implements Flow {
 
 
     private final Throwable cause;

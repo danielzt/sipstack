@@ -13,7 +13,7 @@ import io.pkts.streams.StreamListener;
 import io.pkts.streams.impl.DefaultStreamHandler;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.netty.codec.sip.Transport;
 import org.junit.Before;
@@ -129,8 +129,8 @@ public class SipStackTestBase {
         return ConnectionId.create(protocol, localAddress, remoteAddress);
     }
 
-    public SipMessageEvent createEvent(final SipMessage msg) {
-        return new SipMessageEvent(defaultConnection, msg, 0);
+    public SipMessageIOEventImpl createEvent(final SipMessage msg) {
+        return new SipMessageIOEventImpl(defaultConnection, msg, 0);
     }
 
 

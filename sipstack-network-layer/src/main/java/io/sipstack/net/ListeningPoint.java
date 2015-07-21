@@ -9,6 +9,7 @@ import io.sipstack.netty.codec.sip.Transport;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
@@ -23,7 +24,7 @@ public final class ListeningPoint {
 
 
     private final SipURI listenAddress;
-    private final SipURI vipAddress;
+    private final Optional<SipURI> vipAddress;
     private final Transport transport;
     private final InetSocketAddress localAddress;
     private final int localPort;
@@ -35,7 +36,7 @@ public final class ListeningPoint {
      */
     private ListeningPoint(final Transport transport, final SipURI listenAddress, final SipURI vipAddress) {
         this.listenAddress = listenAddress;
-        this.vipAddress = vipAddress;
+        this.vipAddress = Optional.ofNullable(vipAddress);
         this.transport = transport;
         this.localPort = NettyNetworkInterface.getPort(listenAddress.getPort(), transport);
         this.localAddress = new InetSocketAddress(listenAddress.getHost().toString(), this.localPort);
@@ -44,7 +45,6 @@ public final class ListeningPoint {
     public static ListeningPoint create(final Transport transport, final SipURI listen, final SipURI vipAddress) {
         assertNotNull(transport);
         assertNotNull(listen);
-        assertNotNull(vipAddress);
         return new ListeningPoint(transport, listen, vipAddress);
     }
 
@@ -64,7 +64,7 @@ public final class ListeningPoint {
         return this.listenAddress;
     }
 
-    public SipURI getVipAddress() {
+    public Optional<SipURI> getVipAddress() {
         return this.vipAddress;
     }
 

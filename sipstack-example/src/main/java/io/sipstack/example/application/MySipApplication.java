@@ -10,7 +10,7 @@ import io.sipstack.application.ApplicationInstanceCreator;
 import io.sipstack.core.Application;
 import io.sipstack.core.Bootstrap;
 import io.sipstack.core.Environment;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +29,7 @@ public final class MySipApplication extends Application<MyConfiguration> {
         super("My cool SIP application");
     }
 
-    public void processInvite(final SipMessageEvent event) {
+    public void processInvite(final SipMessageIOEventImpl event) {
         logger.info("Recevied a new sip event");
 
         // ProxyBranch branch = ProxyBranch.withTarget("sip:hello.com").withRoute().withRoute().withHeader(header).build();

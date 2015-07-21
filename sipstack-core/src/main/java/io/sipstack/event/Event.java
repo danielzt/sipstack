@@ -24,11 +24,11 @@ public abstract class Event {
     }
 
     public SipRequestEvent toSipRequestEvent() {
-        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + SipRequestEvent.class.getName());
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipRequestEvent.class.getName());
     }
 
     public SipResponseEvent toSipResponseEvent() {
-        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + SipResponseEvent.class.getName());
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipResponseEvent.class.getName());
     }
 
     public static final Event create(final SipRequest request) {

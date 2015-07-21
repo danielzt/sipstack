@@ -17,7 +17,7 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 import java.net.InetSocketAddress;
 
@@ -36,10 +36,10 @@ import java.net.InetSocketAddress;
  *
  */
 @Sharable
-public final class UAS extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class UAS extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
         final SipMessage msg = event.message();
 
         // just consume the ACK

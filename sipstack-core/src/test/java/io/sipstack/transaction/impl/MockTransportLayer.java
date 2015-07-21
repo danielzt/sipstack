@@ -11,7 +11,7 @@ import io.sipstack.netty.codec.sip.UdpConnection;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
-import io.sipstack.transport.Transports;
+import io.sipstack.transport.TransportLayer;
 import org.mockito.Mockito;
 
 import java.net.InetSocketAddress;
@@ -19,12 +19,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.when;
 
 /**
  * @author jonas@jonasborjesson.com
  */
-public class MockTransportLayer implements Transports {
+public class MockTransportLayer implements TransportLayer {
 
     private final AtomicReference<CountDownLatch> latch = new AtomicReference<>(new CountDownLatch(1));
 
@@ -59,16 +60,19 @@ public class MockTransportLayer implements Transports {
         return latch.get();
     }
 
-    @Override
+    // @Override
     public void write(final SipMessage msg) {
         storage.store(msg);
         latch.get().countDown();
+        fail("this needs to go trough the channelhandlercctx now again");
+
     }
 
-    @Override
+    // @Override
     public void write(final Flow flow, final SipMessage msg) {
         storage.store(msg);
         latch.get().countDown();
+        fail("this needs to go trough the channelhandlercctx now again");
     }
 
     @Override

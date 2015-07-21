@@ -28,8 +28,10 @@ import io.sipstack.event.Event;
 import io.sipstack.net.NettyNetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 import io.sipstack.netty.codec.sip.SystemClock;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
+import io.sipstack.transport.impl.DefaultTransportLayer;
 import io.sipstack.utils.Generics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,27 +145,44 @@ public abstract class Application<T extends Configuration> {
             networkBuilder.withUDPEventLoopGroup(udpTcpGroup);
             networkBuilder.withTCPEventLoopGroup(udpTcpGroup);
 
+            // The internal scheduler is used to schedule
+            // internal which primarily are  as SIP timers.
             // final InternalScheduler scheduler = new DefaultInternalScheduler(udpTcpGroup);
             final InternalScheduler scheduler = new HashWheelScheduler();
             final Clock clock = new SystemClock();
 
             final ApplicationController controller = new ApplicationController(clock, scheduler, applicationCreator());
 
-            // catch 22. The sipstack needs a reference to the network layer
-            // and the network layer needs the handler to pass messages to.
-            final SipStack stack = SipStack.withConfiguration(sipConfig)
-                    .withClock(clock)
-                    .withScheduler(scheduler)
-                    .withConsumer(controller)
-                    .build();
-            networkBuilder.withHandler(stack.handler());
+            // Transport layer is responsible for managing connections,
+            // i.e. Flows.
+            final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport());
+            networkBuilder.withHandler("transport-layer", transportLayer);
+
+            // The transaction layer is responsible for transaction
+            // management and is typically always present in a
+            // SIP stack.
+            final DefaultTransactionLayer transactionLayer = new DefaultTransactionLayer(transportLayer, clock, scheduler,sipConfig.getTransaction());
+            networkBuilder.withHandler("transaction-layer", transactionLayer);
+
+            // DefaultTransactionUserLayer transactionUserLayer = new DefaultTransactionUserLayer(consumer);
+
+            // final SipStack stack = SipStack.withConfiguration(sipConfig)
+                    // .withClock(clock)
+                    // .withScheduler(scheduler)
+                    // .withConsumer(controller)
+                    // .build();
+            // networkBuilder.withHandler(stack.handler());
 
             final NettyNetworkLayer server = networkBuilder.build();
+
+            // catch 22. The transport layers needs a reference to the network layer
+            // and the network layer needs transport layer to be part of the
+            // netty chain.
+            transportLayer.useNetworkLayer(server);
+
             server.start();
 
-            stack.useNetworkLayer(server);
-
-            controller.start(stack.getTransactionUserLayer());
+            // controller.start(stack.getTransactionUserLayer());
 
             // will wait until server shuts down again.
             server.sync();
@@ -326,7 +345,7 @@ public abstract class Application<T extends Configuration> {
 
         @Override
         public ActorRef select(final Object msg, final List<ActorRef> routees) {
-            final SipMessageEvent sipMsgEvent = (SipMessageEvent)msg;
+            final SipMessageIOEventImpl sipMsgEvent = (SipMessageIOEventImpl)msg;
             final ConnectionId id = sipMsgEvent.connection().id();
             return routees.get(Math.abs(id.hashCode() % routees.size()));
         }

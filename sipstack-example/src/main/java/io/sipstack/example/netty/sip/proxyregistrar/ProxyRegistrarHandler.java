@@ -16,7 +16,7 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.example.netty.sip.SimpleSipStack;
 import io.sipstack.example.netty.sip.registrar.Binding;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ import java.util.List;
  * @author jonas@jonasborjesson.com
  * 
  */
-public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     private final LocationService locationService = LocationService.getInstance();
 
@@ -37,7 +37,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
 
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
         final Connection connection = event.connection();
         final SipMessage msg = event.message();
 

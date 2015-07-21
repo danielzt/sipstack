@@ -16,13 +16,13 @@ import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.ToHeader;
 import io.pkts.packet.sip.header.ViaHeader;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 /**
  * @author jonas@jonasborjesson.com
  */
 @Sharable
-public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class UACHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     /**
      * Generating an ACK to a 2xx response is the same as any other subsequent request. However, a
@@ -87,7 +87,7 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
     }
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
         final SipMessage msg = event.message();
 
         if (msg.isInvite() && msg.isResponse()) {

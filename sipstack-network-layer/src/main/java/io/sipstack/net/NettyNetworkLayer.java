@@ -7,6 +7,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
@@ -32,9 +33,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 
+import static io.pkts.packet.sip.impl.PreConditions.ensureNotEmpty;
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 /**
@@ -114,14 +115,21 @@ public class NettyNetworkLayer implements NetworkLayer {
 
         private final Channel udpListeningPoint = null;
 
-        private Optional<InboundOutboundHandlerAdapter> handler = Optional.empty();
+        // private List<InboundOutboundHandlerAdapter> handlers = new ArrayList<>();
+        private List<ChannelHandler> handlers = new ArrayList<>();
+        private List<String> handlerNames = new ArrayList<>();
 
         private Builder(final List<NetworkInterfaceConfiguration> ifs) {
             this.ifs = ifs;
         }
 
-        public Builder withHandler(final InboundOutboundHandlerAdapter handler) {
-            this.handler = Optional.ofNullable(handler);
+        public Builder withHandler(final String handlerName, final ChannelHandler handler) {
+            ensureNotEmpty(handlerName, "The name of the handler cannot be null or the empty string");
+            ensureNotNull(handler, "The handler cannot be null");
+
+            // TODO: was too lazy to create a wrapper class.
+            this.handlerNames.add(handlerName);
+            handlers.add(handler);
             return this;
         }
 
@@ -184,7 +192,6 @@ public class NettyNetworkLayer implements NetworkLayer {
         private Bootstrap ensureUDPBootstrap() {
             if (this.bootstrap == null) {
                 final Bootstrap b = new Bootstrap();
-                b.channelFactory()
                 b.group(this.udpGroup)
                 .channel(NioDatagramChannel.class)
                 .handler(new ChannelInitializer<DatagramChannel>() {
@@ -193,9 +200,15 @@ public class NettyNetworkLayer implements NetworkLayer {
                         final ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast("decoder", new SipMessageDatagramDecoder());
                         pipeline.addLast("encoder", new SipMessageEncoder());
-                        handler.ifPresent(handler -> pipeline.addLast("handler", handler));
+                        for (int i = 0; i < handlers.size(); ++i) {
+                            pipeline.addLast(handlerNames.get(i), handlers.get(i));
+                        }
                     }
-                }).option(ChannelOption.SO_REUSEADDR, true);
+                });
+
+                // this allows you to setup connections from the
+                // same listening point
+                // .option(ChannelOption.SO_REUSEADDR, true);
 
                 this.bootstrap = b;
             }
@@ -214,7 +227,9 @@ public class NettyNetworkLayer implements NetworkLayer {
                         final ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast("decoder", new SipMessageStreamDecoder());
                         pipeline.addLast("encoder", new SipMessageEncoder());
-                        handler.ifPresent(handler -> pipeline.addLast("handler", handler));
+                        for (int i = 0; i < handlers.size(); ++i) {
+                            pipeline.addLast(handlerNames.get(i), handlers.get(i));
+                        }
                     }
                 })
                 .option(ChannelOption.SO_BACKLOG, 128)

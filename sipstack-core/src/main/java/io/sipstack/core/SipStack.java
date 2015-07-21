@@ -6,15 +6,14 @@ import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
-import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transactionuser.TransactionEvent;
 import io.sipstack.transactionuser.TransactionUserLayer;
 import io.sipstack.transactionuser.impl.DefaultTransactionUserLayer;
-import io.sipstack.transport.TransportLayer;
-
-import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
+import io.sipstack.transport.impl.DefaultTransportLayer;
 
 import java.util.function.Consumer;
+
+import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -78,14 +77,17 @@ public interface SipStack {
 
             this.transactionUserLayer = new DefaultTransactionUserLayer(consumer);
 
-            final DefaultTransactionLayer transaction = new DefaultTransactionLayer(clock, scheduler,
-                    transactionUserLayer, config.getTransaction());
-            transactionUserLayer.start(transaction);
+            final DefaultTransportLayer transport = new DefaultTransportLayer(config.getTransport());
 
-            final TransportLayer transport = new TransportLayer(config.getTransport(), transaction);
-            transaction.start(transport);
+            // final DefaultTransactionLayer transaction = new DefaultTransactionLayer(transport, clock, scheduler,
+                    // transactionUserLayer, config.getTransaction());
 
-            return new DefaultSipStack(transport, transaction, transactionUserLayer);
+            // transactionUserLayer.start(transaction);
+
+
+
+            // return new DefaultSipStack(transport, transaction, transactionUserLayer);
+            return null;
         }
     }
 }

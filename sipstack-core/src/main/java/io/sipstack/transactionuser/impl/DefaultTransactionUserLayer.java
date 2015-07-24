@@ -10,7 +10,7 @@ import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionUser;
-import io.sipstack.transaction.Transactions;
+import io.sipstack.transaction.TransactionLayer;
 import io.sipstack.transactionuser.Dialog;
 import io.sipstack.transactionuser.DialogEvent;
 import io.sipstack.transactionuser.TransactionEvent;
@@ -21,7 +21,7 @@ import io.sipstack.transactionuser.TransactionUserLayer;
  */
 public class DefaultTransactionUserLayer implements TransactionUserLayer, TransactionUser {
 
-    private Transactions transactions;
+    private TransactionLayer transactionLayer;
     private final Consumer<TransactionEvent> consumer;
     private Map<Buffer, Dialogs> dialogs = new ConcurrentHashMap<>();
 
@@ -29,15 +29,15 @@ public class DefaultTransactionUserLayer implements TransactionUserLayer, Transa
         this.consumer = consumer;
     }
 
-    public void start(final Transactions transactionLayer) {
-        this.transactions = transactionLayer;
+    public void start(final TransactionLayer transactionLayer) {
+        this.transactionLayer = transactionLayer;
     }
 
     @Override
     public Dialog createDialog(final Consumer<DialogEvent> consumer, final Transaction tx, final SipRequest request) {
         final boolean isUpstream = true;
         final Buffer key = Dialogs.getDialogKey(request, isUpstream);
-        final Dialogs dialog = new Dialogs(consumer, transactions, tx, request, isUpstream);
+        final Dialogs dialog = new Dialogs(consumer, transactionLayer, tx, request, isUpstream);
         this.dialogs.put(key, dialog);
         return dialog.getDialog(request);
     }
@@ -46,7 +46,7 @@ public class DefaultTransactionUserLayer implements TransactionUserLayer, Transa
     public Dialog createDialog(final Consumer<DialogEvent> consumer, final SipRequest request) {
         final boolean isUpstream = false;
         final Buffer key = Dialogs.getDialogKey(request, isUpstream);
-        final Dialogs dialog = new Dialogs(consumer, transactions, null, request, isUpstream);
+        final Dialogs dialog = new Dialogs(consumer, transactionLayer, null, request, isUpstream);
         this.dialogs.put(key, dialog);
         return dialog.getDialog(request);
     }

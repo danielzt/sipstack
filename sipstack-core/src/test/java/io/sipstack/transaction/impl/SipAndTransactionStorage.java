@@ -2,18 +2,18 @@ package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
-import io.sipstack.transaction.TransactionState;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.*;
 
 /**
@@ -23,49 +23,42 @@ import static org.junit.Assert.*;
  *
  * @author jonas@jonasborjesson.com
  */
-public class SipAndTransactionStorage {
+public class SipAndTransactionStorage<T> {
 
     /**
      * A list of all messages we have received...
      */
-    private List<Holder> messages = new ArrayList<>();
+    private List<T> messages = new ArrayList<>();
 
-    private Map<TransactionId, Transaction> allTransactions = new ConcurrentHashMap<>();
+    private final Function<T, SipMessage> mapper;
 
-    private Map<TransactionId, Transaction> terminatedTransaction = new ConcurrentHashMap<>();
+    public SipAndTransactionStorage(final Function<T, SipMessage> mapper) {
+        this.mapper = mapper;
+    }
 
     public void reset() {
         synchronized (messages) {
             messages.clear();
         }
-        allTransactions.clear();
-        terminatedTransaction.clear();
     }
 
-    public void store(final SipMessage msg) {
-        synchronized (messages) {
-            messages.add(new Holder(null, msg));
-        }
-    }
 
     public Transaction assertTransaction(final SipMessage msg) {
-        return assertTransaction(TransactionId.create(msg));
+        // return assertTransaction(TransactionId.create(msg));
+        return null;
     }
 
     public Transaction assertTransaction(final TransactionId id) {
-        final Transaction t = allTransactions.get(id);
-        assertThat(t, not((Transaction)null));
-        return t;
+        // final Transaction t = allTransactions.get(id);
+        // assertThat(t, not((Transaction) null));
+        // return t;
+        return null;
     }
 
-    public void store(final Transaction transaction, final SipMessage msg) {
-        assertThat(transaction, not((Transaction) null));
-
+    public void store(T event) {
         synchronized (messages) {
-            messages.add(new Holder(transaction, msg));
+            messages.add(event);
         }
-
-        allTransactions.put(transaction.id(), transaction);
     }
 
     /**
@@ -74,14 +67,12 @@ public class SipAndTransactionStorage {
      * @param method
      * @return
      */
-    public SipRequest assertRequest(final String method) {
-        final Holder holder = assertRequest(false, method);
-        return holder.msg.toRequest();
+    public T assertRequest(final String method) {
+        return assertRequest(false, method);
     }
 
-    public Transaction consumeRequest(final SipRequest request) {
-        final Holder holder = assertRequest(true, request.getMethod().toString());
-        return holder.transaction;
+    public T consumeRequest(final SipRequest request) {
+        return assertRequest(true, request.getMethod().toString());
     }
 
     /**
@@ -90,24 +81,27 @@ public class SipAndTransactionStorage {
      *
      * @param method
      */
-    public Transaction assertAndConsumeRequest(final String method) {
-        final Holder holder = assertRequest(true, method);
-        return holder.transaction;
+    public T assertAndConsumeRequest(final String method) {
+        return assertRequest(true, method);
     }
 
-    private Holder assertRequest(final boolean consume, final String method) {
+    private T assertRequest(final boolean consume, final String method) {
         synchronized (messages) {
-            final Iterator<Holder> it = messages.iterator();
+            final Iterator<T> it = messages.iterator();
             int count = 0;
-            Holder holder = null;
+            T result = null;
             while (it.hasNext()) {
-                holder = it.next();
-                final SipMessage msg = holder.msg;
-                if (msg.isRequest() && method.equalsIgnoreCase(msg.getMethod().toString())) {
-                    if (consume) {
-                        it.remove();
+                final T event = it.next();
+                final SipMessage msg = mapper.apply(event);
+                if (msg != null && msg.isRequest()) {
+                    final SipRequest request = msg.toRequest();
+                    if (method.equalsIgnoreCase(request.getMethod().toString())) {
+                        if (consume) {
+                            it.remove();
+                        }
+                        result = event;
+                        ++count;
                     }
-                    ++count;
                 }
             }
 
@@ -117,25 +111,27 @@ public class SipAndTransactionStorage {
                 fail("Found many " + method.toUpperCase() + " requests");
             }
 
-            return holder;
+            return result;
         }
     }
 
-    public Transaction assertAndConsumeResponse(final String method, final int responseStatus) {
+    public T assertAndConsumeResponse(final String method, final int responseStatus) {
 
         synchronized (messages) {
-            final Iterator<Holder> it = messages.iterator();
+            final Iterator<T> it = messages.iterator();
             int count = 0;
-            Holder result = null;
+            T result = null;
             while (it.hasNext()) {
-                final Holder holder = it.next();
-                final SipMessage msg = holder.msg;
-                if (msg.isResponse()
-                        && method.equalsIgnoreCase(msg.getMethod().toString())
-                        && msg.toResponse().getStatus() == responseStatus) {
-                    it.remove();
-                    result = holder;
-                    ++count;
+                final T event = it.next();
+                final SipMessage msg = mapper.apply(event);
+                if (msg != null && msg.isResponse()) {
+                    final SipResponse response = msg.toResponse();
+                    if ( method.equalsIgnoreCase(response.getMethod().toString())
+                            && response.getStatus() == responseStatus) {
+                        it.remove();
+                        result = event;
+                        ++count;
+                    }
                 }
             }
 
@@ -145,51 +141,24 @@ public class SipAndTransactionStorage {
                 fail("Found many " + responseStatus + " response to " + method.toUpperCase() + " but didn't find one");
             }
 
-            return result.transaction;
+            return result;
         }
     }
 
     /**
-     * Call this method when a transaction has been terminated. Your test mock class will be called
-     * on the {@link MockTransactionUser#onTransactionTerminated(Transaction)} so then you should
-     * just call this method.
+     * Use a filter to find a particular event.
      *
-     * @param transaction
+     * @param predicate
+     * @return
      */
-    public void onTransactionTerminated(final Transaction transaction) {
-        assertThat(transaction, not((Transaction)null));
-        // assertThat(allTransactions.remove(transaction.id()), not((Transaction)null));
-        terminatedTransaction.put(transaction.id(), transaction);
+    public T ensureEvent(String errorMessage, Predicate<T> predicate) {
+        Optional<T> result = messages.stream().filter(predicate).findFirst();
+        assertThat(errorMessage, result.isPresent(), is(true));
+        return result.get();
     }
 
-    /**
-     * Ensure that the transaction is indeed terminated.
-     *
-     * @param id
-     */
-    public void ensureTransactionTerminated(final TransactionId id) {
-        final Transaction transaction = terminatedTransaction.remove(id);
-        assertThat(transaction, not((Transaction)null));
-        assertThat(transaction.state(), is(TransactionState.TERMINATED));
+    public T ensureEvent(Predicate<T> predicate) {
+        return ensureEvent("Unable to find the event you were looking for", predicate);
     }
 
-    public static class Holder {
-
-        private final SipMessage msg;
-        private final Transaction transaction;
-
-        public Holder(final Transaction transaction, final SipMessage msg) {
-            this.transaction = transaction;
-            this.msg = msg;
-        }
-
-        public SipMessage message() {
-            return msg;
-        }
-
-        public Transaction transaction() {
-            return transaction;
-        }
-
-    }
 }

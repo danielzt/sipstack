@@ -12,7 +12,7 @@ import io.sipstack.transport.Flow;
  *
  * @author jonas@jonasborjesson.com
  */
-public interface Transactions {
+public interface TransactionLayer {
 
     /**
      * Have the {@link SipMessage} sent through the transaction layer using

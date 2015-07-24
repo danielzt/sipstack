@@ -1,12 +1,14 @@
 package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.header.CallIdHeader;
-import io.pkts.packet.sip.header.SipHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.event.SipRequestTransactionEvent;
 import io.sipstack.transport.Flow;
+import io.sipstack.transport.event.FlowEvent;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -37,15 +39,12 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         // note, we create the ACK based on the defaultInviteRequest
         // but if that isn't true then we are screwed since it won't
         // be the same dialog. But then again, we are testing the
-        // transaction level so it wouldn't matchi this ACK to
+        // transaction level so it wouldn't match this ACK to
         // anything anyway...
-        final Flow flow = Mockito.mock(Flow.class);
-        transactionLayer.onMessage(flow, defaultAckRequest);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(transaction.flow(), defaultAckRequest));
 
-        final Transaction ackTransaction = myApplication.assertAndConsumeRequest("ack");
-        assertThat(ackTransaction.flow(), is(flow));
-
-        myApplication.ensureTransactionTerminated(ackTransaction.id());
+        final Transaction ackTransaction = mockChannelContext.assertAndConsumeRequest("ack").transaction();
+        mockChannelContext.ensureTransactionTerminated(ackTransaction.id());
     }
 
     /**
@@ -72,15 +71,13 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
     public void testTimerG() throws Exception {
         transitionToCompleted(500);
 
-        // clear out any messages and reset the countdown latch
-        transports.reset();
+        // clear out any messages so we know that when we issue
+        // the re-transmit that it indeed is a re-transmit.
+        mockChannelContext.reset();
 
         defaultScheduler.fire(SipTimer.G);
 
-        transports.latch().await();
-
-        // we should have the 500 being re-transmitted
-        transports.assertAndConsumeResponse("invite", 500);
+        mockChannelContext.assertAndConsumeDownstreamResponse("invite", 500);
 
         // and timer G should have been fired again
         assertTimerScheduled(SipTimer.G);
@@ -95,12 +92,16 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
      */
     @Test(timeout = 500)
     public void testBasicTransition() throws Exception {
+        // remember that the transaction returned here
+        // is a immutable snapshot of what the transaction was
+        // and cannot therefore be used later on to check if it
+        // transitioned to another state.
         final Transaction transaction = transitionToAccepted(200);
 
         // "fire" timer L
         defaultScheduler.fire(SipTimer.L);
 
-        myApplication.ensureTransactionTerminated(transaction.id());
+        mockChannelContext.ensureTransactionTerminated(transaction.id());
     }
 
 
@@ -122,11 +123,10 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
      *
      * @param finalResponseStatus
      */
-    public Transaction initiateTransition(final int finalResponseStatus) {
+    public Transaction initiateTransition(final int finalResponseStatus) throws Exception {
         // we will be using this header to tell the {@link MockTransactionUser} which response
         // to generate and send back...
         final SipRequest invite = defaultInviteRequest.clone();
-        invite.setHeader(SipHeader.create("X-Transaction-Test-Response", Integer.toString(finalResponseStatus)));
 
         // change the branch since we will otherwise actually hit the
         // same transaction and then this will be a re-transmission
@@ -135,19 +135,26 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         invite.getViaHeader().setBranch(ViaHeader.generateBranch());
 
         final Flow flow = Mockito.mock(Flow.class);
-        transactionLayer.onMessage(flow, invite);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, invite));
 
-        // ensure that we indeed received an invite request
-        // over in the transaction user (which again is the layer above
-        // the Transport Layer and is acting as our application right now)
-        final Transaction transaction = myApplication.assertAndConsumeRequest("invite");
+        final SipRequestTransactionEvent event = mockChannelContext.assertAndConsumeRequest("invite");
 
-        // ensure that the transport layer received the final response
-        // as our application, the transaction user, generated.
-        // See the {@link MockTransactionUser} for how this is done.
-        transports.assertAndConsumeResponse("invite", finalResponseStatus);
+        // so, we have not ensured that the request (the flow event) went through
+        // the Transaction Layer and the transaction layer generated a new transaction
+        // and passed on the request to the next handler in the pipe. We don't have
+        // another handler though but the Transaction Layer doesn't know that :-).
+        // In either case, we will invoke the Transport Layer again, now sending
+        // a response down the pipe instead, just as if an application would have.
+        final SipResponse response = event.request().createResponse(finalResponseStatus);
+        event.transaction().send(response);
 
-        return transaction;
+        // the transaction layer should be invoked again and if the state machine
+        // doesn't consume it, which it shouldn't in this case, then the response
+        // will be written to the ChannelHandlerContext again, which we then can
+        // verify
+        mockChannelContext.assertAndConsumeDownstreamResponse("invite", finalResponseStatus);
+
+        return event.transaction();
     }
 
     /**

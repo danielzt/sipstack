@@ -17,8 +17,10 @@ import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 public abstract class SipTimerEvent extends Event {
 
     private final Object key;
+    private final ChannelHandlerContext ctx;
 
-    private SipTimerEvent(final Object key) {
+    private SipTimerEvent(final ChannelHandlerContext ctx, final Object key) {
+        this.ctx = ctx;
         this.key = key;
     }
 
@@ -43,6 +45,10 @@ public abstract class SipTimerEvent extends Event {
         return key;
     }
 
+    public ChannelHandlerContext ctx() {
+        return ctx;
+    }
+
     public SipTimerEvent toSipTimerEvent() {
         return this;
     }
@@ -54,6 +60,7 @@ public abstract class SipTimerEvent extends Event {
 
     public static class Builder {
         private final SipTimer timer;
+        private ChannelHandlerContext ctx;
         private Object key;
 
         private Builder(final SipTimer timer) {
@@ -83,45 +90,51 @@ public abstract class SipTimerEvent extends Event {
             return this;
         }
 
+        public Builder withContext(final ChannelHandlerContext ctx) {
+            this.ctx = ctx;
+            return this;
+        }
+
         public SipTimerEvent build() {
             ensureNotNull(key, "The Key for this SIP Timer Event cannot be null");
+            ensureNotNull(ctx, "The ChannelHanlderContext cannot be null");
             switch (this.timer) {
                 case Trying:
-                    return new Timer100Trying(key);
+                    return new Timer100Trying(ctx, key);
                 case A:
-                    return new TimerA(key);
+                    return new TimerA(ctx, key);
                 case B:
-                    return new TimerB(key);
+                    return new TimerB(ctx, key);
                 case C:
-                    return new TimerC(key);
+                    return new TimerC(ctx, key);
                 case D:
-                    return new TimerD(key);
+                    return new TimerD(ctx, key);
                 case E:
-                    return new TimerE(key);
+                    return new TimerE(ctx, key);
                 case F:
-                    return new TimerF(key);
+                    return new TimerF(ctx, key);
                 case G:
-                    return new TimerG(key);
+                    return new TimerG(ctx, key);
                 case H:
-                    return new TimerH(key);
+                    return new TimerH(ctx, key);
                 case I:
-                    return new TimerI(key);
+                    return new TimerI(ctx, key);
                 case J:
-                    return new TimerJ(key);
+                    return new TimerJ(ctx, key);
                 case K:
-                    return new TimerK(key);
+                    return new TimerK(ctx, key);
                 case L:
-                    return new TimerL(key);
+                    return new TimerL(ctx, key);
                 case M:
-                    return new TimerM(key);
+                    return new TimerM(ctx, key);
                 default:
                     throw new RuntimeException("Don't know what you are talking about.");
             }
         }
 
         private static class Timer100Trying extends SipTimerEvent {
-            private Timer100Trying(final Object key) {
-                super(key);
+            private Timer100Trying(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -137,8 +150,8 @@ public abstract class SipTimerEvent extends Event {
 
 
         private static class TimerA extends SipTimerEvent {
-            private TimerA(final Object key) {
-                super(key);
+            private TimerA(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -153,8 +166,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerB extends SipTimerEvent {
-            private TimerB(final Object key) {
-                super(key);
+            private TimerB(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -169,8 +182,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerC extends SipTimerEvent {
-            private TimerC(final Object key) {
-                super(key);
+            private TimerC(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -185,8 +198,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerD extends SipTimerEvent {
-            private TimerD(final Object key) {
-                super(key);
+            private TimerD(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -201,8 +214,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerE extends SipTimerEvent {
-            private TimerE(final Object key) {
-                super(key);
+            private TimerE(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -217,8 +230,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerF extends SipTimerEvent {
-            private TimerF(final Object key) {
-                super(key);
+            private TimerF(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -233,8 +246,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerG extends SipTimerEvent {
-            private TimerG(final Object key) {
-                super(key);
+            private TimerG(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -249,8 +262,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerH extends SipTimerEvent {
-            private TimerH(final Object key) {
-                super(key);
+            private TimerH(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -265,8 +278,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerI extends SipTimerEvent {
-            private TimerI(final Object key) {
-                super(key);
+            private TimerI(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -281,8 +294,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerJ extends SipTimerEvent {
-            private TimerJ(final Object key) {
-                super(key);
+            private TimerJ(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -298,8 +311,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerK extends SipTimerEvent {
-            private TimerK(final Object key) {
-                super(key);
+            private TimerK(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -315,8 +328,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerL extends SipTimerEvent {
-            private TimerL(final Object key) {
-                super(key);
+            private TimerL(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override
@@ -332,8 +345,8 @@ public abstract class SipTimerEvent extends Event {
         }
 
         private static class TimerM extends SipTimerEvent {
-            private TimerM(final Object key) {
-                super(key);
+            private TimerM(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
             }
 
             @Override

@@ -1,5 +1,6 @@
 package io.sipstack.actor;
 
+import io.netty.channel.ChannelHandlerContext;
 import io.sipstack.event.Event;
 import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.Clock;
@@ -34,13 +35,17 @@ public class SingleContext implements ActorContext, Scheduler {
 
     private final Clock clock;
 
+    private final ChannelHandlerContext ctx;
+
     private final DefaultTransactionLayer transactionLayer;
 
     public SingleContext(final Clock clock,
+                         final ChannelHandlerContext ctx,
                          final InternalScheduler scheduler,
                          final TransactionId transactionId,
                          final DefaultTransactionLayer transactionLayer) {
         this.clock = clock;
+        this.ctx = ctx;
         this.scheduler = scheduler;
         this.transactionId = transactionId;
         this.transactionLayer = transactionLayer;
@@ -88,7 +93,7 @@ public class SingleContext implements ActorContext, Scheduler {
             throw new RuntimeException("Unable to schedule a timer because there is no underlying transaction");
         }
 
-        final SipTimerEvent event = SipTimerEvent.withTimer(timer).withKey(transactionId).build();
+        final SipTimerEvent event = SipTimerEvent.withTimer(timer).withKey(transactionId).withContext(ctx).build();
         return scheduler.schedule(transactionLayer, event, delay);
 
         /*

@@ -7,8 +7,9 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionState;
-import io.sipstack.transaction.impl.SipAndTransactionStorage.Holder;
+import io.sipstack.transaction.event.SipTransactionEvent;
 import io.sipstack.transport.Flow;
+import io.sipstack.transport.event.FlowEvent;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -34,7 +35,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     @Test(timeout = 500)
     public void testTrying() throws Exception {
         // TODO: we should send every type of request there is.
-        final Holder holder = initiateNewTransaction("bye");
+        final SipTransactionEvent holder = initiateNewTransaction("bye");
     }
 
     /**
@@ -87,7 +88,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      */
     @Test(timeout = 500)
     public void testTransitionToTerminatedFromCompleted() throws Exception {
-        final Holder holder = transitionFromTryingToCompleted("bye", 200);
+        final SipTransactionEvent holder = transitionFromTryingToCompleted("bye", 200);
         defaultScheduler.fire(SipTimer.K);
         myApplication.ensureTransactionTerminated(holder.transaction().id());
     }
@@ -100,7 +101,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     @Test(timeout = 500)
     public void testTransitionToCompletedFromProceeding() throws Exception {
         // TODO: test all combinations of provisional and all known SIP methods
-        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
     }
 
     /**
@@ -111,10 +112,12 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      */
     @Test(timeout = 500)
     public void testTransitionTryingProceedingCompletedTerminated() throws Exception {
-        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
         final SipRequest request = holder.message().toRequest();
         final SipResponse response = request.createResponse(200);
-        transactionLayer.onMessage(mock(Flow.class), response);
+
+        final Flow flow = mock(Flow.class);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
         myApplication.assertAndConsumeResponse("bye", 200);
 
         // should now be in completed so timer K should have been
@@ -132,10 +135,11 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      */
     @Test(timeout = 500)
     public void test1xxResponsesWhileInProceedingState() throws Exception {
-        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
         final SipRequest request = holder.message().toRequest();
         final SipResponse response = request.createResponse(180);
-        transactionLayer.onMessage(mock(Flow.class), response);
+        final Flow flow = mock(Flow.class);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
         myApplication.assertAndConsumeResponse("bye", 180);
     }
 
@@ -147,7 +151,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      */
     @Test(timeout = 500)
     public void testTimerEWhileInProceedingState() throws Exception {
-        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
         defaultScheduler.fire(SipTimer.E);
 
         transports.assertRequest("bye");
@@ -165,7 +169,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      */
     @Test(timeout = 500)
     public void testTimerFWhileInProceedingState() throws Exception {
-        final Holder holder = transitionFromTryingToProceeding("bye", 100);
+        final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
         defaultScheduler.fire(SipTimer.F);
         assertTimerCancelled(SipTimer.E);
         myApplication.ensureTransactionTerminated(holder.transaction().id());
@@ -180,14 +184,15 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      * @return
      * @throws Exception
      */
-    private Holder transitionFromTryingToCompleted(final String method, final int responseStatus) throws Exception {
+    private SipTransactionEvent transitionFromTryingToCompleted(final String method, final int responseStatus) throws Exception {
         // ensure no one is using this method wrong
         assertThat("Only final responses pls!", responseStatus >= 200, is(true));
 
-        final Holder holder = initiateNewTransaction(method);
+        final SipTransactionEvent holder = initiateNewTransaction(method);
         final SipRequest request = holder.message().toRequest();
         final SipResponse response = request.createResponse(responseStatus);
-        transactionLayer.onMessage(mock(Flow.class), response);
+        final Flow flow = mock(Flow.class);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
         myApplication.assertAndConsumeResponse(method, responseStatus);
 
         assertTimerScheduled(SipTimer.K);
@@ -197,20 +202,20 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     /**
      * Helper method to transition Trying -> Proceeding
      */
-    private Holder transitionFromTryingToProceeding(final String method, final int responseStatus) throws Exception {
+    private SipTransactionEvent transitionFromTryingToProceeding(final String method, final int responseStatus) throws Exception {
         // ensure no one is using this method wrong
         assertThat("Only provisional responses pls!", responseStatus / 100 == 1, is(true));
 
-        final Holder holder = initiateNewTransaction(method);
+        final SipTransactionEvent holder = initiateNewTransaction(method);
         final SipRequest request = holder.message().toRequest();
         final SipResponse response = request.createResponse(responseStatus);
-        transactionLayer.onMessage(mock(Flow.class), response);
+        final Flow flow = mock(Flow.class);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
         myApplication.assertAndConsumeResponse(method, responseStatus);
 
         assertTimerScheduled(SipTimer.E);
         assertTimerScheduled(SipTimer.F);
         return holder;
-
     }
 
     /**
@@ -223,7 +228,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      * @return
      * @throws Exception
      */
-    public Holder initiateNewTransaction(final String method) throws Exception {
+    public SipTransactionEvent initiateNewTransaction(final String method) throws Exception {
         final SipRequest request = generateRequest(method);
 
         // change the branch since we will otherwise actually hit the
@@ -251,7 +256,9 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         assertTimerScheduled(SipTimer.E);
         assertTimerScheduled(SipTimer.F);
 
-        return new Holder(t1, request);
+        // return new Holder(t1, request);
+        // TODO
+        return null;
     }
 
     private SipRequest generateRequest(final String method) {

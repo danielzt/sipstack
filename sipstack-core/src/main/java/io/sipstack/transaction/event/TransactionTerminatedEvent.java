@@ -5,6 +5,8 @@ package io.sipstack.transaction.event;
  */
 public interface TransactionTerminatedEvent extends TransactionLifeCycleEvent {
 
+
+
     @Override
     default boolean isTransactionTerminatedEvent() {
         return true;

@@ -4,6 +4,7 @@ import io.sipstack.SipStackTestBase;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
+import io.sipstack.transaction.TransactionLayer;
 import org.junit.Before;
 
 /**
@@ -18,12 +19,12 @@ public class TransactionTestBase extends SipStackTestBase {
 
     protected MockTransportLayer transports;
 
+    protected MockChannelHandlerContext mockChannelContext;
+
     /**
-     * The Transaction Layer is implementing the {@link TransportUser} interface
-     * which is how we will "give/send" messages through that layer. Then, on the other
-     * side, as in the upper part of the stack, the Transaction Layer is exposing the
-     * {@link MockTransactionUser} interface which is how we are able to send messages
-     * out of the stack (and through the transaction layer) again.
+     * The {@link TransactionLayer} is really just another Netty
+     * inbound/outbound handler so we will simply be sending events
+     * up and down the chain to simulate the network.
      */
     protected DefaultTransactionLayer transactionLayer;
 
@@ -42,11 +43,9 @@ public class TransactionTestBase extends SipStackTestBase {
         myApplication = new MockTransactionUser();
         transports = new MockTransportLayer();
 
-        throw new RuntimeException("In the middle of re-writing this again");
-        // transactionLayer = new DefaultTransactionLayer(clock, defaultScheduler, myApplication, config);
-        // transactionLayer.start(transports);
+        mockChannelContext = new MockChannelHandlerContext();
 
-        // myApplication.start(transactionLayer);
+        transactionLayer = new DefaultTransactionLayer(transports, new SystemClock(), defaultScheduler, config);
     }
 
     public void reset() {

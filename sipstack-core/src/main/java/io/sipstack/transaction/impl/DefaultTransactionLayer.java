@@ -17,8 +17,9 @@ import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionState;
-import io.sipstack.transaction.Transactions;
+import io.sipstack.transaction.TransactionLayer;
 import io.sipstack.transaction.event.TransactionEvent;
+import io.sipstack.transaction.event.TransactionLifeCycleEvent;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
 import io.sipstack.transport.event.FlowEvent;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
 /**
  * @author jonas@jonasborjesson.com
  */
-public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter implements Transactions, TransactionFactory, SipTimerListener {
+public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter implements TransactionLayer, TransactionFactory, SipTimerListener {
 
     private static final Logger logger = LoggerFactory.getLogger(DefaultTransactionLayer.class);
 
@@ -96,7 +97,7 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
         final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(true, flow, msg);
         try {
             invoke(ctx, flow, Event.create(msg), holder);
-            checkIfTerminated(holder);
+            checkIfTerminated(ctx, holder);
         } catch (final ClassCastException e) {
             // strange...
             logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
@@ -117,29 +118,7 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
     private void processTransactionWrite(final ChannelHandlerContext ctx, final Flow flow, final TransactionId id, final SipMessage msg) {
         final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.get(id);
         invoke(ctx, flow, Event.create(msg), holder);
-        checkIfTerminated(holder);
-    }
-
-    // @Override
-    public void onMessage(final Flow flow, final SipMessage msg) {
-        if (true)
-            throw new RuntimeException("Shouldn't be used anymore");
-        // the onMessage method is the API the transaction layer implements to interact
-        // with the underlying transport layer, hence, any message we recieve here
-        // is going up the stack, hence the value true on "ensureTransaction"
-    }
-
-    // @Override
-    public void onWriteCompleted(Flow flow, SipMessage msg) {
-        System.err.println("Yay, the write completed for message " + msg);
-        throw new RuntimeException("Shouldn't be used anymore");
-
-    }
-
-    // @Override
-    public void onWriteFailed(Flow flow, SipMessage msg) {
-        System.err.println("Nooooo, the write failed for message " + msg);
-        throw new RuntimeException("Shouldn't be used anymore");
+        checkIfTerminated(ctx, holder);
     }
 
     private void invoke(final ChannelHandlerContext ctx, final Flow flow, final Event event, final DefaultTransactionHolder holder) {
@@ -148,7 +127,7 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
         }
 
         try {
-            final SingleContext actorCtx = invokeTransaction(flow, event, holder);
+            final SingleContext actorCtx = invokeTransaction(ctx, flow, event, holder);
             actorCtx.downstream().ifPresent(e -> {
                 final FlowEvent flowEvent = FlowEvent.create(flow, e.getSipMessage());
                 ctx.write(flowEvent);
@@ -170,13 +149,13 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
     }
 
     @Override
-    public void onTimeout(SipTimerEvent timer) {
+    public void onTimeout(final SipTimerEvent timer) {
         try {
             final TransactionId id = (TransactionId) timer.key();
             final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.get(id);
             if (holder != null) {
-                invoke(null, null, timer, holder);
-                checkIfTerminated(holder);
+                invoke(timer.ctx(), holder.flow(), timer, holder);
+                checkIfTerminated(timer.ctx(), holder);
             }
 
         } catch (final ClassCastException e) {
@@ -190,7 +169,7 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
      *
      * @param actor
      */
-    private void checkIfTerminated(final DefaultTransactionHolder holder) {
+    private void checkIfTerminated(final ChannelHandlerContext ctx, final DefaultTransactionHolder holder) {
         if (holder == null) {
             return;
         }
@@ -205,6 +184,9 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
             // TODO: an actor can emit more events here.
             actor.stop();
             actor.postStop();
+            final Transaction t = new TransactionSnapshot(ctx, holder.id(), holder.state(), holder.flow());
+            final TransactionLifeCycleEvent terminatedEvent = TransactionEvent.create(t);
+            ctx.fireChannelRead(terminatedEvent);
         }
     }
 
@@ -214,12 +196,13 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
      * @param transaction
      * @return
      */
-    private SingleContext invokeTransaction(final Flow flow,
+    private SingleContext invokeTransaction(final ChannelHandlerContext channelCtx,
+                                            final Flow flow,
                                             final Event event,
                                             final DefaultTransactionHolder holder) {
 
         final TransactionActor transaction = holder.actor;
-        final SingleContext ctx = new SingleContext(clock, scheduler, transaction != null ? transaction.id() : null, this);
+        final SingleContext ctx = new SingleContext(clock, channelCtx, scheduler, transaction != null ? transaction.id() : null, this);
         if (transaction != null) {
             // Note, the synchronization model for everything within the core
             // sip stack is that you can ONLY hold one lock at a time and
@@ -293,19 +276,7 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
 
     @Override
     public Transaction send(final Flow flow, final SipMessage msg) {
-        if (true)
-            throw new RuntimeException("This method needs to be killed...");
-        // note, the "send" method is exposed by our "north facing" API hence the
-        // direction of the message is "down" hence the boolean value false to ensureTransaction
-        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(false, flow, msg);
-        try {
-            invoke(null, flow, Event.create(msg), holder);
-            checkIfTerminated(holder);
-        } catch (final ClassCastException e) {
-            // strange...
-            logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
-        }
-        return holder;
+        throw new RuntimeException("This method needs to be killed...");
     }
 
 

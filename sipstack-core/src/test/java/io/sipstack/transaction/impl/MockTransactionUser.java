@@ -10,8 +10,9 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
+import io.sipstack.transaction.TransactionLayer;
 import io.sipstack.transaction.TransactionUser;
-import io.sipstack.transaction.Transactions;
+import io.sipstack.transaction.event.TransactionEvent;
 
 import java.util.Optional;
 
@@ -24,23 +25,28 @@ import static org.junit.Assert.*;
 public class MockTransactionUser implements TransactionUser {
 
     /**
-     * The {@link Transactions} API is our way into the transaction layer
+     * The {@link TransactionLayer} API is our way into the transaction layer
      * and is how we will be writing messages back.
      */
-    private Transactions transactionLayer;
+    private TransactionLayer transactionLayer;
 
-    private SipAndTransactionStorage storage = new SipAndTransactionStorage();
+    private SipAndTransactionStorage<TransactionEvent> storage = new SipAndTransactionStorage<>(transactionEvent -> {
+        if (transactionEvent.isSipTransactionEvent()) {
+            return transactionEvent.toSipTransactionEvent().message();
+        }
+        return null;
+    });
 
     public void ensureTransactionTerminated(final TransactionId id) {
-        storage.ensureTransactionTerminated(id);
+        fail("not to use this one anymore...");
     }
 
     public Transaction assertAndConsumeRequest(final String method) {
-        return storage.assertAndConsumeRequest(method);
+        return storage.assertAndConsumeRequest(method).transaction();
     }
 
     public Transaction assertAndConsumeResponse(final String method, final int responseStatus) {
-        return storage.assertAndConsumeResponse(method, responseStatus);
+        return storage.assertAndConsumeResponse(method, responseStatus).transaction();
     }
 
     /**
@@ -55,7 +61,7 @@ public class MockTransactionUser implements TransactionUser {
                 .withPort(5060)
                 .onSuccess(f -> {
                     final Transaction t = transactionLayer.send(f, request);
-                    storage.store(t, request);
+                    // storage.store(t, request);
                 })
                 .onFailure(f -> fail("Not sure why this failed"))
                 .onCancelled(f -> fail("Who cancelled the flow future!"))
@@ -82,13 +88,13 @@ public class MockTransactionUser implements TransactionUser {
     }
 
     @Override
-    public void start(final Transactions transactionLayer) {
+    public void start(final TransactionLayer transactionLayer) {
         this.transactionLayer = transactionLayer;
     }
 
     @Override
     public void onRequest(final Transaction transaction, final SipRequest request) {
-        storage.store(transaction, request);
+        // storage.store(transaction, request);
 
         if (request.isAck()) {
             return;
@@ -113,7 +119,7 @@ public class MockTransactionUser implements TransactionUser {
 
     @Override
     public void onResponse(final Transaction transaction, final SipResponse response) {
-        storage.store(transaction, response);
+        // storage.store(transaction, response);
 
         if (response.isSuccess() && response.isInvite()) {
             final ViaHeader via = ViaHeader.with()
@@ -134,14 +140,15 @@ public class MockTransactionUser implements TransactionUser {
                     .via(via).build();
 
             final Transaction ackTransaction = transactionLayer.send(transaction.flow(), ack);
-            assertThat(ackTransaction, not((Transaction)null));
-            storage.store(ackTransaction, ack);
+            assertThat(ackTransaction, not((Transaction) null));
+            // storage.store(ackTransaction, ack);
         }
     }
 
     @Override
     public void onTransactionTerminated(final Transaction transaction) {
-        storage.onTransactionTerminated(transaction);
+        fail("not using this anymore...");
+        // storage.onTransactionTerminated(transaction);
     }
 
     @Override

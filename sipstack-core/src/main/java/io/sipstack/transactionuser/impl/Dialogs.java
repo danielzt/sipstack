@@ -15,7 +15,7 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.pkts.packet.sip.header.impl.AddressParametersHeaderImpl;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
-import io.sipstack.transaction.Transactions;
+import io.sipstack.transaction.TransactionLayer;
 import io.sipstack.transactionuser.Dialog;
 import io.sipstack.transactionuser.DialogEvent;
 import io.sipstack.transactionuser.TransactionEvent;
@@ -74,7 +74,7 @@ public class Dialogs {
     private enum State {TRYING, PROCEEDING, EARLY, CONFIRMED, TERMINATED}
 
     private final Consumer<DialogEvent> upstream;
-    private final Transactions transactions;
+    private final TransactionLayer transactionLayer;
     private final SipRequest request;
     private final Buffer callId;
     private final Buffer localTag;
@@ -83,10 +83,10 @@ public class Dialogs {
     // For now support only one dialog
     private final MyDialog dialog = new MyDialog();
 
-    public Dialogs(final Consumer<DialogEvent> upstream, final Transactions transactions,
+    public Dialogs(final Consumer<DialogEvent> upstream, final TransactionLayer transactionLayer,
             final Transaction tx, final SipRequest request, final boolean isUpstream) {
         this.upstream = upstream;
-        this.transactions = transactions;
+        this.transactionLayer = transactionLayer;
         this.request = request;
         this.callId = request.getCallIDHeader().getCallId();
         this.localTag = getLocalTag(request, isUpstream);
@@ -174,21 +174,21 @@ public class Dialogs {
             request.addHeaderFirst(via);
 
             if (remoteContact != null) {
-                transactions.createFlow(remoteContact.getHost())
+                transactionLayer.createFlow(remoteContact.getHost())
                         .withPort(remoteContact.getPort())
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactions.send(f, request);
+                            final Transaction t = transactionLayer.send(f, request);
                         })
                         .connect();
             } else {
-                transactions.createFlow(REMOTE_HOST)
+                transactionLayer.createFlow(REMOTE_HOST)
                         .withPort(REMOTE_PORT)
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactions.send(f, request);
+                            final Transaction t = transactionLayer.send(f, request);
                         })
                         .connect();
             }
@@ -198,21 +198,21 @@ public class Dialogs {
         public void send(final SipResponse message) {
             message.setHeader(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
             if (remoteContact != null) {
-                transactions.createFlow(remoteContact.getHost())
+                transactionLayer.createFlow(remoteContact.getHost())
                         .withPort(remoteContact.getPort())
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactions.send(f, message);
+                            final Transaction t = transactionLayer.send(f, message);
                         })
                         .connect();
             } else {
-                transactions.createFlow(REMOTE_HOST)
+                transactionLayer.createFlow(REMOTE_HOST)
                         .withPort(REMOTE_PORT)
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactions.send(f, message);
+                            final Transaction t = transactionLayer.send(f, message);
                         })
                         .connect();
             }

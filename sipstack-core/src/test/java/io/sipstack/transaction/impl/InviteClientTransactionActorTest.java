@@ -6,8 +6,10 @@ import io.pkts.packet.sip.header.CallIdHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.transaction.Transaction;
-import io.sipstack.transaction.impl.SipAndTransactionStorage.Holder;
+import io.sipstack.transaction.event.SipTransactionEvent;
+import io.sipstack.transaction.event.TransactionEvent;
 import io.sipstack.transport.Flow;
+import io.sipstack.transport.event.FlowEvent;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -33,7 +35,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      */
     @Test
     public void testSendAckOn200() throws Exception {
-        final Holder holder = initiateTransition(200);
+        final SipTransactionEvent event = initiateTransition(200);
         transports.assertAndConsumeRequest("ack");
     }
 
@@ -46,11 +48,11 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
     // @Test(timeout = 1000)
     @Test
     public void testRetransmittedWhileInAccepted() throws Exception {
-        final Holder holder = initiateTransition(200);
+        final SipTransactionEvent event = initiateTransition(200);
         reset();
-        final SipResponse reTransmitted = holder.message().createResponse(200);
+        final SipResponse reTransmitted = event.message().createResponse(200);
         final Flow flow = Mockito.mock(Flow.class);
-        transactionLayer.onMessage(flow, reTransmitted);
+        transactionLayer.channelRead(defaultChannelCtx, FlowEvent.create(flow, reTransmitted));
         myApplication.assertAndConsumeResponse("invite", 200);
     }
     /**
@@ -85,10 +87,10 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         final int provisionalResponse = PROVISIONAL[0];
         final int failureResponse = CLIENT_FAILURES[0];
 
-        final Holder holder = initiateTransition(provisionalResponse);
-        final SipResponse response = holder.message().createResponse(failureResponse);
+        final SipTransactionEvent event = initiateTransition(provisionalResponse);
+        final SipResponse response = event.message().createResponse(failureResponse);
         final Flow flow = Mockito.mock(Flow.class);
-        transactionLayer.onMessage(flow, response);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 
         assertTimerScheduled(SipTimer.D);
         reset();
@@ -107,10 +109,10 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
                 final int provisionalResponse = PROVISIONAL[i];
                 final int successfulResponse = SUCCESSFUL[j];
                 System.out.println("Testing provisional " + provisionalResponse + " then final " + successfulResponse);
-                final Holder holder = initiateTransition(provisionalResponse);
-                final SipResponse response = holder.message().createResponse(successfulResponse);
+                final SipTransactionEvent event = initiateTransition(provisionalResponse);
+                final SipResponse response = event.response().createResponse(successfulResponse);
                 final Flow flow = Mockito.mock(Flow.class);
-                transactionLayer.onMessage(flow, response);
+                transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 
                 assertTimerScheduled(SipTimer.M);
                 reset();
@@ -129,14 +131,14 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
     public void testRetransmitWhileInProceeding() throws Exception {
 
         for (int i = 100; i < 200; ++i) {
-            final Holder holder = initiateTransition(i);
+            final SipTransactionEvent event = initiateTransition(i);
             assertTimerCancelled(SipTimer.A);
             assertTimerCancelled(SipTimer.B);
             reset();
 
-            final SipResponse response = holder.message().createResponse(i);
+            final SipResponse response = event.message().createResponse(i);
             final Flow flow = Mockito.mock(Flow.class);
-            transactionLayer.onMessage(flow, response);
+            transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 
             myApplication.assertAndConsumeResponse("invite", i);
             reset();
@@ -155,9 +157,9 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
 
     @Test(timeout = 500)
     public void testFireTimerA() throws Exception {
-        final Holder holder = initiateNewTransaction();
-        final Transaction t1 = holder.transaction();
-        final SipRequest request = holder.message().toRequest();
+        final SipTransactionEvent event = initiateNewTransaction();
+        final Transaction t1 = event.transaction();
+        final SipRequest request = event.message().toRequest();
 
         defaultScheduler.fire(SipTimer.A);
 
@@ -180,7 +182,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      * @return
      * @throws Exception
      */
-    public Holder initiateNewTransaction() throws Exception {
+    public SipTransactionEvent initiateNewTransaction() throws Exception {
         final SipRequest invite = defaultInviteRequest.clone();
         // change the branch since we will otherwise actually hit the
         // same transaction and then this will be a re-transmission
@@ -207,7 +209,8 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         assertTimerScheduled(SipTimer.A);
         assertTimerScheduled(SipTimer.B);
 
-        return new Holder(t1, request);
+        // return new Holder(t1, request);
+        return null;
     }
 
     /**
@@ -217,15 +220,15 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      *
      * @param finalResponseStatus
      */
-    public Holder initiateTransition(final int finalResponseStatus) throws Exception {
-        final Holder holder = initiateNewTransaction();
+    public SipTransactionEvent initiateTransition(final int finalResponseStatus) throws Exception {
+        final TransactionEvent holder = initiateNewTransaction();
         final Transaction t1 = holder.transaction();
-        final SipRequest request = holder.message().toRequest();
+        final SipRequest request = holder.toSipRequestTransactionEvent().request();
 
         // create the final response
         final SipResponse response = request.createResponse(finalResponseStatus);
         final Flow flow = Mockito.mock(Flow.class);
-        transactionLayer.onMessage(flow, response);
+        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 
         // the final response should have been propagated through the transaction layer
         // and then ending up in our "application" (our transaction user mock object).
@@ -235,7 +238,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         // transaction as what the original invite request got associated with.
         assertThat(t1.id(), is(t2.id()));
 
-        return holder;
+        return holder.toSipTransactionEvent();
     }
 
 }

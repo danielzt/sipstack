@@ -4,8 +4,10 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.TransactionState;
 import io.sipstack.transaction.event.impl.SipRequestTransactionEventImpl;
 import io.sipstack.transaction.event.impl.SipResponseTransactionEventImpl;
+import io.sipstack.transaction.event.impl.TransactionTerminatedEventImpl;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -75,6 +77,19 @@ public interface TransactionEvent {
         }
 
         return create(transaction, msg.toResponse());
+    }
+
+    /**
+     *
+     * @param transaction
+     * @return
+     */
+    static TransactionLifeCycleEvent create(final Transaction transaction) {
+        if (transaction.state() == TransactionState.TERMINATED) {
+            return new TransactionTerminatedEventImpl(transaction);
+        }
+
+        throw new RuntimeException("havent' done the rest yet...");
     }
 
     static SipRequestTransactionEvent create(final Transaction transaction, final SipRequest request) {

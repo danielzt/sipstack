@@ -56,4 +56,11 @@ public class AckTransactionActor extends ActorSupport<Event, TransactionState> i
     public TransactionId id() {
         return id;
     }
+
+    @Override
+    public boolean isClientTransaction() {
+        // TODO: we may have to separate out the ack transaction into two (server and client).
+        // not so sure though but we'll see...
+        return false;
+    }
 }

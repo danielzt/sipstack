@@ -60,8 +60,8 @@ public class MockTransactionUser implements TransactionUser {
                 .withTransport(Transport.udp)
                 .withPort(5060)
                 .onSuccess(f -> {
-                    final Transaction t = transactionLayer.send(f, request);
-                    // storage.store(t, request);
+                    transactionLayer.newClientTransaction(f, request).start();
+                    // storage.store(request);
                 })
                 .onFailure(f -> fail("Not sure why this failed"))
                 .onCancelled(f -> fail("Who cancelled the flow future!"))
@@ -106,7 +106,8 @@ public class MockTransactionUser implements TransactionUser {
             responseCode = Integer.valueOf(header.get().getValue().toString());
         }
 
-        transactionLayer.send(transaction.flow(), request.createResponse(responseCode));
+        // transactionLayer.send(transaction.flow(), request.createResponse(responseCode));
+        throw new RuntimeException("In the middle of fixing all of this stuff again");
 
         /*
         FlowFuture flowFuture = Flow.withHost().withPort()...connect();
@@ -139,9 +140,10 @@ public class MockTransactionUser implements TransactionUser {
                     .cseq(cSeq)
                     .via(via).build();
 
-            final Transaction ackTransaction = transactionLayer.send(transaction.flow(), ack);
-            assertThat(ackTransaction, not((Transaction) null));
+            // final Transaction ackTransaction = transactionLayer.send(transaction.flow(), ack);
+            // assertThat(ackTransaction, not((Transaction) null));
             // storage.store(ackTransaction, ack);
+            throw new RuntimeException("In the middle of fixing all of this stuff again");
         }
     }
 

@@ -4,6 +4,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.sipstack.actor.HashWheelScheduler;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.actor.SingleContext;
@@ -13,17 +14,24 @@ import io.sipstack.event.Event;
 import io.sipstack.event.SipTimerEvent;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
 import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SystemClock;
+import io.sipstack.transaction.ClientTransaction;
+import io.sipstack.transaction.ServerTransaction;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
-import io.sipstack.transaction.TransactionState;
 import io.sipstack.transaction.TransactionLayer;
+import io.sipstack.transaction.TransactionState;
+import io.sipstack.transaction.event.SipRequestTransactionEvent;
+import io.sipstack.transaction.event.SipTransactionEvent;
 import io.sipstack.transaction.event.TransactionEvent;
 import io.sipstack.transaction.event.TransactionLifeCycleEvent;
 import io.sipstack.transport.Flow;
+import io.sipstack.transport.FlowException;
 import io.sipstack.transport.TransportLayer;
 import io.sipstack.transport.event.FlowEvent;
 import io.sipstack.transport.event.SipFlowEvent;
+import io.sipstack.transport.impl.InternalFlow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,8 +95,31 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
      */
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
-        throw new RuntimeException("blah");
-        // ctx.write(msg, promise);
+        try {
+            final TransactionEvent event = (TransactionEvent) msg;
+            if (event.isSipTransactionEvent()) {
+                processSipTransactionWriteEvent(ctx, event.toSipTransactionEvent());
+            } else {
+                throw new RuntimeException("not handling any other write events right now.");
+            }
+
+        } catch (final ClassCastException e) {
+            // TODO: Not sure we should do anything else
+            ctx.write(msg, promise);
+        }
+    }
+
+    private void processSipTransactionWriteEvent(final ChannelHandlerContext ctx, final SipTransactionEvent event) {
+        final SipMessage msg = event.message();
+        final Flow flow = event.transaction().flow();
+        final DefaultTransactionHolder holder = (DefaultTransactionHolder)transactionStore.ensureTransaction(false, flow, msg);
+        try {
+            invoke(ctx, flow, Event.create(msg), holder);
+            checkIfTerminated(ctx, holder);
+        } catch (final ClassCastException e) {
+            // strange...
+            logger.warn("Got a unexpected message of type {}. Will ignore.", msg.getClass());
+        }
     }
 
     private void processSipFlowEvent(final ChannelHandlerContext ctx, final SipFlowEvent event) {
@@ -107,7 +138,7 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
 
     /**
      * When someone does {@link Transaction#send(SipMessage)} they will call the send method
-     * on the {@link TransactionSnapshot} class, which will eventually end up here.
+     * on the {@link ServerTransactionSnapshot} class, which will eventually end up here.
      *
      * Note, the transaction must exist and if it doesn't the write will fail.
      *
@@ -134,10 +165,10 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
             });
 
             actorCtx.upstream().ifPresent(e -> {
-                final Transaction t = new TransactionSnapshot(ctx, holder.id(), holder.state(), flow);
+                final Transaction t = new ServerTransactionSnapshot(ctx, holder.id(), holder.state(), flow);
                 if (e.isSipRequestEvent()) {
                     ctx.fireChannelRead(TransactionEvent.create(t, e.request()));
-                } else if (e.isSipResponseEvent()){
+                } else if (e.isSipResponseEvent()) {
                     ctx.fireChannelRead(TransactionEvent.create(t, e.response()));
                 } else {
                     throw new RuntimeException("not sure how to forward this event upstream " + e);
@@ -184,7 +215,7 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
             // TODO: an actor can emit more events here.
             actor.stop();
             actor.postStop();
-            final Transaction t = new TransactionSnapshot(ctx, holder.id(), holder.state(), holder.flow());
+            final Transaction t = new ServerTransactionSnapshot(ctx, holder.id(), holder.state(), holder.flow());
             final TransactionLifeCycleEvent terminatedEvent = TransactionEvent.create(t);
             ctx.fireChannelRead(terminatedEvent);
         }
@@ -245,25 +276,25 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
     @Override
     public TransactionHolder createInviteServerTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new InviteServerTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(flow, actor);
+        return new DefaultTransactionHolder((InternalFlow)flow, actor);
     }
 
     @Override
     public TransactionHolder createInviteClientTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new InviteClientTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(flow, actor);
+        return new DefaultTransactionHolder((InternalFlow)flow, actor);
     }
 
     @Override
     public TransactionHolder createNonInviteServerTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new NonInviteServerTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(flow, actor);
+        return new DefaultTransactionHolder((InternalFlow)flow, actor);
     }
 
     @Override
     public TransactionHolder createNonInviteClientTransaction(final TransactionId id, final Flow flow, final SipRequest request, final TransactionLayerConfiguration config) {
         final TransactionActor actor = new NonInviteClientTransactionActor(id, request, config);
-        return new DefaultTransactionHolder(flow, actor);
+        return new DefaultTransactionHolder((InternalFlow)flow, actor);
     }
 
     @Override
@@ -271,10 +302,9 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
                                                   final Flow flow, final SipRequest request,
                                                   final TransactionLayerConfiguration config) {
         final TransactionActor actor = new AckTransactionActor(id, isServer);
-        return new DefaultTransactionHolder(flow, actor);
+        return new DefaultTransactionHolder((InternalFlow)flow, actor);
     }
 
-    @Override
     public Transaction send(final Flow flow, final SipMessage msg) {
         throw new RuntimeException("This method needs to be killed...");
     }
@@ -289,18 +319,69 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
     }
 
     @Override
+    public ClientTransaction newClientTransaction(final Flow flow, final SipRequest request) {
+        // Note that since we create a fake representation of a transaction here there
+        // is a chance that e.g. an incoming request with the same transaction id is received
+        // and processed before this request is going out but all of that will be handled
+        // later if this transaction is indeed started.
+        final TransactionId id = TransactionId.create(request);
+        return new ClientInitialTransactionSnapshot(request, (InternalFlow)flow, id);
+    }
+
+    @Override
     public Flow.Builder createFlow(String host) throws IllegalArgumentException {
         return transportLayer.createFlow(host);
     }
 
-    private class TransactionSnapshot implements Transaction {
+    /**
+     * When the transaction user asks to have a new client transaction created, we will
+     * not actually create it right away and therefore we return this "fake" representation
+     * of the transaction to be.
+     */
+    private class ClientInitialTransactionSnapshot implements ClientTransaction {
+
+        private final SipRequest request;
+        private final InternalFlow flow;
+        private final TransactionId id;
+
+        private ClientInitialTransactionSnapshot(final SipRequest request, final InternalFlow flow, final TransactionId id) {
+            this.request = request;
+            this.flow = flow;
+            this.id = id;
+        }
+
+        @Override
+        public TransactionId id() {
+            return id;
+        }
+
+        @Override
+        public TransactionState state() {
+            return TransactionState.INIT;
+        }
+
+        @Override
+        public Flow flow() {
+            return flow;
+        }
+
+        @Override
+        public ClientTransaction start() throws FlowException {
+            final Connection c = flow.connection().orElseThrow(FlowException::new);
+            final SipRequestTransactionEvent event = TransactionEvent.create(this, request);
+            c.send(event);
+            return this;
+        }
+    }
+
+    private class ServerTransactionSnapshot implements ServerTransaction {
 
         private final ChannelHandlerContext ctx;
         private final TransactionId id;
         private final TransactionState state;
         private final Flow flow;
 
-        private TransactionSnapshot(final ChannelHandlerContext ctx, final TransactionId id, final TransactionState state, final Flow flow) {
+        private ServerTransactionSnapshot(final ChannelHandlerContext ctx, final TransactionId id, final TransactionState state, final Flow flow) {
             this.ctx = ctx;
             this.id = id;
             this.state = state;
@@ -318,13 +399,13 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
         }
 
         @Override
-        public void send(SipMessage msg) throws IllegalArgumentException {
-            final TransactionId id = TransactionId.create(msg);
+        public void send(final SipResponse response) throws IllegalArgumentException {
+            final TransactionId id = TransactionId.create(response);
             if (!this.id.equals(id)) {
                 throw new IllegalArgumentException("The message you tried to send does not belong to this transaction");
             }
 
-            processTransactionWrite(ctx, flow, id, msg);
+            processTransactionWrite(ctx, flow, id, response);
         }
 
         @Override
@@ -340,9 +421,9 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
 
         private final TransactionActor actor;
 
-        private Flow flow;
+        private InternalFlow flow;
 
-        private DefaultTransactionHolder(final Flow flow, final TransactionActor actor) {
+        private DefaultTransactionHolder(final InternalFlow flow, final TransactionActor actor) {
             this.flow = flow;
             this.actor = actor;
         }
@@ -355,11 +436,6 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
         @Override
         public TransactionState state() {
             return actor.state();
-        }
-
-        @Override
-        public void send(final SipMessage msg) throws IllegalArgumentException {
-            throw new RuntimeException("This method should never be called on this internal object");
         }
 
         @Override

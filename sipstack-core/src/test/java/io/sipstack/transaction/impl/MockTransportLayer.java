@@ -1,25 +1,23 @@
 package io.sipstack.transaction.impl;
 
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandler;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.impl.PreConditions;
-import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.TcpConnection;
 import io.sipstack.netty.codec.sip.Transport;
-import io.sipstack.netty.codec.sip.UdpConnection;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 import io.sipstack.transport.TransportLayer;
 import io.sipstack.transport.event.FlowEvent;
-import org.mockito.Mockito;
+import io.sipstack.transport.impl.FlowFutureImpl;
 
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-
-import static org.mockito.Mockito.when;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -34,6 +32,22 @@ public class MockTransportLayer implements TransportLayer {
         }
         return null;
     });
+
+    private final ChannelHandlerContext ctx;
+    private ChannelOutboundHandler handler;
+
+    /**
+     *
+     * @param ctx
+     * @param topOfPipeLine
+     */
+    public MockTransportLayer(final ChannelHandlerContext ctx) {
+        this.ctx = ctx;
+    }
+
+    public void setChannelOutboundHandler(final ChannelOutboundHandler handler) {
+        this.handler = handler;
+    }
 
     public void reset() {
         reset(1);
@@ -69,7 +83,7 @@ public class MockTransportLayer implements TransportLayer {
     @Override
     public Flow.Builder createFlow(final String host) throws IllegalArgumentException {
         PreConditions.ensureNotEmpty(host, "Host cannot be empty");
-        return new MockFlowBuilder(host);
+        return new MockFlowBuilder(ctx, handler, host);
     }
 
     /**
@@ -80,6 +94,9 @@ public class MockTransportLayer implements TransportLayer {
      */
     private static class MockFlowBuilder implements Flow.Builder {
 
+        private final ChannelHandlerContext ctx;
+        private final ChannelOutboundHandler handler;
+
         private Consumer<Flow> onSuccess;
         private Consumer<Flow> onFailure;
         private Consumer<Flow> onCancelled;
@@ -87,7 +104,9 @@ public class MockTransportLayer implements TransportLayer {
         private int port;
         private Transport transport;
 
-        private MockFlowBuilder(final String host) {
+        private MockFlowBuilder(final ChannelHandlerContext ctx, final ChannelOutboundHandler handler, final String host) {
+            this.ctx = ctx;
+            this.handler = handler;
             this.host = host;
         }
 
@@ -130,22 +149,19 @@ public class MockTransportLayer implements TransportLayer {
 
             // TODO: want to mock up the channel so that it
             // returns the correct values as well.
-            final Channel channel = Mockito.mock(Channel.class);
-            when(channel.localAddress()).thenReturn(localAddress);
-            when(channel.remoteAddress()).thenReturn(remoteAddress);
+            final Channel channel = new MockChannel(ctx, handler, localAddress, remoteAddress);
 
-            Connection connection = null;
-            if (transport == null || transport == Transport.udp) {
-                connection = new UdpConnection(channel, remoteAddress);
-            } else {
-                connection = new TcpConnection(channel, remoteAddress);
-            }
+            // TODO: need to mock out the transport eventually as well.
 
-            // final MockFuture<Connection> mockFuture = new MockFuture<>(connection);
-            // final FlowFutureImpl flowFuture = new FlowFutureImpl(mockFuture, onSuccess, onFailure, onCancelled);
-            // mockFuture.addListener(flowFuture);
-            // return flowFuture;
-            throw new RuntimeException("TODO again");
+            final MockChannelFuture mockFuture = new MockChannelFuture(channel);
+            final FlowFutureImpl flowFuture = new FlowFutureImpl(new HashMap<>(), mockFuture, onSuccess, onFailure, onCancelled);
+
+            // this will cause the future to call the callback right away because
+            // it is a completed future already.
+            mockFuture.addListener(flowFuture);
+
+
+            return flowFuture;
         }
 
         /**

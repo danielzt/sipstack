@@ -1,21 +1,18 @@
 package io.sipstack.transport.impl;
 
-import io.pkts.packet.sip.SipMessage;
-import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.transport.Flow;
+import java.util.Optional;
 
 /**
  * @author jonas@jonasborjesson.com
  */
-public class CancelledFlow implements Flow {
+public class CancelledFlow extends InternalFlow {
 
-    @Override
-    public ConnectionId id() {
-        return null;
+    public CancelledFlow() {
+        super(Optional.empty());
     }
 
-    @Override
-    public void write(SipMessage msg) {
-
+    public boolean isValid() {
+        return false;
     }
+
 }

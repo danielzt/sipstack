@@ -4,6 +4,7 @@ import io.netty.channel.ChannelFuture;
 import io.sipstack.netty.codec.sip.Transport;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -33,4 +34,25 @@ public interface NetworkLayer {
      * @throws InterruptedException
      */
     void sync() throws InterruptedException;
+
+    /**
+     * Same as {@link NetworkLayer#getListeningPoint(String, Transport)} but we will
+     * grab the default {@link NetworkInterface}.
+     *
+     * @param ip
+     * @param port
+     * @param transport
+     * @return
+     */
+    Optional<ListeningPoint> getListeningPoint(Transport transport);
+
+    /**
+     * Try and get a listening point that can be used to send messages across using the
+     * specified {@link Transport} over the named {@link NetworkInterface}.
+     *
+     * @param networkInterfaceName
+     * @param transport
+     * @return
+     */
+    Optional<ListeningPoint> getListeningPoint(String networkInterfaceName, Transport transport);
 }

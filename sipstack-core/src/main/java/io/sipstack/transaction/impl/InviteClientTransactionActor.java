@@ -70,7 +70,7 @@ import java.time.Duration;
  */
 public class InviteClientTransactionActor extends ActorSupport<Event, TransactionState> implements TransactionActor {
 
-    private static final Logger logger = LoggerFactory.getLogger(InviteServerTransactionActor.class);
+    private static final Logger logger = LoggerFactory.getLogger(InviteClientTransactionActor.class);
 
     private final TransactionId id;
 
@@ -146,6 +146,10 @@ public class InviteClientTransactionActor extends ActorSupport<Event, Transactio
         if (isUsingUnreliableTransport) {
             onEnter(TransactionState.COMPLETED, this::onEnterCompleted);
         }
+    }
+
+    public boolean isClientTransaction() {
+        return true;
     }
 
     /**

@@ -41,17 +41,20 @@ public class TransactionTestBase extends SipStackTestBase {
         config.setSend100TryingImmediately(true);
 
         myApplication = new MockTransactionUser();
-        transports = new MockTransportLayer();
 
         mockChannelContext = new MockChannelHandlerContext();
+        transports = new MockTransportLayer(mockChannelContext);
 
         transactionLayer = new DefaultTransactionLayer(transports, new SystemClock(), defaultScheduler, config);
+
+        transports.setChannelOutboundHandler(transactionLayer);
     }
 
     public void reset() {
         transports.reset();
         myApplication.reset();
         defaultScheduler.reset();
+        mockChannelContext.reset();
     }
 
 

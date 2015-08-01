@@ -1,6 +1,6 @@
 package io.sipstack.transaction;
 
-import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipResponse;
 import io.sipstack.transport.Flow;
 
 /**
@@ -20,7 +20,9 @@ public interface Transaction {
      * @param msg
      * @throws
      */
-    void send(SipMessage msg) throws IllegalArgumentException;
+    default void send(final SipResponse response) throws IllegalArgumentException {
+        throw new IllegalArgumentException("Only a ServerTransaction allows you to send a response");
+    }
 
     /**
      * The {@link Flow} associated with this {@link Transaction}.

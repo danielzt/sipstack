@@ -2,6 +2,7 @@ package io.sipstack.transaction;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
 import io.sipstack.transport.Flow;
 
 /**
@@ -23,7 +24,9 @@ public interface TransactionLayer {
      * @param msg
      * @return
      */
-    Transaction send(Flow flow, SipMessage msg);
+    // Transaction send(Flow flow, SipMessage msg);
+
+    ClientTransaction newClientTransaction(Flow flow, SipRequest request);
 
     /**
      * Have the {@link SipMessage} sent via the transaction layer but without specifying which

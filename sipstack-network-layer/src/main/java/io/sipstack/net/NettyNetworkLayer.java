@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotEmpty;
@@ -89,6 +90,19 @@ public class NettyNetworkLayer implements NetworkLayer {
     @Override
     public void sync() throws InterruptedException {
         this.latch.await();
+    }
+
+    @Override
+    public Optional<ListeningPoint> getListeningPoint(final Transport transport) {
+        return Optional.ofNullable(defaultInterface.getListeningPoint(transport));
+    }
+
+    @Override
+    public Optional<ListeningPoint> getListeningPoint(final String networkInterfaceName, final Transport transport) {
+        return interfaces.stream()
+                .filter(i -> i.getName().equals(networkInterfaceName))
+                .findFirst()
+                .map(i -> i.getListeningPoint(transport));
     }
 
     public static Builder with(final List<NetworkInterfaceConfiguration> ifs) throws IllegalArgumentException {

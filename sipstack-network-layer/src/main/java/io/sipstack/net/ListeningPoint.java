@@ -8,7 +8,6 @@ import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.netty.codec.sip.Transport;
 
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -52,8 +51,12 @@ public final class ListeningPoint {
         return localPort;
     }
 
-    public SocketAddress getLocalAddress() {
+    public InetSocketAddress getLocalAddress() {
         return this.localAddress;
+    }
+
+    public String getLocalIp() {
+        return this.localAddress.getHostString();
     }
 
     public Transport getTransport() {

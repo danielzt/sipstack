@@ -158,6 +158,11 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
         return 5060;
     }
 
+    @Override
+    public ListeningPoint getListeningPoint(final Transport transport) {
+        return listeningPointsByTransport[Transport.udp.ordinal()];
+    }
+
     /**
      * Use this {@link NettyNetworkInterface} to connect to a remote address using the supplied
      * {@link Transport}.
@@ -178,6 +183,10 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
         if (transport == Transport.udp || transport == null) {
             final ListeningPoint lp = listeningPointsByTransport[Transport.udp.ordinal()];
             return this.udpBootstrap.connect(remoteAddress, lp.getLocalAddress());
+
+            // final UdpConnection connection = new UdpConnection(lp.getChannel(), remoteAddress);
+            // final ChannelFuture future = lp.getChannel().newSucceededFuture();
+            // return future;
 
             /*
             f.addListener(new GenericFutureListener<ChannelFuture>(){
@@ -222,6 +231,7 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
 
         throw new IllegalTransportException("Stack has not been configured for transport " + transport);
     }
+
 
     static Builder with(final NetworkInterfaceConfiguration config) {
         assertNotNull(config);

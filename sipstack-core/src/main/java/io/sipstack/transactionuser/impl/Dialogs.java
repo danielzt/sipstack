@@ -1,7 +1,5 @@
 package io.sipstack.transactionuser.impl;
 
-import java.util.function.Consumer;
-
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
@@ -20,6 +18,8 @@ import io.sipstack.transactionuser.Dialog;
 import io.sipstack.transactionuser.DialogEvent;
 import io.sipstack.transactionuser.TransactionEvent;
 import io.sipstack.transport.Flow;
+
+import java.util.function.Consumer;
 
 /**
  * Implements https://tools.ietf.org/html/rfc4235#section-3.7.1
@@ -179,7 +179,7 @@ public class Dialogs {
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactionLayer.send(f, request);
+                            final Transaction t = transactionLayer.newClientTransaction(f, request).start();
                         })
                         .connect();
             } else {
@@ -188,7 +188,7 @@ public class Dialogs {
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactionLayer.send(f, request);
+                            final Transaction t = transactionLayer.newClientTransaction(f, request).start();
                         })
                         .connect();
             }
@@ -203,7 +203,8 @@ public class Dialogs {
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactionLayer.send(f, message);
+                            throw new RuntimeException("This is wrong. Need to save the transaction and reuse it to send the response");
+                            // final Transaction t = transactionLayer.newClientTransaction(f, message).start();
                         })
                         .connect();
             } else {
@@ -212,7 +213,8 @@ public class Dialogs {
                         .withTransport(Transport.udp)
                         .onSuccess(f -> {
                             lastFlow = f;
-                            final Transaction t = transactionLayer.send(f, message);
+                            throw new RuntimeException("This is wrong. Need to save the transaction and reuse it to send the response");
+                            // final Transaction t = transactionLayer.send(f, message);
                         })
                         .connect();
             }

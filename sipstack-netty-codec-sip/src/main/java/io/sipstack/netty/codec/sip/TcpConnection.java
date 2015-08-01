@@ -4,7 +4,6 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
-import io.pkts.packet.sip.SipMessage;
 
 import java.net.InetSocketAddress;
 
@@ -23,8 +22,9 @@ public final class TcpConnection extends AbstractConnection {
      * {@inheritDoc}
      */
     @Override
-    public void send(final SipMessage msg) {
-        channel().writeAndFlush(toByteBuf(msg));
+    public void send(final Object o) {
+        // channel().writeAndFlush(toByteBuf(msg));
+        channel().writeAndFlush(o);
     }
 
     @Override

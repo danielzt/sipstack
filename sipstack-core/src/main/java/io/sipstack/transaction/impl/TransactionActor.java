@@ -14,6 +14,12 @@ public interface TransactionActor extends Actor {
 
     TransactionState state();
 
+    boolean isClientTransaction();
+
+    default boolean isServerTransaction() {
+        return !isClientTransaction();
+    }
+
     /**
      * Get a state representation of the current io.sipstack.transaction.transaction.
      *

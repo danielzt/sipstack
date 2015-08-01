@@ -164,8 +164,8 @@ public class MockConnection implements Connection {
     }
 
     @Override
-    public void send(final SipMessage msg) {
-        messages.add(msg);
+    public void send(final Object o) {
+        messages.add((SipMessage)o);
         totalMessagesSent.addAndGet(1);
         latch.get().countDown();
     }

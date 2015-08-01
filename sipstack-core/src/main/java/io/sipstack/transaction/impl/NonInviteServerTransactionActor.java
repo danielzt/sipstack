@@ -113,6 +113,10 @@ public class NonInviteServerTransactionActor extends ActorSupport<Event, Transac
         // should be processed anyway.
     }
 
+    public boolean isClientTransaction() {
+        return false;
+    }
+
     /**
      * The init state. Just make sure that the first event we receive is the same INVITE as created
      * the io.sipstack.transaction.transaction (yes, we compare references in this case, that's what we want) and then

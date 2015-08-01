@@ -4,7 +4,6 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
-import io.pkts.packet.sip.SipMessage;
 
 import java.net.InetSocketAddress;
 import java.util.Optional;
@@ -120,11 +119,11 @@ public interface Connection {
     boolean isWS();
 
     /**
-     * Send a message over this connection.
+     * Send an Object over this connection.
      * 
      * @param msg
      */
-    void send(SipMessage msg);
+    void send(Object o);
 
     public boolean connect();
 

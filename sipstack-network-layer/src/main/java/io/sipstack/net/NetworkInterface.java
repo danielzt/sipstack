@@ -39,4 +39,6 @@ public interface NetworkInterface {
      *         the specified {@link Transport}
      */
     ChannelFuture connect(final InetSocketAddress remoteAddress, final Transport transport);
+
+    ListeningPoint getListeningPoint(Transport transport);
 }

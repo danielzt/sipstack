@@ -63,6 +63,10 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
         return storage.assertAndConsumeRequest(method).toSipRequestTransactionEvent();
     }
 
+    public SipFlowEvent assertAndConsumeDownstreamRequest(final String method) {
+        return flowEventStorage.assertAndConsumeRequest(method).toSipFlowEvent();
+    }
+
     public Transaction assertAndConsumeResponse(final String method, final int responseStatus) {
         return storage.assertAndConsumeResponse(method, responseStatus).transaction();
     }

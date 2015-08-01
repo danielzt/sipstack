@@ -137,6 +137,10 @@ public class NonInviteClientTransactionActor extends ActorSupport<Event, Transac
         }
     }
 
+    public boolean isClientTransaction() {
+        return true;
+    }
+
     private void onInit(final Event event) {
         if (event.isSipRequestEvent() && event.request() == originalRequest) {
             ctx().forwardDownstream(event);

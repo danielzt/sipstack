@@ -32,7 +32,6 @@ public interface TransactionId {
             id[capacity + 4] = 'C';
             id[capacity + 5] = 'E';
             id[capacity + 6] = 'L';
-
         }
         return new TransactionIdImpl(id);
     }

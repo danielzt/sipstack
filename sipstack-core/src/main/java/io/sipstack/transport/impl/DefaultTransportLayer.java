@@ -8,10 +8,12 @@ import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.core.SipStack;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
+import io.sipstack.net.ListeningPoint;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.netty.codec.sip.UdpConnection;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
@@ -21,6 +23,7 @@ import io.sipstack.transport.event.FlowEvent;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -83,20 +86,15 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
 
             final Connection connection = event.connection();
             final ConnectionId connectionId = connection.id();
-
             final Flow flow = flows.computeIfAbsent(connectionId, obj -> {
                 System.err.println("Got a new flow going");
                 return new DefaultFlow(connection);
             });
 
-
-
-            // TODO: convert to a FlowEvent and then push it up the chain...
             final SipMessage sipMsg = event.toSipMessageIOEvent().message();
             final FlowEvent flowEvent = sipMsg.isRequest() ? FlowEvent.create(flow, sipMsg.toRequest()) :
                     FlowEvent.create(flow, sipMsg.toResponse());
             ctx.fireChannelRead(flowEvent);
-            // transportUser.onMessage(flow, ((SipMessageEvent) msg).message());
         } catch (final ClassCastException e) {
             e.printStackTrace();;
         }
@@ -180,8 +178,12 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
         final FlowEvent event = (FlowEvent)msg;
         if (event.isSipFlowEvent()) {
             final SipMessage sip = event.toSipFlowEvent().message();
-            final DefaultFlow flow = (DefaultFlow)event.flow();
-            ctx.write(IOEvent.create(flow.connection(), sip), promise);
+
+            // TODO: what if the flow doesn't have a connection present, such as in
+            // the case of faulty flows (broken etc)? We probably should generate a
+            // transport failed event of some sort.
+            final InternalFlow flow = (InternalFlow)event.flow();
+            flow.connection().ifPresent(c -> ctx.write(IOEvent.create(c, sip), promise));
         }
     }
 
@@ -237,14 +239,57 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
         @Override
         public FlowFuture connect() throws IllegalArgumentException {
             final int port = this.port == -1 ? defaultPort() : this.port;
+
+            // TODO: need to ensure that the host is an actual IP-address
+            final Transport transportToUse = transport == null ? Transport.udp : transport;
             final InetSocketAddress remoteAddress = new InetSocketAddress(host, port);
-            // TODO: we need to figure out if we already have a flow pointing
-            // to the same remote:local:transport. May have to ask the network layer
-            // if it knows what local ip:port we will be using.
-            final ChannelFuture future = network.connect(remoteAddress, transport == null ? Transport.udp : transport);
-            final FlowFutureImpl flowFuture = new FlowFutureImpl(future, onSuccess, onFailure, onCancelled);
-            future.addListener(flowFuture);
+            final Optional<ListeningPoint> lpToUse = network.getListeningPoint(transportToUse);
+
+            // if we cannot find an appropriate ListeningPoint then we are dead. Return
+            // a failed future.
+            if (!lpToUse.isPresent()) {
+                // TODO: create a failed FlowFuture and complete it right away. For now, exception...
+                // TODO: or should we re-throw exception? I think we should stick with one thing so lets
+                // go for a failed future.
+                throw new RuntimeException("Guess we don't support the transport or something. Create failed FlowFuture here instead");
+            }
+
+            final ListeningPoint lp = lpToUse.get();
+            final ConnectionId connectionId =
+                    ConnectionId.create(transportToUse, lp.getLocalAddress(), remoteAddress);
+            final Flow flow = flows.get(connectionId);
+            FlowFuture flowFuture = null;
+            if (flow != null) {
+                flowFuture = new SuccessfulFlowFuture();
+                invokeCallbackDirectly(flow, onSuccess);
+            } else if (connectionId.isReliableTransport()) {
+                // TODO: connect directly via the ListeningPoint instead.
+                // TODO: actually need to store the future...
+                final ChannelFuture future = network.connect(remoteAddress, transportToUse);
+                final FlowFutureImpl flowFutureImpl = new FlowFutureImpl(flows, future, onSuccess, onFailure, onCancelled);
+                future.addListener(flowFutureImpl);
+                flowFuture = flowFutureImpl;
+            } else {
+                // for unreliable transports, we will simply create a connection as is without
+                // actually "connecting".
+                final Connection connection = new UdpConnection(lp.getChannel(), remoteAddress);
+                final Flow newFlow = flows.computeIfAbsent(connection.id(), obj -> {
+                    System.err.println("Created a new fake connection and returning it as a flow. This should only happen once");
+                    return new DefaultFlow(connection);
+                });
+                flowFuture = new SuccessfulFlowFuture();
+                invokeCallbackDirectly(newFlow, onSuccess);
+            }
             return flowFuture;
+        }
+
+        private void invokeCallbackDirectly(final Flow flow, final Consumer<Flow> callback) {
+            try {
+                callback.accept(flow);
+            } catch (final Throwable t) {
+                // TODO: do something about this... guess we should propagate the exception up the chain or something
+                t.printStackTrace();
+            }
         }
 
         /**
@@ -271,5 +316,4 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
             return 5060;
         }
     }
-
 }

@@ -4,17 +4,26 @@ import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.net.NettyNetworkLayer;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.transaction.ClientTransaction;
+import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.TransactionId;
+import io.sipstack.transaction.TransactionLayer;
 import io.sipstack.transaction.event.TransactionEvent;
+import io.sipstack.transaction.event.TransactionLifeCycleEvent;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transport.impl.DefaultTransportLayer;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The examples under io.sipstack.example.netty.sip are all using the raw sip support
@@ -26,16 +35,60 @@ import java.util.List;
  * @author jonas@jonasborjesson.com
  */
 @Sharable
-public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
+public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
+
+    private final TransactionLayer transactionLayer;
+    private final String remoteIp;
+    private final int remotePort;
+    private final Map<TransactionId, Transaction> outstandingTransactions = new ConcurrentHashMap<>(1024);
+
+    public Proxy(final TransactionLayer transactionLayer, final String remoteIp, final int remotePort) {
+        this.transactionLayer = transactionLayer;
+        this.remoteIp = remoteIp;
+        this.remotePort = remotePort;
+    }
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final TransactionEvent event) throws Exception {
         if (event.isSipTransactionEvent()) {
+            final Transaction transaction = event.transaction();
+            outstandingTransactions.put(transaction.id(), transaction);
             final SipMessage msg = event.toSipTransactionEvent().message();
-            if (msg.isRequest() && !msg.isAck()) {
-                final SipResponse response = msg.createResponse(200);
-                event.transaction().send(response);
+
+            if (msg.isRequest()) {
+                final SipRequest request = msg.toRequest();
+                transactionLayer.createFlow(remoteIp)
+                        .withPort(remotePort)
+                        .withTransport(Transport.udp)
+                        .onSuccess(f -> {
+                            // TODO: this should be added automatically by the
+                            // transport layer.
+                            final ViaHeader via = ViaHeader.with().host("127.0.0.1").port(5060).transportUDP().branch(ViaHeader.generateBranch()).build();
+                            request.addHeaderFirst(via);
+                            final ClientTransaction ct = transactionLayer.newClientTransaction(f, request);
+                            outstandingTransactions.put(ct.id(), ct);
+                            ct.start();
+                        })
+                        .onFailure(f -> System.err.println("What, the flow failed!!!"))
+                        .onCancelled(f -> System.err.println("What, the flow was cancelled!!!"))
+                        .connect();
+
+            } else if (msg.isResponse()) {
+                final SipResponse response = msg.toResponse();
+                final ViaHeader via = response.popViaHeader();
+                final TransactionId id = TransactionId.create(response);
+                final Transaction serverTransaction = outstandingTransactions.get(id);
+                serverTransaction.send(response);
             }
+        } else if (event.isTransactionLifeCycleEvent()) {
+            processTransactionLifeCycleEvent(event.toTransactionLifeCycleEvent());
+        }
+    }
+
+    private void processTransactionLifeCycleEvent(final TransactionLifeCycleEvent event) {
+        if (event.isTransactionTerminatedEvent()) {
+            outstandingTransactions.remove(event.transaction().id());
+            // System.err.println("yay, transaction died!!! " + outstandingTransactions.size() + " transactions outstanding");
         }
     }
 
@@ -52,7 +105,7 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
      *
      * @return
      */
-    private static NetworkLayer configureNetworkStack(final UAS uas, final String ip, final int port) {
+    private static NetworkLayer configureNetworkStack(final String ip, final int port) {
 
         // Create a new configuration object. In a real scenario you
         // want to read the values off of a yaml file but for this example
@@ -88,7 +141,8 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
 
         // Finally, add your own Netty handler to the chain, which must be the last
         // out of them all.
-        networkBuilder.withHandler("my-application", uas);
+        final Proxy proxy = new Proxy(transactionLayer, "127.0.0.1", 5070);
+        networkBuilder.withHandler("my-application", proxy);
 
         // Build the network
         final NettyNetworkLayer server = networkBuilder.build();
@@ -102,8 +156,7 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
     }
 
     public static void main(final String ... args) throws Exception {
-        final UAS uas = new UAS();
-        NetworkLayer stack = configureNetworkStack(uas, "127.0.0.1", 5060);
+        NetworkLayer stack = configureNetworkStack("127.0.0.1", 5060);
         stack.start();
         stack.sync();
     }

@@ -5,13 +5,12 @@ import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.header.CallIdHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.SipTimer;
+import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.event.SipRequestTransactionEvent;
-import io.sipstack.transport.Flow;
 import io.sipstack.transport.event.FlowEvent;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
@@ -32,7 +31,8 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
      *
      * @throws Exception
      */
-    @Test(timeout = 500)
+    // @Test(timeout = 500)
+    @Test
     public void testAckTo200() throws Exception {
         final Transaction transaction = transitionToAccepted(200);
 
@@ -134,8 +134,20 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         invite.setHeader(CallIdHeader.create());
         invite.getViaHeader().setBranch(ViaHeader.generateBranch());
 
-        final Flow flow = Mockito.mock(Flow.class);
-        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, invite));
+        transactionLayer.createFlow("127.0.0.1")
+                .withPort(5070)
+                .withTransport(Transport.udp)
+                .onSuccess(f -> {
+                    try {
+                        transactionLayer.channelRead(mockChannelContext, FlowEvent.create(f, invite));
+                    } catch (final Exception e) {
+                        e.printStackTrace();
+                        fail("Failing test due to exception");
+                    }
+                })
+                .onFailure(f -> fail("Creating the flow shouldnt fail"))
+                .onCancelled(f -> fail("The flow shouldn't have been cancelled"))
+                .connect();
 
         final SipRequestTransactionEvent event = mockChannelContext.assertAndConsumeRequest("invite");
 

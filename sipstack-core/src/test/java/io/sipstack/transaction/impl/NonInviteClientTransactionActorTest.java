@@ -5,13 +5,17 @@ import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.header.CallIdHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.SipTimer;
+import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.transaction.ClientTransaction;
 import io.sipstack.transaction.Transaction;
-import io.sipstack.transaction.TransactionState;
 import io.sipstack.transaction.event.SipTransactionEvent;
+import io.sipstack.transaction.event.TransactionEvent;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.event.FlowEvent;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.*;
@@ -65,7 +69,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         final Transaction transaction = initiateNewTransaction("bye").transaction();
         defaultScheduler.fire(SipTimer.F);
         assertTimerCancelled(SipTimer.E);
-        myApplication.ensureTransactionTerminated(transaction.id());
+        mockChannelContext.ensureTransactionTerminated(transaction.id());
     }
 
     /**
@@ -90,7 +94,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     public void testTransitionToTerminatedFromCompleted() throws Exception {
         final SipTransactionEvent holder = transitionFromTryingToCompleted("bye", 200);
         defaultScheduler.fire(SipTimer.K);
-        myApplication.ensureTransactionTerminated(holder.transaction().id());
+        mockChannelContext.ensureTransactionTerminated(holder.transaction().id());
     }
 
     /**
@@ -118,7 +122,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
 
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
-        myApplication.assertAndConsumeResponse("bye", 200);
+        mockChannelContext.assertAndConsumeResponse("bye", 200);
 
         // should now be in completed so timer K should have been
         // scheduled
@@ -126,7 +130,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
 
         // fire timer K which then takes us to terminated
         defaultScheduler.fire(SipTimer.K);
-        myApplication.ensureTransactionTerminated(holder.transaction().id());
+        mockChannelContext.ensureTransactionTerminated(holder.transaction().id());
     }
 
     /**
@@ -140,7 +144,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         final SipResponse response = request.createResponse(180);
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
-        myApplication.assertAndConsumeResponse("bye", 180);
+        mockChannelContext.assertAndConsumeResponse("bye", 180);
     }
 
     /**
@@ -172,7 +176,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
         defaultScheduler.fire(SipTimer.F);
         assertTimerCancelled(SipTimer.E);
-        myApplication.ensureTransactionTerminated(holder.transaction().id());
+        mockChannelContext.ensureTransactionTerminated(holder.transaction().id());
     }
 
 
@@ -193,7 +197,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         final SipResponse response = request.createResponse(responseStatus);
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
-        myApplication.assertAndConsumeResponse(method, responseStatus);
+        mockChannelContext.assertAndConsumeResponse(method, responseStatus);
 
         assertTimerScheduled(SipTimer.K);
         return holder;
@@ -211,7 +215,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         final SipResponse response = request.createResponse(responseStatus);
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
-        myApplication.assertAndConsumeResponse(method, responseStatus);
+        mockChannelContext.assertAndConsumeResponse(method, responseStatus);
 
         assertTimerScheduled(SipTimer.E);
         assertTimerScheduled(SipTimer.F);
@@ -237,28 +241,30 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         request.setHeader(CallIdHeader.create());
         request.getViaHeader().setBranch(ViaHeader.generateBranch());
 
-        // ask our "application", which is just a Transaction User and that is using the
-        // transaction layer to send requests/responses, to send an INVITE.
-        myApplication.sendRequest(request);
-
-        // We need to know what transaction the "transaction user" (i.e. our app) got
-        // for the request it just sent. Our application is storing
-        // all transaction so we can look it up.
-        final Transaction t1 = myApplication.assertTransaction(request);
-        assertThat(t1.state(), is(TransactionState.TRYING));
+        final AtomicReference<Transaction> tRef = new AtomicReference<>();
+        transactionLayer.createFlow("127.0.0.1")
+                .withPort(5070)
+                .withTransport(Transport.udp)
+                .onSuccess(f -> {
+                    final ClientTransaction transaction = transactionLayer.newClientTransaction(f, request);
+                    tRef.set(transaction);
+                    transaction.start();
+                })
+                .onFailure(f -> fail("Creating the flow shouldnt fail"))
+                .onCancelled(f -> fail("The flow shouldn't have been cancelled"))
+                .connect();
 
         // the request should have been sent through the transaction layer down to the
         // transport layer, for which we have a mock implementation so check that we
         // received it there.
-        final SipRequest request2 = transports.assertRequest(method);
-        transports.consumeRequest(request2);
+        final FlowEvent event = mockChannelContext.assertAndConsumeDownstreamRequest(method);
+        final SipRequest request2 = event.toSipRequestFlowEvent().request();
+        assertThat(request, is(request2));
 
         assertTimerScheduled(SipTimer.E);
         assertTimerScheduled(SipTimer.F);
 
-        // return new Holder(t1, request);
-        // TODO
-        return null;
+        return TransactionEvent.create(tRef.get(), request2);
     }
 
     private SipRequest generateRequest(final String method) {

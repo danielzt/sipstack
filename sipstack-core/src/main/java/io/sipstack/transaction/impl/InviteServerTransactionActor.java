@@ -154,6 +154,10 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
         // onEnter(TransactionState.TERMINATED, onEnterTerminated);
     }
 
+    public boolean isClientTransaction() {
+        return false;
+    }
+
     /**
      * The init state. Just make sure that the first event we receive is the same INVITE as created
      * the transaction (yes, we compare references in this case, that's what we want) and then

@@ -118,7 +118,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     public void testTransitionTryingProceedingCompletedTerminated() throws Exception {
         final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
         final SipRequest request = holder.message().toRequest();
-        final SipResponse response = request.createResponse(200);
+        final SipResponse response = request.createResponse(200).build();
 
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
@@ -141,7 +141,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     public void test1xxResponsesWhileInProceedingState() throws Exception {
         final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
         final SipRequest request = holder.message().toRequest();
-        final SipResponse response = request.createResponse(180);
+        final SipResponse response = request.createResponse(180).build();
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
         mockChannelContext.assertAndConsumeResponse("bye", 180);
@@ -194,7 +194,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
 
         final SipTransactionEvent holder = initiateNewTransaction(method);
         final SipRequest request = holder.message().toRequest();
-        final SipResponse response = request.createResponse(responseStatus);
+        final SipResponse response = request.createResponse(responseStatus).build();
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
         mockChannelContext.assertAndConsumeResponse(method, responseStatus);
@@ -212,7 +212,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
 
         final SipTransactionEvent holder = initiateNewTransaction(method);
         final SipRequest request = holder.message().toRequest();
-        final SipResponse response = request.createResponse(responseStatus);
+        final SipResponse response = request.createResponse(responseStatus).build();
         final Flow flow = mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
         mockChannelContext.assertAndConsumeResponse(method, responseStatus);
@@ -239,7 +239,8 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
         // same transaction and then this will be a re-transmission
         // instead which is not what we want.
         request.setHeader(CallIdHeader.create());
-        request.getViaHeader().setBranch(ViaHeader.generateBranch());
+        final ViaHeader via = request.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
+        request.setHeader(via);
 
         final AtomicReference<Transaction> tRef = new AtomicReference<>();
         transactionLayer.createFlow("127.0.0.1")

@@ -132,7 +132,9 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         // same transaction and then this will be a re-transmission
         // instead which is not what we want.
         invite.setHeader(CallIdHeader.create());
-        invite.getViaHeader().setBranch(ViaHeader.generateBranch());
+        final ViaHeader via = invite.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
+        invite.setHeader(via);
+        // invite.getViaHeader().setBranch(ViaHeader.generateBranch());
 
         transactionLayer.createFlow("127.0.0.1")
                 .withPort(5070)
@@ -157,7 +159,7 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
         // another handler though but the Transaction Layer doesn't know that :-).
         // In either case, we will invoke the Transport Layer again, now sending
         // a response down the pipe instead, just as if an application would have.
-        final SipResponse response = event.request().createResponse(finalResponseStatus);
+        final SipResponse response = event.request().createResponse(finalResponseStatus).build();
         event.transaction().send(response);
 
         // the transaction layer should be invoked again and if the state machine

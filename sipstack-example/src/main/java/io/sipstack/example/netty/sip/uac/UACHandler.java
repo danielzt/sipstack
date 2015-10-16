@@ -59,7 +59,7 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageIOEv
 
         // Since this is an ACK, the cseq should have the same cseq number as the response,
         // i.e., the same as the original INVITE that we are ACK:ing.
-        final CSeqHeader cseq = CSeqHeader.with().cseq(response.getCSeqHeader().getSeqNumber()).method("ACK").build();
+        final CSeqHeader cseq = CSeqHeader.withMethod("ACK").withCSeq(response.getCSeqHeader().getSeqNumber()).build();
         final CallIdHeader callId = response.getCallIDHeader();
 
         // If there are Record-Route headers in the response, they must be
@@ -73,16 +73,17 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageIOEv
         // any transport protocol and it can actually change from message
         // to message but in this simple example we will just use the
         // same last time so we will only have to generate a new branch id
-        final ViaHeader via = response.getViaHeader().clone();
-        via.setBranch(ViaHeader.generateBranch());
+
+        // TODO: this doesn't work right now. We need to change the response to a builder as well before we can change the Via header
+        final ViaHeader via = response.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
 
         // now we have all the pieces so let's put it together
         final SipRequest.Builder builder = SipRequest.ack(requestURI);
-        builder.from(from);
-        builder.to(to);
-        builder.callId(callId);
-        builder.cseq(cseq);
-        builder.via(via);
+        builder.withFromHeader(from);
+        builder.withToHeader(to);
+        builder.withCallIdHeader(callId);
+        builder.withCSeqHeader(cseq);
+        builder.withViaHeader(via);
         return builder.build();
     }
 
@@ -109,7 +110,7 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageIOEv
 
         // for all requests, just generate a 200 OK response.
         if (msg.isRequest()) {
-            final SipResponse response = msg.createResponse(200);
+            final SipResponse response = msg.createResponse(200).build();
             event.connection().send(response);
         }
     }

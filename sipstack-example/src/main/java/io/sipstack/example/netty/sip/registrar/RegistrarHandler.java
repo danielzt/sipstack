@@ -78,7 +78,7 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
         // the aor is not allowed to register under this domain
         // generate a 404 according to specfication
         if (!validateDomain(domain, aor)) {
-            return request.createResponse(404);
+            return request.createResponse(404).build();
         }
 
         final Binding.Builder builder = Binding.with();
@@ -93,11 +93,12 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
 
         final Binding binding = builder.build();
         final List<Binding> currentBindings = updateBindings(binding);
-        final SipResponse response = request.createResponse(200);
+        final SipResponse response = request.createResponse(200).build();
         currentBindings.forEach(b -> {
-            final SipURI contactURI = b.getContact();
-            contactURI.setParameter("expires", b.getExpires());
-            response.addHeader(ContactHeader.with(contactURI).build());
+            final SipURI contactURI = b.getContact().copy()
+                    .withParameter("expires", b.getExpires())
+                    .build();
+            response.addHeader(ContactHeader.withSipURI(contactURI).build());
         });
 
         return response;

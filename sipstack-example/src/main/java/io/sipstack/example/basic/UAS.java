@@ -15,8 +15,10 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
 import io.sipstack.netty.codec.sip.SipMessageEncoder;
+import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 import java.net.InetSocketAddress;
@@ -49,8 +51,9 @@ public final class UAS extends SimpleChannelInboundHandler<SipMessageIOEventImpl
 
         // for all other requests, just generate a 200 OK response.
         if (msg.isRequest()) {
-            final SipResponse response = msg.createResponse(200);
-            event.connection().send(response);
+            final SipResponse response = msg.createResponse(200).build();
+            final Connection connection = event.connection();
+            connection.send(IOEvent.create(connection, response));
         }
     }
 

@@ -1,11 +1,5 @@
 package io.sipstack.example.trunking;
 
-import java.util.List;
-import java.util.Optional;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipParseException;
@@ -20,6 +14,11 @@ import io.sipstack.application.ApplicationInstance;
 import io.sipstack.application.B2BUA;
 import io.sipstack.application.SipRequestEvent;
 import io.sipstack.application.UA;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Optional;
 
 public class TrunkingServiceApplicationInstance extends ApplicationInstance {
 
@@ -127,7 +126,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
                 throw new SipParseException("Unsupported edge type " + edgeType);
             }
 
-            builder.header(SipHeader.create(TwilioHeaders.X_TWILIO_DIRECTION_HEADER, "outbound"));
+            builder.withHeader(SipHeader.create(TwilioHeaders.X_TWILIO_DIRECTION_HEADER, "outbound"));
         } catch (final SipParseException e) {
             logWarn(request, e.getMessage(), e);
             rejectCall(b2bua.getUaA(), request, 400, null);
@@ -160,7 +159,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
 
     private void rejectCall(final UA uaA, final SipRequest invite, final int statusCode, final String reason) {
         // TODO how to set reason phrase?
-        final SipResponse response = invite.createResponse(statusCode);
+        final SipResponse response = invite.createResponse(statusCode).build();
         updateStatus(response, CallLog.Status.FAIL);
         uaA.send(response);
     }
@@ -169,35 +168,24 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
      * Handle INVITE request of originating case.
      */
     private void processOriginatingInvite(final SipRequest request, final SipRequest.Builder linked) {
+        // TODO: just getting things to compile again. Will have to work on this later...
 
-        final SipURI requestURI = linked.requestURI();
+        // final SipURI requestURI = linked.requestURI();
 
         final Optional<SipHeader> trunkSidHeader = request.getHeader(TwilioHeaders.X_TWILIO_TRUNK_SID);
         if (trunkSidHeader.isPresent()) {
             // If we have a trunk sid proxy core supported the 'trunk' user parameter
-            requestURI.setParameter("user", "trunk");
+            // requestURI.withPa("user", "trunk");
         } else {
-            requestURI.setParameter("public-sip", "trunk");
-            linked.header(SipHeader.create("X-Twilio-OutboundRequestUri0", requestURI.toString()));
-            linked.header(SipHeader.create("X-Twilio-OutboundRouteCount", "1"));
+            // requestURI.setParameter("public-sip", "trunk");
+            // linked.header(SipHeader.create("X-Twilio-OutboundRequestUri0", requestURI.toString()));
+            // linked.header(SipHeader.create("X-Twilio-OutboundRouteCount", "1"));
         }
 
-        // Set the From header in the forked INVITE as {caller's number}@{customer's trunking domain}.
-        // This makes a callback use our Twilio terminating.
-//        final SipURI fromURI = (SipURI) linked.from().getAddress().getURI();
-//        fromURI.setHost(getDefaultTrunkingDomain(callLog.getAccountSid()));
-
-        // In originating, if the callerid is not E.164, set it as unknown
-        // This is not to reveal the sender's SIP URI in short-circuiting case.
-//        if (!SipUtil.isValidE164Number(callLog.getFrom())) {
-//            callLog.setFrom(UNKNOWN_CALLERID);
-//        }
 
         // Set user part of To header as "sipout". This is what PMG expects for outbound.
-        final Address toAddress = linked.to().getAddress();
-//        toAddress.setDisplayName("sipout");
-        final SipURI toURI = (SipURI) toAddress.getURI();
-        toURI.setParameter("user", "sipout");
+        // final Address toAddress = linked.to().getAddress();
+        // final SipURI toURI = toAddress.copy().withURIParameter("user", "sipout").build().getURI().toSipURI();
 
         // Set to field in calllog, which is SIP URI in request-URI
         callLog.setTo(parseSipUri((SipURI) request.getRequestUri()));
@@ -236,7 +224,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
 
 //        final SipURI uri = (SipURI) request.getRequestUri().clone();
 //        uri.setParameter("user", "phone");
-        linked.requestURI().setParameter("user", "phone");
+        // linked.requestURI().setParameter("user", "phone");
     }
 
     /**
@@ -262,13 +250,13 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
      * @param linked the "b2bua:ed" request, whose From-address we are patching.
      */
     private void patchCallerId(final Address remoteAddress, final SipRequest original, final SipRequest.Builder linked) {
-        final Address fromAddress = Address.with(original.getFromHeader().getAddress().getURI())
-                .displayName(remoteAddress.getDisplayName())
+        final Address fromAddress = Address.withURI(original.getFromHeader().getAddress().getURI())
+                .withDisplayName(remoteAddress.getDisplayName())
                 .build();
-        final FromHeader from = FromHeader.with(fromAddress)
-                .user(((SipURI) remoteAddress.getURI()).getUser())
+        final FromHeader from = FromHeader.withAddress(fromAddress)
+                .withUser(((SipURI) remoteAddress.getURI()).getUser())
                 .build();
-        linked.from(from);
+        linked.withFromHeader(from);
     }
 
     private void doInfo(final SipRequest request) {

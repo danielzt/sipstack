@@ -123,22 +123,22 @@ public class MockTransactionUser implements TransactionUser {
         // storage.store(transaction, response);
 
         if (response.isSuccess() && response.isInvite()) {
-            final ViaHeader via = ViaHeader.with()
-                    .host("127.0.0.1")
-                    .port(5099)
-                    .transportUDP()
-                    .branch(ViaHeader.generateBranch())
+            final ViaHeader via = ViaHeader
+                    .withHost("127.0.0.1")
+                    .withPort(5099)
+                    .withTransportUdp()
+                    .withBranch(ViaHeader.generateBranch())
                     .build();
 
             // of course, the request-uri of the ack should be the contact etc but
             // we keep it simple here
-            final CSeqHeader cSeq = CSeqHeader.with().cseq(response.getCSeqHeader().getSeqNumber()).method("ACK").build();
+            final CSeqHeader cSeq = CSeqHeader.withMethod("ACK").withCSeq(response.getCSeqHeader().getSeqNumber()).build();
             final SipRequest ack = SipRequest.ack(SipURI.withHost("127.0.0.1").withPort(5090).build())
-                    .callId(response.getCallIDHeader())
-                    .from(response.getFromHeader())
-                    .to(response.getToHeader())
-                    .cseq(cSeq)
-                    .via(via).build();
+                    .withCallIdHeader(response.getCallIDHeader())
+                    .withFromHeader(response.getFromHeader())
+                    .withToHeader(response.getToHeader())
+                    .withCSeqHeader(cSeq)
+                    .withTopMostViaHeader(via).build();
 
             // final Transaction ackTransaction = transactionLayer.send(transaction.flow(), ack);
             // assertThat(ackTransaction, not((Transaction) null));

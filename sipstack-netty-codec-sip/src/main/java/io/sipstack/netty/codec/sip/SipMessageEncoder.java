@@ -23,7 +23,6 @@ public class SipMessageEncoder extends MessageToMessageEncoder<IOEvent> {
 
     // this is when we do MessageToByteEncoder
     protected void encode(final ChannelHandlerContext ctx, final SipMessage msg, final ByteBuf out) {
-        System.err.println("SipMessageEncoder");
         try {
             final Buffer b = msg.toBuffer();
             for (int i = 0; i < b.getReadableBytes(); ++i) {

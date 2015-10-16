@@ -3,16 +3,11 @@ package io.sipstack.example.transaction;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.pkts.packet.sip.SipMessage;
-import io.pkts.packet.sip.SipRequest;
-import io.pkts.packet.sip.SipResponse;
-import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.net.NettyNetworkLayer;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.Transport;
-import io.sipstack.transaction.ClientTransaction;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
 import io.sipstack.transaction.TransactionLayer;
@@ -50,10 +45,17 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final TransactionEvent event) throws Exception {
+        throw new RuntimeException("TODO: re-writing everything again");
+        /*
         if (event.isSipTransactionEvent()) {
             final Transaction transaction = event.transaction();
             outstandingTransactions.put(transaction.id(), transaction);
             final SipMessage msg = event.toSipTransactionEvent().message();
+
+            transaction.onResponse(r -> r.transaction.send());
+            transaction.onFlowFailure();
+            transaction.onRetransmit();
+            transaction.onTerminated();
 
             if (msg.isRequest()) {
                 final SipRequest request = msg.toRequest();
@@ -66,6 +68,8 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
                             final ViaHeader via = ViaHeader.with().host("127.0.0.1").port(5060).transportUDP().branch(ViaHeader.generateBranch()).build();
                             request.addHeaderFirst(via);
                             final ClientTransaction ct = transactionLayer.newClientTransaction(f, request);
+                            ct.onresponse(r -> apa; ctx.fireChannelRead());
+                            ct.onTerminated();
                             outstandingTransactions.put(ct.id(), ct);
                             ct.start();
                         })
@@ -83,6 +87,7 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
         } else if (event.isTransactionLifeCycleEvent()) {
             processTransactionLifeCycleEvent(event.toTransactionLifeCycleEvent());
         }
+        */
     }
 
     private void processTransactionLifeCycleEvent(final TransactionLifeCycleEvent event) {

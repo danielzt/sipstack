@@ -18,7 +18,7 @@ public final class UAC {
     private final SimpleSipStack stack;
 
     // we will be using the same from for all requests
-    private final FromHeader from = FromHeader.with().user("bob").host("example.com").build();
+    private final FromHeader from = FromHeader.withHost("example.com").withUser("bob").build();
 
     /**
      * 
@@ -33,8 +33,8 @@ public final class UAC {
         final Connection connection = this.stack.connect(host, port);
         this.from.setParameter(Buffers.wrap("tag"), FromHeader.generateTag());
         final ViaHeader via =
-                ViaHeader.with().host(host).port(port).branch(ViaHeader.generateBranch()).transportUDP().build();
-        final SipRequest invite = SipRequest.invite("sip:alice@example.com").from(UAC.this.from).via(via).build();
+                ViaHeader.withHost(host).withPort(port).withBranch(ViaHeader.generateBranch()).withTransportTCP().build();
+        final SipRequest invite = SipRequest.invite("sip:alice@example.com").withFromHeader(UAC.this.from).withTopMostViaHeader(via).build();
         connection.send(invite);
     }
 

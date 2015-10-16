@@ -6,7 +6,6 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.address.SipURI;
-import io.pkts.packet.sip.header.CSeqHeader;
 import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.ToHeader;
 import io.pkts.packet.sip.header.ViaHeader;
@@ -158,18 +157,20 @@ public class Dialogs {
 
         @Override
         public void send(final SipRequest.Builder builder) {
+            /*
             if (!builder.method().toString().equals("ACK")) {
                 cseqNr++;
             }
-            builder.contact(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build())
-                    .cseq(CSeqHeader.with().cseq(cseqNr).method(builder.method()).build());
+            builder.withContactHeader(ContactHeader.with().withHost(LOCAL_HOST).withPort(5060).withTransportUDP().build())
+                    .cseq(CSeqHeader.withMethod(builder.method()).withCSeq(cseqNr).build());
+                    */
 
             final SipRequest request = builder.build();
-            final ViaHeader via = ViaHeader.with()
-                    .host(LOCAL_HOST)
-                    .port(5060)
-                    .transportUDP()
-                    .branch(ViaHeader.generateBranch())
+            final ViaHeader via = ViaHeader
+                    .withHost(LOCAL_HOST)
+                    .withPort(5060)
+                    .withTransportUdp()
+                    .withBranch(ViaHeader.generateBranch())
                     .build();
             request.addHeaderFirst(via);
 
@@ -196,7 +197,7 @@ public class Dialogs {
 
         @Override
         public void send(final SipResponse message) {
-            message.setHeader(ContactHeader.with().host(LOCAL_HOST).port(5060).transportUDP().build());
+            message.setHeader(ContactHeader.with().withHost(LOCAL_HOST).withPort(5060).withTransportUDP().build());
             if (remoteContact != null) {
                 transactionLayer.createFlow(remoteContact.getHost())
                         .withPort(remoteContact.getPort())
@@ -227,10 +228,10 @@ public class Dialogs {
                 // TODO ugly internal class
                 to.setParameter(AddressParametersHeaderImpl.TAG, remoteTag);
             }
-            return SipRequest.ack(request.getRequestUri())
-                    .from(request.getFromHeader())
-                    .to(to)
-                    .callId(request.getCallIDHeader());
+
+            final SipRequest.Builder ack = SipRequest.ack(request.getRequestUri());
+            ack.withFromHeader(request.getFromHeader()).withToHeader(to).withCallIdHeader(request.getCallIDHeader());
+            return ack;
         }
 
         @Override
@@ -240,10 +241,10 @@ public class Dialogs {
                 // TODO ugly internal class
                 to.setParameter(AddressParametersHeaderImpl.TAG, remoteTag);
             }
-            return SipRequest.bye(request.getRequestUri())
-                    .from(request.getFromHeader())
-                    .to(to)
-                    .callId(request.getCallIDHeader());
+            return (SipRequest.Builder)SipRequest.bye(request.getRequestUri())
+                    .withFromHeader(request.getFromHeader())
+                    .withToHeader(to)
+                    .withCallIdHeader(request.getCallIDHeader());
         }
 
         public void update(final SipMessage message) {

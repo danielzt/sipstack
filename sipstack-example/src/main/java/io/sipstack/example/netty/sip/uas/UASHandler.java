@@ -29,7 +29,7 @@ public final class UASHandler extends SimpleChannelInboundHandler<SipMessageIOEv
 
         // for all requests, just generate a 200 OK response.
         if (msg.isRequest()) {
-            final SipResponse response = msg.createResponse(200);
+            final SipResponse response = msg.createResponse(200).build();
             event.connection().send(response);
         }
     }

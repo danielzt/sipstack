@@ -95,6 +95,8 @@ public class DefaultB2BUA implements B2BUA {
     }
 
     private void processRequest(final DefaultUA target, final SipRequest request) {
+        throw new RuntimeException("TODO: re-writing a bunch of stuff so...");
+        /*
         if (request.isInvite()) {
             final SipRequest.Builder builder = SipRequest.invite(target.getTarget())
                     .from(request.getFromHeader())
@@ -130,11 +132,13 @@ public class DefaultB2BUA implements B2BUA {
         } else {
             // throw new RuntimeException("TODO");
         }
+        */
     }
 
     private void processResponse(final DefaultUA target, final SipResponse response) {
         final SipRequest linkedRequest = response.isInvite() ? target.getRequest() : byeRequest;
-        final SipResponse builder = linkedRequest.createResponse(response.getStatus(), response.getRawContent());
+        final SipResponse builder = linkedRequest.createResponse(response.getStatus()).build();
+        // TODO: set the content.
 
         if (response.hasContent()) {
             // Copy content

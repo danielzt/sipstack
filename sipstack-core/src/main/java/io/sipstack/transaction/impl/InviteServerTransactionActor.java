@@ -214,7 +214,7 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
                 become(TransactionState.COMPLETED);
             }
         } else if (event.isSipTimer100Trying()) {
-            final SipResponse response = originalInvite().createResponse(100);
+            final SipResponse response = originalInvite().createResponse(100).build();
             ctx().forwardDownstream(null);
         } else {
             unhandled(event);
@@ -231,7 +231,7 @@ public class InviteServerTransactionActor extends ActorSupport<Event, Transactio
             if (invite.isAck()) {
                 System.err.println("What the fuck, this is an ACK!");
             }
-            relayResponse(invite.createResponse(100));
+            relayResponse(invite.createResponse(100).build());
         } else {
             // TODO: schedule timer...
             // timer100Trying = ctx().scheduler().schedule();

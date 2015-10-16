@@ -1,5 +1,7 @@
 package io.sipstack.transaction;
 
+import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.SipResponse;
 import io.sipstack.transport.FlowException;
 
 /**
@@ -16,4 +18,30 @@ public interface ClientTransaction extends Transaction {
      * @throws FlowException
      */
     ClientTransaction start() throws FlowException;
+
+    /**
+     * When the transaction receives a retransmitted {@link SipResponse}, the specified
+     * function will be called.
+     *
+     * @param f the function that will be called when a re-transmit
+     *          happens for this {@link ClientTransaction}. The arguments to
+     *          the function is a reference to 'this', i.e. to the same
+     *          {@link ClientTransaction} to which you registered the function.
+     *          and then the re-transmitted {@link SipResponse}.
+     */
+    // void onRetransmit(BiConsumer<ClientTransaction, SipResponse> f);
+
+    /**
+     * Whenever a {@link SipResponse} is received on this transaction, the
+     * supplied function will be called.
+     *
+     * @param f the function that will be called whenever a {@link SipResponse} is
+     *          received for this {@link ClientTransaction}. The arguments to the
+     *          function is a reference to 'this', i.e. to the same {@link ClientTransaction}
+     *          to which oyu registered the function and then the {@link SipResponse} that
+     *          was received.
+     */
+    // void onResponse(BiConsumer<ClientTransaction, SipResponse> f);
+
+    // void onTransportError(BiConsumer<ClientTransaction, SipRequest> f);
 }

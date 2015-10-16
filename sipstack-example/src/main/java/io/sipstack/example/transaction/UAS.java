@@ -33,7 +33,7 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
         if (event.isSipTransactionEvent()) {
             final SipMessage msg = event.toSipTransactionEvent().message();
             if (msg.isRequest() && !msg.isAck()) {
-                final SipResponse response = msg.createResponse(200);
+                final SipResponse response = msg.createResponse(200).build();
                 event.transaction().send(response);
             }
         }

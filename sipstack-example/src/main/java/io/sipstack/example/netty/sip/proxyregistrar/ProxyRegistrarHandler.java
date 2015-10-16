@@ -160,7 +160,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
         myBranch.write((byte) 'a');
         myBranch.write((byte) 'b');
         myBranch.write((byte) 'c');
-        final ViaHeader via = ViaHeader.with().host("10.0.1.28").port(5060).transportUDP().branch(myBranch).build();
+        final ViaHeader via = ViaHeader.withHost("10.0.1.28").withPort(5060).withTransportUdp().withBranch(myBranch).build();
 
         // This is how you should generate the branch parameter if you are a stateful proxy:
         // Note the ViaHeader.generateBranch()...
@@ -193,7 +193,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
         // the aor is not allowed to register under this domain
         // generate a 404 according to specfication
         if (!validateDomain(domain, aor)) {
-            return request.createResponse(404);
+            return request.createResponse(404).build();
         }
 
         final Binding.Builder builder = Binding.with();
@@ -208,12 +208,13 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
 
         final Binding binding = builder.build();
         final List<Binding> currentBindings = this.locationService.updateBindings(binding);
-        final SipResponse response = request.createResponse(200);
+        final SipResponse response = request.createResponse(200).build();
         currentBindings.forEach(b -> {
-            final SipURI contactURI = b.getContact();
-            contactURI.setParameter("expires", b.getExpires());
-            final ContactHeader contact = ContactHeader.with(contactURI).build();
-            response.addHeader(contact);
+            // TODO: need to change this eventually to use the new builder stuff
+            // final SipURI contactURI = b.getContact();
+            // contactURI.setParameter("expires", b.getExpires());
+            // final ContactHeader contact = ContactHeader.withSipURI(contactURI).build();
+            // response.addHeader(contact);
         });
 
         return response;

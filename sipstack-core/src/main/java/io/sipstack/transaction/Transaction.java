@@ -13,6 +13,15 @@ public interface Transaction {
     TransactionState state();
 
     /**
+     * When the {@link Transaction} is terminated the supplied function
+     * will be called with a reference to 'this'.
+     *
+     * @param f
+     */
+    // void onTerminated(Consumer<Transaction> f);
+
+
+    /**
      * Send a sip message within this {@link Transaction}. If the message that is about to be sent
      * is not actually part of this transaction then an {@link IllegalArgumentException} will
      * be thrown.

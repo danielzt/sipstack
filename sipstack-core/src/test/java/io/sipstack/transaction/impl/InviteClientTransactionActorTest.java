@@ -55,7 +55,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
     public void testRetransmittedWhileInAccepted() throws Exception {
         final SipTransactionEvent event = initiateTransition(200);
         reset();
-        final SipResponse reTransmitted = event.message().createResponse(200);
+        final SipResponse reTransmitted = event.message().createResponse(200).build();
         final Flow flow = Mockito.mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, reTransmitted));
         mockChannelContext.assertAndConsumeResponse("invite", 200);
@@ -93,7 +93,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         final int failureResponse = CLIENT_FAILURES[0];
 
         final SipTransactionEvent event = initiateTransition(provisionalResponse);
-        final SipResponse response = event.message().createResponse(failureResponse);
+        final SipResponse response = event.message().createResponse(failureResponse).build();
         final Flow flow = Mockito.mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 
@@ -115,7 +115,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
                 final int successfulResponse = SUCCESSFUL[j];
                 System.out.println("Testing provisional " + provisionalResponse + " then final " + successfulResponse);
                 final SipTransactionEvent event = initiateTransition(provisionalResponse);
-                final SipResponse response = event.request().createResponse(successfulResponse);
+                final SipResponse response = event.request().createResponse(successfulResponse).build();
                 final Flow flow = Mockito.mock(Flow.class);
                 transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 
@@ -142,7 +142,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
             assertTimerCancelled(SipTimer.B);
             reset();
 
-            final SipResponse response = event.message().createResponse(i);
+            final SipResponse response = event.message().createResponse(i).build();
             final Flow flow = Mockito.mock(Flow.class);
             transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 
@@ -195,7 +195,8 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         // same transaction and then this will be a re-transmission
         // instead which is not what we want.
         invite.setHeader(CallIdHeader.create());
-        invite.getViaHeader().setBranch(ViaHeader.generateBranch());
+        final ViaHeader via = invite.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
+        invite.setHeader(via);
 
         final AtomicReference<Transaction> tRef = new AtomicReference<>();
         transactionLayer.createFlow("127.0.0.1")
@@ -240,7 +241,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
         final SipRequest request = holder.toSipRequestTransactionEvent().request();
 
         // create the final response
-        final SipResponse response = request.createResponse(finalResponseStatus);
+        final SipResponse response = request.createResponse(finalResponseStatus).build();
         final Flow flow = Mockito.mock(Flow.class);
         transactionLayer.channelRead(mockChannelContext, FlowEvent.create(flow, response));
 

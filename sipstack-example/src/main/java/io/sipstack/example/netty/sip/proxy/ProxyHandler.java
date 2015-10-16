@@ -49,12 +49,12 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageIO
             // codes that really tells the story so that the UAC at least have a
             // fighting chance to figure out what it did wrong.
             e.printStackTrace();
-            final SipResponse response = msg.toRequest().createResponse(400);
+            final SipResponse response = msg.toRequest().createResponse(400).build();
             event.connection().send(response);
         } catch (final Exception e) {
             // something went wrong, send a 500 back...
             e.printStackTrace();
-            final SipResponse response = msg.toRequest().createResponse(500);
+            final SipResponse response = msg.toRequest().createResponse(500).build();
             event.connection().send(response);
         }
     }
@@ -81,10 +81,15 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageIO
      */
     private void proxyTo(final SipURI destination, final SipRequest msg) {
         final Connection connection = this.stack.connect(destination.getHost(), destination.getPort());
-        final ViaHeader via =
-                ViaHeader.with().host("127.0.0.1").port(5060).transportUDP().branch(ViaHeader.generateBranch()).build();
-        msg.addHeaderFirst(via);
-        connection.send(msg);
+        final ViaHeader via = ViaHeader.withHost("127.0.0.1")
+                .withPort(5060)
+                .withTransportUdp()
+                .withBranch(ViaHeader.generateBranch())
+                .build();
+        // msg.addHeaderFirst(via);
+
+        final SipMessage proxyMsg = msg.copy().withTopMostViaHeader(via).build();
+        connection.send(proxyMsg);
     }
 
     /**

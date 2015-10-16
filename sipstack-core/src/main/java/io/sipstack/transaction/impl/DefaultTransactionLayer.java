@@ -73,10 +73,6 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
      */
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
-        // TODO: I guess the transport layer needs to convert the message into
-        // something else so that we get both the flow as well as the
-        // sip message.
-        // throw new RuntimeException("Ok, continue from here next time");
         final FlowEvent event = (FlowEvent)msg;
         if (event.isSipFlowEvent()) {
             processSipFlowEvent(ctx, event.toSipFlowEvent());
@@ -166,10 +162,8 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
 
             actorCtx.upstream().ifPresent(e -> {
                 final Transaction t = new ServerTransactionSnapshot(ctx, holder.id(), holder.state(), flow);
-                if (e.isSipRequestEvent()) {
-                    ctx.fireChannelRead(TransactionEvent.create(t, e.request()));
-                } else if (e.isSipResponseEvent()) {
-                    ctx.fireChannelRead(TransactionEvent.create(t, e.response()));
+                if (e.isSipEvent()) {
+                    ctx.fireChannelRead(TransactionEvent.create(t, e.getSipMessage()));
                 } else {
                     throw new RuntimeException("not sure how to forward this event upstream " + e);
                 }

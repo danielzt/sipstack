@@ -5,13 +5,16 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandler;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.impl.PreConditions;
+import io.sipstack.config.FlowConfiguration;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 import io.sipstack.transport.TransportLayer;
 import io.sipstack.transport.event.FlowEvent;
+import io.sipstack.transport.impl.DefaultFlowStore;
 import io.sipstack.transport.impl.FlowFutureImpl;
+import io.sipstack.transport.impl.FlowStore;
 
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -154,7 +157,9 @@ public class MockTransportLayer implements TransportLayer {
             // TODO: need to mock out the transport eventually as well.
 
             final MockChannelFuture mockFuture = new MockChannelFuture(channel);
-            final FlowFutureImpl flowFuture = new FlowFutureImpl(new HashMap<>(), mockFuture, onSuccess, onFailure, onCancelled);
+            final FlowConfiguration flowConfiguration = new FlowConfiguration();
+            final FlowStore flowStore = new DefaultFlowStore(flowConfiguration);
+            final FlowFutureImpl flowFuture = new FlowFutureImpl(flowStore, mockFuture, onSuccess, onFailure, onCancelled);
 
             // this will cause the future to call the callback right away because
             // it is a completed future already.

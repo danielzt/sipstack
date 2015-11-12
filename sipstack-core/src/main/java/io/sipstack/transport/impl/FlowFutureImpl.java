@@ -21,19 +21,19 @@ public class FlowFutureImpl implements FlowFuture, GenericFutureListener<Channel
     /**
      * A reference to all the existing flows and where we will store our flow if successful.
      */
-    private final Map<ConnectionId, Flow> flows;
+    private final FlowStore flowStorage;
 
     private final Consumer<Flow> onSuccess;
     private final Consumer<Flow> onFailure;
     private final Consumer<Flow> onCancel;
     private final ChannelFuture actualFuture;
 
-    public FlowFutureImpl(final Map<ConnectionId, Flow> flows,
+    public FlowFutureImpl(final FlowStore flowStorage,
                           final ChannelFuture actualFuture,
                           final Consumer<Flow> onSuccess,
                           final Consumer<Flow> onFailure,
                           final Consumer<Flow> onCancel) {
-        this.flows = flows;
+        this.flowStorage = flowStorage;
         this.actualFuture = actualFuture;
         this.onSuccess = onSuccess;
         this.onFailure = onFailure;
@@ -55,12 +55,13 @@ public class FlowFutureImpl implements FlowFuture, GenericFutureListener<Channel
             // This takes care of that.
             // TODO: we should probably not pass in the raw hash map
             // TODO: we don't know if this is a UDP/TCP connection at this point. Needs to be fixed...
+            // TODO: hmmm... now that we are catching the events bubbling up from the
+            // TODO: lower levels can we be sure that a flow is created and as such as we only
+            // TODO: need to do a "get" on the flowStorage??? Assume that "bind" etc is called before
+            // TODO: this as well as the registered and active ones...
             final Connection connection = new UdpConnection(channel, (InetSocketAddress)channel.remoteAddress());
-            final Flow flow = flows.computeIfAbsent(connection.id(), obj -> {
-                System.err.println("Got a new flow when connecting out");
-                return new DefaultFlow(connection);
-            });
-            onSuccess.accept(flow);
+            final FlowActor actor = flowStorage.ensureFlow(connection);
+            onSuccess.accept(actor.flow());
         } else if (future.isCancelled() && onCancel != null) {
             onCancel.accept(new CancelledFlow());
         } else if (future.cause() != null && onFailure != null) {

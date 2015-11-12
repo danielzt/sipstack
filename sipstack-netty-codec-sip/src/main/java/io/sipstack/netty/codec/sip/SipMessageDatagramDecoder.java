@@ -1,6 +1,7 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.MessageToMessageDecoder;
@@ -10,6 +11,7 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.impl.SipParser;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 
+import java.net.InetSocketAddress;
 import java.util.List;
 
 /**
@@ -34,6 +36,52 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
         this.clock = clock;
     }
 
+    @Override
+    public void channelRegistered(final ChannelHandlerContext ctx) throws Exception {
+        // TODO: create new Flow if the connection actually has a remote
+        // TODO: address, if not then it is a listening socket and we
+        // TODO: don't care about those (or a un-connected UDP)
+        System.err.println("UDP Decoder: Channel registered: " + ctx.channel());
+        final Channel channel = ctx.channel();
+    }
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
+        // TODO: the FlowActor should transition to the CLOSED state.
+        System.err.println("UDP Decoder: Channel un-registered " + ctx.channel());
+        final Channel channel = ctx.channel();
+    }
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelActive(final ChannelHandlerContext ctx) throws Exception {
+        // TODO: Send an event to the FlowActor
+        System.err.println("UDP Decoder: Channel active " + ctx.channel());
+        final Channel channel = ctx.channel();
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
+        // TODO: this would be the closing event
+        // TODO:
+        System.err.println("UDP Decoder: Channel in-active " + ctx.channel());
+        final Channel channel = ctx.channel();
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelWritabilityChanged(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("UDP Decoder: Channel writability changed");
+        // ctx.fireChannelWritabilityChanged();
+    }
     /**
      * Framing an UDP packet is much simpler than for a stream based protocol
      * like TCP. We just assumes that everything is correct and therefore all is
@@ -50,6 +98,7 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
     @Override
     protected void decode(final ChannelHandlerContext ctx, final DatagramPacket msg, final List<Object> out)
             throws Exception {
+        System.err.println("Decoding an incoming UDP packet");
         // ctx.channel().connect(msg.sender(), ctx.channel().localAddress());
         final long arrivalTime = this.clock.getCurrentTimeMillis();
         final ByteBuf content = msg.content();

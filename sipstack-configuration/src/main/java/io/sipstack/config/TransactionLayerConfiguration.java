@@ -27,7 +27,7 @@ public final class TransactionLayerConfiguration {
     private TimersConfiguration timers = new TimersConfiguration();
 
     /**
-     * The size of the internal io.sipstack.transaction.transaction storage. Default is 500k
+     * The size of the internal transaction storage. Default is 500k
      */
     @JsonProperty
     private int defaultStorageSize = 500000;

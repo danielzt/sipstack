@@ -28,6 +28,20 @@ public interface IOEvent {
     long arrivalTime();
 
     /**
+     * Events concerning the state of a connection will be delivered via ConnectionIOEvents.
+     * Check if this IOEvent is a connection event.
+     *
+     * @return
+     */
+    default boolean isConnectionIOEvent() {
+        return false;
+    }
+
+    default ConnectionIOEvent toConnectionIOEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + ConnectionIOEvent.class.getName());
+    }
+
+    /**
      * Check whether or not the event is a {@link SipMessageIOEvent}.
      *
      * @return

@@ -10,7 +10,7 @@ package io.sipstack.actor;
  *
  * @author jonas@jonasborjesson.com
  */
-public interface Actor {
+public interface Actor<T> {
 
     /**
      * Called when an actor is supposed to stop. At this point an actor can
@@ -72,5 +72,5 @@ public interface Actor {
      * @param ctx
      * @param event
      */
-    void onReceive(ActorContext ctx, Object msg);
+    void onReceive(ActorContext<T> ctx, T msg);
 }

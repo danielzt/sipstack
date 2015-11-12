@@ -7,6 +7,8 @@ import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.net.NettyNetworkLayer;
 import io.sipstack.net.NetworkLayer;
+import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.TransactionId;
@@ -134,7 +136,8 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
         // Any SIP stack really needs a transport layer, which is responsible
         // for maintaining connections etc. This layer MUST be the first one
         // in our netty handler chain.
-        final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport());
+        final Clock clock = new SystemClock();
+        final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport(), clock, null);
         networkBuilder.withHandler("transport-layer", transportLayer);
 
         // The transaction layer is responsible for transaction

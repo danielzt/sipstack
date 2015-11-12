@@ -148,7 +148,7 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
      * @return
      */
     @Override
-    public ChannelHandlerContext fireChannelRead(Object msg) {
+    public ChannelHandlerContext fireChannelRead(final Object msg) {
         assertThat(msg instanceof TransactionEvent, is(true));
         final TransactionEvent event = (TransactionEvent)msg;
         storage.store(event);

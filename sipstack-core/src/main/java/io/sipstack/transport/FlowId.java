@@ -1,5 +1,8 @@
 package io.sipstack.transport;
 
+import io.pkts.packet.sip.impl.PreConditions;
+import io.sipstack.netty.codec.sip.ConnectionId;
+
 /**
  * The only difference between a {@link FlowId} and a {@link io.sipstack.netty.codec.sip.ConnectionId} is that the
  * flow id is encrypted in order to prevent tampering. Imagine the following scenario:
@@ -18,5 +21,49 @@ package io.sipstack.transport;
  * @author jonas@jonasborjesson.com
  */
 public interface FlowId {
+
+    /**
+     * Create a new {@link FlowId}.
+     * @param id
+     * @return
+     * @throws IllegalArgumentException in case the connection id is null
+     */
+    static FlowId create(final ConnectionId id) throws IllegalArgumentException {
+        PreConditions.ensureNotNull(id, "The Connection ID cannot be null");
+        return new BasicFlowId(id);
+    }
+
+    class BasicFlowId implements FlowId {
+
+        private final ConnectionId id;
+
+        private BasicFlowId(final ConnectionId id) {
+            this.id = id;
+        }
+
+        @Override
+        public boolean equals(final Object o) {
+            if (this == o) {
+                return true;
+            }
+
+            if (o ==  null) {
+                return false;
+            }
+
+            try {
+                final BasicFlowId that = (BasicFlowId) o;
+                return id.equals(that.id);
+            } catch (final ClassCastException e) {
+                return false;
+            }
+
+        }
+
+        @Override
+        public int hashCode() {
+            return id.hashCode();
+        }
+    }
 
 }

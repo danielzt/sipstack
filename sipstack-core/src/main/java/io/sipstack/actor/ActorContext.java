@@ -11,7 +11,7 @@ import io.sipstack.event.Event;
  *
  * @author jonas@jonasborjesson.com
  */
-public interface ActorContext {
+public interface ActorContext<T> {
 
     /**
      * Like a ChannelHandler in Netty, an "actor" in this sip codec project
@@ -21,9 +21,9 @@ public interface ActorContext {
      *
      * @param event
      */
-    void forwardUpstream(Event event);
+    void forwardUpstream(T event);
 
-    void forwardDownstream(Event event);
+    void forwardDownstream(T event);
 
     Scheduler scheduler();
 

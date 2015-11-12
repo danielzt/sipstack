@@ -9,11 +9,13 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.pkts.buffer.Buffer;
 import io.pkts.packet.sip.impl.SipInitialLine;
-import io.sipstack.netty.codec.sip.event.SipMessageIOEvent;
+import io.sipstack.netty.codec.sip.event.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 /**
  * @author jonas
@@ -57,6 +59,50 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
     @Override
     public boolean isSingleDecode() {
         return true;
+    }
+
+    @Override
+    public void channelRegistered(final ChannelHandlerContext ctx) throws Exception {
+        ctx.fireUserEventTriggered(create(ctx, ConnectionOpenedIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
+        ctx.fireUserEventTriggered(create(ctx, ConnectionClosedIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelActive(final ChannelHandlerContext ctx) throws Exception {
+        ctx.fireUserEventTriggered(create(ctx, ConnectionActiveIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
+        ctx.fireUserEventTriggered(create(ctx, ConnectionInactiveIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelWritabilityChanged(final ChannelHandlerContext ctx) throws Exception {
+        // just consume the event
+    }
+
+    private ConnectionIOEvent create(final ChannelHandlerContext ctx, final BiFunction<Connection, Long, ConnectionIOEvent> f) {
+        final Channel channel = ctx.channel();
+        final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress());
+        final Long arrivalTime = clock.getCurrentTimeMillis();
+        return f.apply(connection, arrivalTime);
     }
 
     @Override

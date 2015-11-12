@@ -9,7 +9,7 @@ For more information, please see [the documentation](http://www.sipstack.io).
 License
 -------
 
-Copyright (c) 2013-2014 Jonas Borjesson, aboutsip.com, sipstack.io
+Copyright (c) 2013-2015 Jonas Borjesson, aboutsip.com, sipstack.io
 
 sipstack.io and all projects under aboutsip.com are released under the terms of the MIT license, see LICENSE
 

@@ -76,7 +76,7 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
         // Any SIP stack really needs a transport layer, which is responsible
         // for maintaining connections etc. This layer MUST be the first one
         // in our netty handler chain.
-        final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport());
+        final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport(), null, null);
         networkBuilder.withHandler("transport-layer", transportLayer);
 
         // The transaction layer is responsible for transaction

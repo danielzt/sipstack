@@ -50,22 +50,27 @@ public class SipMessageEncoder extends MessageToMessageEncoder<IOEvent> {
     }
 
     protected ByteBuf toByteBuf(final Channel channel, final SipMessage msg) {
-        try {
+        // try {
             final Buffer b = msg.toBuffer();
-            final int capacity = b.capacity() + 2;
+            final int capacity = b.capacity();
             final ByteBuf buffer = channel.alloc().buffer(capacity, capacity);
+            final byte[] rawByteArray = b.getRawArray();
 
+            buffer.writeBytes(rawByteArray);
+
+            /*
             for (int i = 0; i < b.getReadableBytes(); ++i) {
                 buffer.writeByte(b.getByte(i));
             }
+            */
             //buffer.writeByte(SipParser.CR);
             //buffer.writeByte(SipParser.LF);
             return buffer;
-        } catch (final IOException e) {
+        // } catch (final IOException e) {
             // shouldn't be possible since the underlying buffer
             // from the msg is backed by a byte-array.
             // TODO: do something appropriate other than this
-            throw new RuntimeException("Unable to convert SipMessage to a ByteBuf due to IOException", e);
-        }
+            // throw new RuntimeException("Unable to convert SipMessage to a ByteBuf due to IOException", e);
+        // }
     }
 }

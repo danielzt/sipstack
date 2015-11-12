@@ -77,7 +77,7 @@ public interface SipStack {
 
             this.transactionUserLayer = new DefaultTransactionUserLayer(consumer);
 
-            final DefaultTransportLayer transport = new DefaultTransportLayer(config.getTransport());
+            // final DefaultTransportLayer transport = new DefaultTransportLayer(config.getTransport());
 
             // final DefaultTransactionLayer transaction = new DefaultTransactionLayer(transport, clock, scheduler,
                     // transactionUserLayer, config.getTransaction());

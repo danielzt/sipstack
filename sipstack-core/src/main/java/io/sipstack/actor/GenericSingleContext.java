@@ -1,7 +1,7 @@
 package io.sipstack.actor;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.sipstack.event.Event;
+import io.sipstack.core.SipTimerListener;
 import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SipTimer;
@@ -21,34 +21,44 @@ import java.util.concurrent.ScheduledFuture;
  *
  * @author jonas@jonasborjesson.com
  */
-public class SingleContext implements ActorContext<Event>, Scheduler {
+public class GenericSingleContext<T> implements ActorContext<T>, Scheduler {
 
-    private Optional<Event> upstream = Optional.empty();
+    private Optional<T> upstream = Optional.empty();
 
-    private Optional<Event> downstream = Optional.empty();
+    private Optional<T> downstream = Optional.empty();
 
     private ArrayList<SipTimer> timers = new ArrayList<>(3);
 
     private final InternalScheduler scheduler;
 
-    private final TransactionId transactionId;
-
     private final Clock clock;
 
     private final ChannelHandlerContext ctx;
 
-    private final DefaultTransactionLayer transactionLayer;
+    private final Object key;
 
-    public SingleContext(final Clock clock,
-                         final ChannelHandlerContext ctx,
-                         final InternalScheduler scheduler,
-                         final TransactionId transactionId,
-                         final DefaultTransactionLayer transactionLayer) {
+    private final SipTimerListener timerListener;
+
+    /**
+     *
+     * @param clock
+     * @param ctx
+     * @param scheduler
+     * @param key the key used as part of timer. It has handed back to the {@link SipTimerListener}
+     *            so it has a chance of figuring out to which internal (typically) actor is supposed
+     *            to handle the timer event.
+     * @param timerListener
+     */
+    public GenericSingleContext(final Clock clock,
+                                final ChannelHandlerContext ctx,
+                                final InternalScheduler scheduler,
+                                final Object key,
+                                final SipTimerListener timerListener) {
         this.clock = clock;
         this.ctx = ctx;
+        this.key = key;
         this.scheduler = scheduler;
-        this.transactionId = transactionId;
-        this.transactionLayer = transactionLayer;
+        this.timerListener = timerListener;
     }
 
     public Scheduler scheduler() {
@@ -56,7 +66,7 @@ public class SingleContext implements ActorContext<Event>, Scheduler {
     }
 
     @Override
-    public void forwardUpstream(final Event event) {
+    public void forwardUpstream(final T event) {
         if (upstream.isPresent()) {
             throw new IllegalStateException("An upstream event has already been forwarded");
         }
@@ -65,7 +75,7 @@ public class SingleContext implements ActorContext<Event>, Scheduler {
     }
 
     @Override
-    public void forwardDownstream(final Event event) {
+    public void forwardDownstream(final T event) {
         if (downstream.isPresent()) {
             throw new IllegalStateException("A downstream event has already been forwarded");
         }
@@ -73,19 +83,19 @@ public class SingleContext implements ActorContext<Event>, Scheduler {
         downstream = Optional.ofNullable(event);
     }
 
-    public Optional<Event> upstream() {
+    public Optional<T> upstream() {
         return upstream;
     }
 
-    public Optional<Event> downstream() {
+    public Optional<T> downstream() {
         return downstream;
     }
 
     @Override
     public Cancellable schedule(final SipTimer timer, final Duration delay) {
 
-        if (transactionId == null) {
-            // for stray responses etc there will be no transaction
+        if (key == null) {
+            // For stray responses etc there will be no transaction
             // available anymore and it really shouldn't be possible
             // for someone to create a timer in that case but if they
             // try then we will halt. Probably a better way to handle this
@@ -93,8 +103,8 @@ public class SingleContext implements ActorContext<Event>, Scheduler {
             throw new RuntimeException("Unable to schedule a timer because there is no underlying transaction");
         }
 
-        final SipTimerEvent event = SipTimerEvent.withTimer(timer).withKey(transactionId).withContext(ctx).build();
-        return scheduler.schedule(transactionLayer, event, delay);
+        final SipTimerEvent event = SipTimerEvent.withTimer(timer).withKey(key).withContext(ctx).build();
+        return scheduler.schedule(timerListener, event, delay);
 
         /*
         return scheduler.schedule(new Runnable() {

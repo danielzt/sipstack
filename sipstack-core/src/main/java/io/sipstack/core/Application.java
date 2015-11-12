@@ -79,12 +79,12 @@ public abstract class Application<T extends Configuration> {
     }
 
     /**
-     * Will be called when the io.sipstack.application.application runs. Override it to add
-     * resources etc for your io.sipstack.application.application.
+     * Will be called when the application runs. Override it to add
+     * resources etc for your application.
      * 
      * Note that any exception that escapes this method will cause 
-     * the io.sipstack.application.application to halt. Typically this is what you want since
-     * you do not ever want to run your io.sipstack.application.application in a
+     * the application to halt. Typically this is what you want since
+     * you do not ever want to run your application in a
      * half-initialized/unknown stage. Hence, make sure that you do
      * handle all the exceptions that you can indeed handle but if
      * you do not have a sane default behavior for dealing with a 
@@ -92,7 +92,7 @@ public abstract class Application<T extends Configuration> {
      * that the server shuts down.
      * 
      * @param configuration the parsed {@link Configuration} object
-     * @throws Exception if anything goes wrong. The io.sipstack.application.application will halt.
+     * @throws Exception if anything goes wrong. The application will halt.
      */
     public abstract void run(T configuration, Environment environment) throws Exception;
 
@@ -131,7 +131,7 @@ public abstract class Application<T extends Configuration> {
             builder.withMetricRegistry(bootstrap.getMetricRegistry());
             final Environment environment = builder.build();
 
-            // start the io.sipstack.application.application
+            // start the application
             run(config, environment);
 
             // Create and initialize the actual Sip server
@@ -155,7 +155,8 @@ public abstract class Application<T extends Configuration> {
 
             // Transport layer is responsible for managing connections,
             // i.e. Flows.
-            final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport());
+            System.err.println("Creating the transport layer here");
+            final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport(), clock, scheduler);
             networkBuilder.withHandler("transport-layer", transportLayer);
 
             // The transaction layer is responsible for transaction

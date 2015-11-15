@@ -19,6 +19,7 @@ import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.*;
 import io.sipstack.netty.codec.sip.event.ConnectionIOEvent;
 import io.sipstack.netty.codec.sip.event.IOEvent;
+import io.sipstack.transaction.event.TransactionLifeCycleEvent;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 import io.sipstack.transport.FlowId;
@@ -98,8 +99,6 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
                 return;
             }
 
-            System.err.println("Got an IOEvent");
-
             final Connection connection = event.connection();
             final FlowActor actor = flowStore.ensureFlow(connection);
             // TODO: invoke transaction here
@@ -144,10 +143,11 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
     private void processConnectionIOEvent(final ChannelHandlerContext ctx, final ConnectionIOEvent event) {
         final Connection connection = event.connection();
 
-        // TODO: are these the correct events that creates a flow? Should e.g. ConnectionInactive result
-        // in a new flow gets created just to have it removed right away?
+        // There are a few events that will create a new flow so if
+        // receive one of those then create a new flow. See the flow
+        // as outlined in the {@link FlowActor}
         FlowActor actor = null;
-        if (event.isConnectionActiveIOEvent() || event.isConnectionBoundIOEvent()) {
+        if (event.isConnectionOpenedIOEvent() || event.isConnectionBoundIOEvent()) {
             actor = flowStore.ensureFlow(connection);
         } else {
             actor = flowStore.get(FlowId.create(connection.id()));
@@ -165,17 +165,32 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
 
     private void invokeActor(final ChannelHandlerContext channelCtx, final FlowActor actor, final IOEvent event) {
         try {
-            final GenericSingleContext<IOEvent> ctx = new GenericSingleContext<IOEvent>(clock, channelCtx, scheduler, actor.id(), this);
-            actor.onReceive(ctx, event);
+            synchronized (actor) {
+                final GenericSingleContext<IOEvent> ctx = new GenericSingleContext<IOEvent>(clock, channelCtx, scheduler, actor.id(), this);
+                actor.onReceive(ctx, event);
 
-            // always favor downstream
-            ctx.downstream().ifPresent(e -> {
-                System.err.println("TODO: Received a downstream event from the Flow Actor.");
-            });
+                // always favor downstream
+                ctx.downstream().ifPresent(e -> {
+                    System.err.println("TODO: Received a downstream event from the Flow Actor.");
+                });
 
-            ctx.upstream().ifPresent(e -> {
-                System.err.println("TODO: Received an upstream event from the Flow Actor.");
-            });
+                ctx.forward().ifPresent(e -> {
+                    System.err.println("TODO: Received an forwarded event from the Flow Actor.");
+                });
+
+                ctx.upstream().ifPresent(e -> {
+                    System.err.println("TODO: Received an upstream event from the Flow Actor.");
+                });
+
+                if (actor.isTerminated()) {
+                    flowStore.remove(actor.id());
+                    actor.stop();
+                    actor.postStop();
+                    // Probably want to issue a life-cycle event regarding the flow
+                    // Compare with the transaction life-cycle events
+                }
+            }
+
         } catch (final Throwable t) {
             // TODO: need to decide what to do.
             // Did the flow die due to this?
@@ -231,7 +246,16 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
 
     @Override
     public void onTimeout(final SipTimerEvent timer) {
-        System.err.println("Received a timeout event");
+        try {
+            final FlowId id = (FlowId) timer.key();
+            final FlowActor actor = flowStore.get(id);
+            if (actor != null) {
+                final IOEvent event = io.sipstack.netty.codec.sip.event.SipTimerEvent.create(timer.timer());
+                invokeActor(timer.ctx(), actor, event);
+            }
+        } catch (final ClassCastException e) {
+            // TODO: log error and move on?
+        }
     }
 
     private class FlowBuilder implements Flow.Builder {

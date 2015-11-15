@@ -182,7 +182,6 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
                 invoke(timer.ctx(), holder.flow(), timer, holder);
                 checkIfTerminated(timer.ctx(), holder);
             }
-
         } catch (final ClassCastException e) {
             // TODO
             e.printStackTrace();

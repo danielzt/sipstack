@@ -126,15 +126,14 @@ public class InviteServerTransactionActorTest extends TransactionTestBase {
     public Transaction initiateTransition(final int finalResponseStatus) throws Exception {
         // we will be using this header to tell the {@link MockTransactionUser} which response
         // to generate and send back...
-        final SipRequest invite = defaultInviteRequest.clone();
+        final SipRequest.Builder builder = defaultInviteRequest.copy();
 
         // change the branch since we will otherwise actually hit the
         // same transaction and then this will be a re-transmission
         // instead which is not what we want.
-        invite.setHeader(CallIdHeader.create());
-        final ViaHeader via = invite.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
-        invite.setHeader(via);
-        // invite.getViaHeader().setBranch(ViaHeader.generateBranch());
+        builder.withCallIdHeader(CallIdHeader.create());
+        builder.onTopMostViaHeader(v -> v.withBranch(ViaHeader.generateBranch()));
+        final SipRequest invite = builder.build();
 
         transactionLayer.createFlow("127.0.0.1")
                 .withPort(5070)

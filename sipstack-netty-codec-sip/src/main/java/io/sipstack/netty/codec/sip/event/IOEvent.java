@@ -37,6 +37,30 @@ public interface IOEvent {
         return false;
     }
 
+    default boolean isConnectionOpenedIOEvent() {
+        return false;
+    }
+
+    default boolean isConnectionClosedIOEvent() {
+        return false;
+    }
+
+    default boolean isConnectionCloseIOEvent() {
+        return false;
+    }
+
+    default boolean isConnectionActiveIOEvent() {
+        return false;
+    }
+
+    default boolean isConnectionInactiveIOEvent() {
+        return false;
+    }
+
+    default boolean isConnectionBoundIOEvent() {
+        return false;
+    }
+
     default ConnectionIOEvent toConnectionIOEvent() {
         throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + ConnectionIOEvent.class.getName());
     }
@@ -122,5 +146,86 @@ public interface IOEvent {
      */
     static SipRequestIOEvent create(final Connection connection, final SipRequest request) {
         return new SipRequestIOEventImpl(connection, request, System.currentTimeMillis());
+    }
+
+    default SipTimerEvent toSipTimerEvent() {
+        throw new ClassCastException("Cannot case " + getClass().getName() + " into a " + SipTimerEvent.class.getName());
+    }
+
+    default boolean isSipTimerEvent() {
+        return false;
+    }
+
+    /**
+     * There isn't an official "100 Trying" timer but if you look in the state machine for an Invite
+     * Server Transaction it states that it should send a 100 Trying after 200 ms unless the TU does
+     * so itself. Hence, this is the timer that keeps track of that.
+     *
+     * @return
+     */
+    default boolean isSipTimer100Trying() {
+        return false;
+    }
+
+    /**
+     * This is a generic timeout event for those times when there isn't a specific timer
+     * event defined in any of the RFC:s.
+     *
+     * @return
+     */
+    default boolean isSipTimerTimeout() {
+        return false;
+    }
+
+    default boolean isSipTimerA() {
+        return false;
+    }
+
+    default boolean isSipTimerB() {
+        return false;
+    }
+
+    default boolean isSipTimerC() {
+        return false;
+    }
+
+    default boolean isSipTimerD() {
+        return false;
+    }
+
+    default boolean isSipTimerE() {
+        return false;
+    }
+
+    default boolean isSipTimerF() {
+        return false;
+    }
+
+    default boolean isSipTimerG() {
+        return false;
+    }
+
+    default boolean isSipTimerH() {
+        return false;
+    }
+
+    default boolean isSipTimerI() {
+        return false;
+    }
+
+    default boolean isSipTimerJ() {
+        return false;
+    }
+
+    default boolean isSipTimerK() {
+        return false;
+    }
+
+    default boolean isSipTimerL() {
+        return false;
+    }
+
+    default boolean isSipTimerM() {
+        return false;
     }
 }

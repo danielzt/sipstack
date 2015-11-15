@@ -8,36 +8,14 @@ import io.sipstack.netty.codec.sip.event.impl.IOEventImpl;
  */
 public interface ConnectionIOEvent extends IOEvent {
 
-    default boolean isConnectionIOEvent() {
-        return true;
-    }
-
-    default boolean isConnectionOpenedIOEvent() {
-        return false;
-    }
-
-    default boolean isConnectionClosedIOEvent() {
-        return false;
-    }
-
-    default boolean isConnectionCloseIOEvent() {
-        return false;
-    }
-
-    default boolean isConnectionActiveIOEvent() {
-        return false;
-    }
-
-    default boolean isConnectionInactiveIOEvent() {
-        return false;
-    }
-
-    default boolean isConnectionBoundIOEvent() {
-        return false;
-    }
-
+    @Override
     default ConnectionIOEvent toConnectionIOEvent() {
         return this;
+    }
+
+    @Override
+    default boolean isConnectionIOEvent() {
+        return true;
     }
 
 }

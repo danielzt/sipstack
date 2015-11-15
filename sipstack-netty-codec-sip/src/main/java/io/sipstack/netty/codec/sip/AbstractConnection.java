@@ -61,6 +61,11 @@ public abstract class AbstractConnection implements Connection {
     }
 
     @Override
+    public void close() {
+        // TODO: do we need to do more?
+        channel.close();
+    }
+    @Override
     public byte[] getRawRemoteIpAddress() {
         return this.remote.getAddress().getAddress();
     }

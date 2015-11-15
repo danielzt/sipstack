@@ -27,6 +27,8 @@ public class SingleContext implements ActorContext<Event>, Scheduler {
 
     private Optional<Event> downstream = Optional.empty();
 
+    private Optional<Event> forward = Optional.empty();
+
     private ArrayList<SipTimer> timers = new ArrayList<>(3);
 
     private final InternalScheduler scheduler;
@@ -53,6 +55,15 @@ public class SingleContext implements ActorContext<Event>, Scheduler {
 
     public Scheduler scheduler() {
         return this;
+    }
+
+    @Override
+    public void forward(final Event event) {
+        if (forward.isPresent()) {
+            throw new IllegalStateException("We have already forwarded an event");
+        }
+
+        forward = Optional.ofNullable(event);
     }
 
     @Override

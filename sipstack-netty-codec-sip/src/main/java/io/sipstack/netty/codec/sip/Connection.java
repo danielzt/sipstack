@@ -125,6 +125,8 @@ public interface Connection {
      */
     void send(Object o);
 
-    public boolean connect();
+    boolean connect();
+
+    void close();
 
 }

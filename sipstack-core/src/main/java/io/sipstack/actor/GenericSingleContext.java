@@ -27,6 +27,8 @@ public class GenericSingleContext<T> implements ActorContext<T>, Scheduler {
 
     private Optional<T> downstream = Optional.empty();
 
+    private Optional<T> forward = Optional.empty();
+
     private ArrayList<SipTimer> timers = new ArrayList<>(3);
 
     private final InternalScheduler scheduler;
@@ -66,6 +68,15 @@ public class GenericSingleContext<T> implements ActorContext<T>, Scheduler {
     }
 
     @Override
+    public void forward(final T event) {
+        if (forward.isPresent()) {
+            throw new IllegalStateException("We have already forwarded an event");
+        }
+
+        forward = Optional.ofNullable(event);
+    }
+
+    @Override
     public void forwardUpstream(final T event) {
         if (upstream.isPresent()) {
             throw new IllegalStateException("An upstream event has already been forwarded");
@@ -89,6 +100,10 @@ public class GenericSingleContext<T> implements ActorContext<T>, Scheduler {
 
     public Optional<T> downstream() {
         return downstream;
+    }
+
+    public Optional<T> forward() {
+        return forward;
     }
 
     @Override

@@ -3,16 +3,19 @@ package io.sipstack.transport.impl;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandler;
+import io.sipstack.MockChannelHandlerContext;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.netty.codec.sip.*;
 import io.sipstack.netty.codec.sip.event.ConnectionActiveIOEvent;
+import io.sipstack.netty.codec.sip.event.ConnectionOpenedIOEvent;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.transaction.impl.MockChannel;
-import io.sipstack.transaction.impl.MockChannelHandlerContext;
 import io.sipstack.transport.TransportLayer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mock;
+import org.mockito.Mockito;
 
 import java.net.InetSocketAddress;
 
@@ -32,18 +35,34 @@ public class DefaultTransportLayerTest extends TransportLayerTestBase {
         final TransportLayerConfiguration config = new TransportLayerConfiguration();
         config.getFlow().setDefaultStorageSize(100);
 
-        transportLayer = new DefaultTransportLayer(config, defaultClock, null);
+        transportLayer = new DefaultTransportLayer(config, defaultClock, defaultScheduler);
+        defaultChannelCtx = new MockChannelHandlerContext(transportLayer);
     }
 
     /**
+     * There are several ways for a flow to get created. For UDP, we typically create a new
+     * flow when we receive a new incoming SIP message. For TCP, we typically get the {@link ConnectionOpenedIOEvent}
+     * event.
      *
      * @throws Exception
      */
     @Test
-    public void testCreateFlow() throws Exception {
+    public void testCreateFlowOnConnectionOpenedIOEvent() throws Exception {
+        initiateNewFlow();
+    }
+
+    @Test
+    public void testFlowShutsDownDueToNoInitialTraffic() throws Exception {
+        final Connection connection = initiateNewFlow();
+        defaultScheduler.fire(SipTimer.Timeout);
+    }
+
+    private Connection initiateNewFlow() throws Exception {
         final Connection connection = createTcpConnection();
-        final IOEvent event = ConnectionActiveIOEvent.create(connection, defaultClock.getCurrentTimeMillis());
+        final IOEvent event = ConnectionOpenedIOEvent.create(connection, defaultClock.getCurrentTimeMillis());
         transportLayer.userEventTriggered(defaultChannelCtx, event);
+        assertTimerScheduled(SipTimer.Timeout);
+        return connection;
     }
 
     public Connection createTcpConnection() {

@@ -190,13 +190,13 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      * @throws Exception
      */
     public SipTransactionEvent initiateNewTransaction() throws Exception {
-        final SipRequest invite = defaultInviteRequest.clone();
+        final SipRequest.Builder builder = defaultInviteRequest.copy();
         // change the branch since we will otherwise actually hit the
         // same transaction and then this will be a re-transmission
         // instead which is not what we want.
-        invite.setHeader(CallIdHeader.create());
-        final ViaHeader via = invite.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
-        invite.setHeader(via);
+        builder.withCallIdHeader(CallIdHeader.create());
+        builder.onTopMostViaHeader(v -> v.withBranch(ViaHeader.generateBranch()));
+        final SipRequest invite = builder.build();
 
         final AtomicReference<Transaction> tRef = new AtomicReference<>();
         transactionLayer.createFlow("127.0.0.1")

@@ -18,4 +18,6 @@ public interface FlowStore {
     FlowActor ensureFlow(Connection connection);
 
     FlowActor get(FlowId id);
+
+    void remove(FlowId id);
 }

@@ -25,6 +25,16 @@ public interface ActorContext<T> {
 
     void forwardDownstream(T event);
 
+    /**
+     * Forward the event in the same direction as the event came in.
+     * Use this method if your actor doesn't care about direction
+     * (or knows the direction) and you just want to continue
+     * the chain.
+     *
+     * @param event
+     */
+    void forward(T event);
+
     Scheduler scheduler();
 
 }

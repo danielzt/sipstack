@@ -11,8 +11,10 @@ import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 
 /**
- * @author jonas@jonasborjesson.com
+ * Wraps a {@link SipTimer} into an event, which contains a key that is then typically
+ * needed by the handler for looking up an appropriate context by the handler.
  *
+ * @author jonas@jonasborjesson.com
  */
 public abstract class SipTimerEvent extends Event {
 
@@ -127,8 +129,26 @@ public abstract class SipTimerEvent extends Event {
                     return new TimerL(ctx, key);
                 case M:
                     return new TimerM(ctx, key);
+                case Timeout:
+                    return new TimerTimeout(ctx, key);
                 default:
                     throw new RuntimeException("Don't know what you are talking about.");
+            }
+        }
+
+        private static class TimerTimeout extends SipTimerEvent {
+            private TimerTimeout(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
+            }
+
+            @Override
+            public boolean isSipTimerTimeout() {
+                return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.Timeout;
             }
         }
 

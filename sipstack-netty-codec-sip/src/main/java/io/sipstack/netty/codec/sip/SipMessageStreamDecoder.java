@@ -63,6 +63,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     @Override
     public void channelRegistered(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("registered");
         ctx.fireUserEventTriggered(create(ctx, ConnectionOpenedIOEvent::create));
     }
 
@@ -71,6 +72,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("un-registered");
         ctx.fireUserEventTriggered(create(ctx, ConnectionClosedIOEvent::create));
     }
 
@@ -79,6 +81,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelActive(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("active");
         ctx.fireUserEventTriggered(create(ctx, ConnectionActiveIOEvent::create));
     }
 
@@ -87,6 +90,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("in-active");
         ctx.fireUserEventTriggered(create(ctx, ConnectionInactiveIOEvent::create));
     }
 

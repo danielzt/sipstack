@@ -25,15 +25,25 @@ public class DefaultFlowStore implements FlowStore {
     public FlowActor ensureFlow(final Connection connection) {
         final FlowId flowId = FlowId.create(connection.id());
         final FlowActor actor = flows.computeIfAbsent(flowId, obj -> {
-            System.err.println("Got a new flow going");
             return new DefaultFlowActor(config, connection);
         });
 
+        printSize();
         return actor;
+    }
+
+    private void printSize() {
+        System.err.println("Size: " + flows.size());
     }
 
     public FlowActor get(final FlowId id) {
         return flows.get(id);
+    }
+
+    @Override
+    public void remove(final FlowId id) {
+        flows.remove(id);
+        printSize();
     }
 
 }

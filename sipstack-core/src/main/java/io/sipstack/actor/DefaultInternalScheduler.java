@@ -28,7 +28,7 @@ public class DefaultInternalScheduler implements InternalScheduler {
     }
 
     @Override
-    public Cancellable schedule(SipTimerListener listener, SipTimerEvent timerEvent, Duration delay) {
+    public Cancellable schedule(final SipTimerListener listener, final SipTimerEvent timerEvent, final Duration delay) {
         return schedule(new Runnable() {
             @Override
             public void run() {

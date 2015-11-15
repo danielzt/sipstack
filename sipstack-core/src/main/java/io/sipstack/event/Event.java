@@ -99,6 +99,16 @@ public abstract class Event {
         return false;
     }
 
+    /**
+     * This is a generic timeout event for those times when there isn't a specific timer
+     * event defined in any of the RFC:s.
+     *
+     * @return
+     */
+    public boolean isSipTimerTimeout() {
+        return false;
+    }
+
     public boolean isSipTimerA() {
         return false;
     }

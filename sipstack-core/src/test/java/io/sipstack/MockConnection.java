@@ -175,4 +175,10 @@ public class MockConnection implements Connection {
         throw new RuntimeException("not implemented yet");
     }
 
+    @Override
+    public void close() {
+        System.err.println("Closed called!");
+
+    }
+
 }

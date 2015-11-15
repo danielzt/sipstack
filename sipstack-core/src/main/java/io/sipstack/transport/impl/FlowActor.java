@@ -11,18 +11,9 @@ import io.sipstack.transport.FlowId;
  *
  *
  * <pre>
- *    ConnectionActiveIOEvent
- *           |
- *           v
- *     +----------+
- *     |  init    |
- *     +----------+
- *           |
- *           v
- *     +----------+
- *     |  ready   |
- *     +----------+
- *
+ *     Currently displayed here while I figure out exactly
+ *     how the FSM should look like:
+ *     http://www.gliffy.com/go/publish/image/9427857/L.png
  * </pre>
  *
  * States:

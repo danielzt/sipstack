@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -194,7 +195,7 @@ public class SipStackTestBase {
      * @return the cancellable that we just asserted actually exists and is correct.
      */
     public MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
-        defaultScheduler.latch.await();
+        defaultScheduler.latch.await(5, TimeUnit.SECONDS);
         final Optional<MockCancellable> cancellable = defaultScheduler.isScheduled(timer);
         if (!cancellable.isPresent()) {
             fail("No timer " + timer + " scheduled");

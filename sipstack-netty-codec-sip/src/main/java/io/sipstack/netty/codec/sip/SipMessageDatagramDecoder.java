@@ -98,8 +98,6 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
     @Override
     protected void decode(final ChannelHandlerContext ctx, final DatagramPacket msg, final List<Object> out)
             throws Exception {
-        System.err.println("Decoding an incoming UDP packet");
-        // ctx.channel().connect(msg.sender(), ctx.channel().localAddress());
         final long arrivalTime = this.clock.getCurrentTimeMillis();
         final ByteBuf content = msg.content();
 
@@ -120,17 +118,6 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
         final Buffer buffer = Buffers.wrap(b);
         SipParser.consumeSWS(buffer);
         final SipMessage sipMessage = SipParser.frame(buffer);
-        // System.err.println("CSeq header: " + sipMessage.getCSeqHeader());
-
-        // final SipInitialLine initialLine = SipInitialLine.parse(buffer.readLine());
-        // final Buffer headers = buffer.readUntilDoubleCRLF();
-        // SipMessage sipMessage = null;
-        // if (initialLine.isRequestLine()) {
-        // sipMessage = new SipRequestImpl(initialLine.toRequestLine(), headers, buffer);
-        // } else {
-        // sipMessage = new SipResponseImpl(initialLine.toResponseLine(), headers, buffer);
-        // }
-
         final Connection connection = new UdpConnection(ctx.channel(), msg.sender());
         if (sipMessage.isRequest()) {
             out.add(IOEvent.create(connection, sipMessage.toRequest()));

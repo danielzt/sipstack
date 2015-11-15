@@ -12,6 +12,9 @@ public class FlowConfiguration {
     @JsonProperty
     private Duration timeout = Duration.ofMinutes(3);
 
+    @JsonProperty
+    private Duration initialIdleTimeout = Duration.ofSeconds(4);
+
     /**
      * The size of the internal flow storage. Default is 1000 but you should
      * adjust this to the expected maximum number of open flows at any given
@@ -25,6 +28,21 @@ public class FlowConfiguration {
 
     public Duration getTimeout() {
         return timeout;
+    }
+
+    /**
+     * When a flow accepts a new connection and enters the ready state it will
+     * wait a maximum number of seconds for anything to be sent across that flow.
+     * If nothing is showing up then the flow will be closed.
+     *
+     * This is typically only useful for flows based off of TCP connections
+     * where you want to prevent attacks where someone just establish a TCP
+     * connection but then never actually send traffic across that connection.
+     *
+     * @return
+     */
+    public Duration getInitialIdleTimeout() {
+        return initialIdleTimeout;
     }
 
     public int getDefaultStorageSize() {

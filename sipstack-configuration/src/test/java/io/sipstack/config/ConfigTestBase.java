@@ -8,6 +8,7 @@ import java.io.InputStream;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -31,6 +32,7 @@ public class ConfigTestBase {
         final SimpleModule module = new SimpleModule();
         module.addDeserializer(NetworkInterfaceConfiguration.class, new NetworkInterfaceDeserializer());
         mapper.registerModule(module);
+        mapper.registerModule(new JSR310Module());
         return mapper.readValue(stream, clazz);
     }
 

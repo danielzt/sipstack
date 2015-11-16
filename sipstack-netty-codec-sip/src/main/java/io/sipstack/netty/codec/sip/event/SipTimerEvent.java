@@ -47,6 +47,14 @@ public interface SipTimerEvent extends IOEvent {
                 return SipTimerEventImpl.M;
             case Timeout:
                 return SipTimerEventImpl.TIMEOUT;
+            case Timeout1:
+                return SipTimerEventImpl.TIMEOUT1;
+            case Timeout2:
+                return SipTimerEventImpl.TIMEOUT2;
+            case Timeout3:
+                return SipTimerEventImpl.TIMEOUT3;
+            case Timeout4:
+                return SipTimerEventImpl.TIMEOUT4;
             default:
                 throw new RuntimeException("Don't know which timer you are talking about.");
         }

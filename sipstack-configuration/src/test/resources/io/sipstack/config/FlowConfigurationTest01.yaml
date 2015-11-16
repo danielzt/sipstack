@@ -1,0 +1,31 @@
+# Test yaml file used by unit test.
+
+transport:
+  flow:
+    keepAlive:
+
+      # Which mode the keep-alive functionality should operate under.
+      # Valid values are:
+      # NONE - turn everything off.
+      # PASSIVE - we will simply just respond to a ping if we get one but
+      # ACTIVE - we will actively issue keep-alive traffic if we do not recieve
+      #          any. In this mode, the "interval" and "maxFailed" kicks in...
+      mode: NONE
+
+      # For how long this flow can sit idle without taking any traffic across it.
+      # If this timer fires and we are in ACTIVE mode, then we will start to issue
+      # keep-alive traffic.
+      #
+      # Value is in seconds
+      idleTimeout: 40
+
+      # If we start issuing keep-alive traffic, which we only do in ACTIVE mode and
+      # if the idle timeout has fired, then how many times can the keep-alive traffic
+      # fail before we give up and kill the flow?
+      maxFailed: 3
+
+      # If a keep-alive probe fails, for how long do we wait until we try and send another
+      # one?
+      #
+      # Value is in seconds
+      interval: 5

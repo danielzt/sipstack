@@ -32,12 +32,18 @@ public class MockChannel implements Channel {
     private final InetSocketAddress localAddress;
     private final InetSocketAddress remoteAddress;
 
+    private boolean hasCloseBeenCalled;
+
     public MockChannel(final ChannelHandlerContext ctx, final ChannelOutboundHandler handler,
                        final InetSocketAddress localAddress, final InetSocketAddress remoteAddress) {
         this.ctx = ctx;
         this.handler = handler;
         this.localAddress = localAddress;
         this.remoteAddress = remoteAddress;
+    }
+
+    public boolean hasCloseBeenCalled() {
+        return hasCloseBeenCalled;
     }
 
     @Override
@@ -162,6 +168,7 @@ public class MockChannel implements Channel {
 
     @Override
     public ChannelFuture close() {
+        hasCloseBeenCalled = true;
         return null;
     }
 
@@ -192,6 +199,7 @@ public class MockChannel implements Channel {
 
     @Override
     public ChannelFuture close(ChannelPromise promise) {
+        hasCloseBeenCalled = true;
         return null;
     }
 

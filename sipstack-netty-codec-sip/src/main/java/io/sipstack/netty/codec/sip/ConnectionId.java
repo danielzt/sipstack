@@ -120,7 +120,7 @@ public interface ConnectionId {
         return new IPv4ConnectionId(protocol, localIp, localPort, remoteIp, remotePort);
     }
 
-    static class IPv4ConnectionId implements ConnectionId {
+    class IPv4ConnectionId implements ConnectionId {
 
         private final Transport protocol;
         private final int localPort;

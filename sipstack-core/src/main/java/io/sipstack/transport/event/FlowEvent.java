@@ -14,6 +14,10 @@ public interface FlowEvent {
 
     Flow flow();
 
+    // =====================================
+    // === SIP flow events
+    // =====================================
+
     /**
      * Check if this is a Sip Event, which is either a request or response message.
      *
@@ -27,6 +31,16 @@ public interface FlowEvent {
         throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipFlowEvent.class.getName());
     }
 
+    static SipFlowEvent create(final Flow flow, final SipMessage message) {
+        if (message.isRequest()) {
+            return create(flow, message.toRequest());
+        }
+        return create(flow, message.toResponse());
+    }
+
+    // =====================================
+    // === SIP request flow events
+    // =====================================
     default boolean isSipRequestFlowEvent() {
         return false;
     }
@@ -35,6 +49,14 @@ public interface FlowEvent {
         throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipRequestFlowEvent.class.getName());
     }
 
+
+    static SipRequestFlowEvent create(final Flow flow, final SipRequest request) {
+        return new SipRequestFlowEventImpl(flow, request);
+    }
+
+    // =====================================
+    // === SIP response flow events
+    // =====================================
     default boolean isSipResponseFlowEvent() {
         return false;
     }
@@ -43,19 +65,24 @@ public interface FlowEvent {
         throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipResponseFlowEvent.class.getName());
     }
 
-    static SipFlowEvent create(final Flow flow, final SipMessage message) {
-        if (message.isRequest()) {
-            return create(flow, message.toRequest());
-        }
-        return create(flow, message.toResponse());
-    }
-
-    static SipRequestFlowEvent create(final Flow flow, final SipRequest request) {
-        return new SipRequestFlowEventImpl(flow, request);
-    }
 
     static SipResponseFlowEvent create(final Flow flow, final SipResponse response) {
         return new SipResponseFlowEventImpl(flow, response);
+    }
+
+    // =====================================
+    // === Life-cycle events
+    // =====================================
+    default boolean isFlowLifeCycleEvent() {
+        return false;
+    }
+
+    default FlowLifeCycleEvent toFlowLifeCycleEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + FlowLifeCycleEvent.class.getName());
+    }
+
+    default boolean isFlowTerminatedEvent() {
+        return false;
     }
 
 }

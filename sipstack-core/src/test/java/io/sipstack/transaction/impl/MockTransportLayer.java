@@ -12,12 +12,11 @@ import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 import io.sipstack.transport.TransportLayer;
 import io.sipstack.transport.event.FlowEvent;
-import io.sipstack.transport.impl.DefaultFlowStore;
+import io.sipstack.transport.impl.DefaultFlowStorage;
 import io.sipstack.transport.impl.FlowFutureImpl;
-import io.sipstack.transport.impl.FlowStore;
+import io.sipstack.transport.impl.FlowStorage;
 
 import java.net.InetSocketAddress;
-import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -158,8 +157,8 @@ public class MockTransportLayer implements TransportLayer {
 
             final MockChannelFuture mockFuture = new MockChannelFuture(channel);
             final FlowConfiguration flowConfiguration = new FlowConfiguration();
-            final FlowStore flowStore = new DefaultFlowStore(flowConfiguration);
-            final FlowFutureImpl flowFuture = new FlowFutureImpl(flowStore, mockFuture, onSuccess, onFailure, onCancelled);
+            final FlowStorage flowStorage = new DefaultFlowStorage(flowConfiguration);
+            final FlowFutureImpl flowFuture = new FlowFutureImpl(flowStorage, mockFuture, onSuccess, onFailure, onCancelled);
 
             // this will cause the future to call the callback right away because
             // it is a completed future already.

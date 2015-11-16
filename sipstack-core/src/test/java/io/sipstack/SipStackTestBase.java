@@ -195,7 +195,7 @@ public class SipStackTestBase {
      * @return the cancellable that we just asserted actually exists and is correct.
      */
     public MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
-        defaultScheduler.latch.await(5, TimeUnit.SECONDS);
+        defaultScheduler.latch.await(2, TimeUnit.SECONDS);
         final Optional<MockCancellable> cancellable = defaultScheduler.isScheduled(timer);
         if (!cancellable.isPresent()) {
             fail("No timer " + timer + " scheduled");

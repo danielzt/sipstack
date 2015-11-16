@@ -12,6 +12,10 @@ import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 public abstract class SipTimerEventImpl extends IOEventImpl implements SipTimerEvent {
 
     public static final SipTimerEvent TIMEOUT = new TimerTimeout();
+    public static final SipTimerEvent TIMEOUT1 = new TimerTimeout1();
+    public static final SipTimerEvent TIMEOUT2 = new TimerTimeout2();
+    public static final SipTimerEvent TIMEOUT3 = new TimerTimeout3();
+    public static final SipTimerEvent TIMEOUT4 = new TimerTimeout4();
     public static final SipTimerEvent TRYING = new Timer100Trying();
     public static final SipTimerEvent A = new TimerA();
     public static final SipTimerEvent B = new TimerB();
@@ -64,6 +68,66 @@ public abstract class SipTimerEventImpl extends IOEventImpl implements SipTimerE
         @Override
         public SipTimer timer() {
             return SipTimer.Timeout;
+        }
+    }
+
+    private static class TimerTimeout1 extends SipTimerEventImpl {
+        private TimerTimeout1() {
+        }
+
+        @Override
+        public boolean isSipTimerTimeout1() {
+            return true;
+        }
+
+        @Override
+        public SipTimer timer() {
+            return SipTimer.Timeout1;
+        }
+    }
+
+    private static class TimerTimeout2 extends SipTimerEventImpl {
+        private TimerTimeout2() {
+        }
+
+        @Override
+        public boolean isSipTimerTimeout2() {
+            return true;
+        }
+
+        @Override
+        public SipTimer timer() {
+            return SipTimer.Timeout2;
+        }
+    }
+
+    private static class TimerTimeout3 extends SipTimerEventImpl {
+        private TimerTimeout3() {
+        }
+
+        @Override
+        public boolean isSipTimerTimeout3() {
+            return true;
+        }
+
+        @Override
+        public SipTimer timer() {
+            return SipTimer.Timeout3;
+        }
+    }
+
+    private static class TimerTimeout4 extends SipTimerEventImpl {
+        private TimerTimeout4() {
+        }
+
+        @Override
+        public boolean isSipTimerTimeout4() {
+            return true;
+        }
+
+        @Override
+        public SipTimer timer() {
+            return SipTimer.Timeout4;
         }
     }
 

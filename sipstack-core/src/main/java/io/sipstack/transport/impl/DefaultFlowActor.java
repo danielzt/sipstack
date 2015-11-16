@@ -3,6 +3,7 @@ package io.sipstack.transport.impl;
 import io.sipstack.actor.ActorSupport;
 import io.sipstack.actor.Cancellable;
 import io.sipstack.config.FlowConfiguration;
+import io.sipstack.config.KeepAliveConfiguration;
 import io.sipstack.event.Event;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipTimer;
@@ -119,7 +120,14 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
     // === Active State
     // =====================
     private void onEnterActive(final IOEvent event) {
-        // Start timer
+
+        // In active mode we will schedule a timer to ensure we get
+        // keep-alive traffic and if not, we will issue keep-alive
+        // traffic ourselves.
+        final KeepAliveConfiguration config = this.config.getKeepAliveConfiguration();
+        if (config.getMode() == KeepAliveConfiguration.KEEP_ALIVE_MODE.ACTIVE) {
+            timeoutTimer = Optional.of(ctx().scheduler().schedule(SipTimer.Timeout, config.getIdleTimeout()));
+        }
     }
 
     private void onExitActive(final IOEvent event) {

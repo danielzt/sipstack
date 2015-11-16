@@ -2,7 +2,6 @@ package io.sipstack.transport.impl;
 
 import io.sipstack.config.FlowConfiguration;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.transport.FlowId;
 
 import java.util.Map;
@@ -11,13 +10,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * @author jonas@jonasborjesson.com
  */
-public class DefaultFlowStore implements FlowStore {
+public class DefaultFlowStorage implements FlowStorage {
 
     private final FlowConfiguration config;
 
     private final Map<FlowId, FlowActor> flows;
 
-    public DefaultFlowStore(final FlowConfiguration config) {
+    public DefaultFlowStorage(final FlowConfiguration config) {
         this.config = config;
         this.flows = new ConcurrentHashMap<>(config.getDefaultStorageSize());
     }
@@ -28,12 +27,7 @@ public class DefaultFlowStore implements FlowStore {
             return new DefaultFlowActor(config, connection);
         });
 
-        printSize();
         return actor;
-    }
-
-    private void printSize() {
-        System.err.println("Size: " + flows.size());
     }
 
     public FlowActor get(final FlowId id) {
@@ -43,7 +37,6 @@ public class DefaultFlowStore implements FlowStore {
     @Override
     public void remove(final FlowId id) {
         flows.remove(id);
-        printSize();
     }
 
 }

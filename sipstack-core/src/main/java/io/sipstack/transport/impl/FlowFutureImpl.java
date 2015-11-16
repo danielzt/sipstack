@@ -4,13 +4,11 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.UdpConnection;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 
 import java.net.InetSocketAddress;
-import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -21,14 +19,14 @@ public class FlowFutureImpl implements FlowFuture, GenericFutureListener<Channel
     /**
      * A reference to all the existing flows and where we will store our flow if successful.
      */
-    private final FlowStore flowStorage;
+    private final FlowStorage flowStorage;
 
     private final Consumer<Flow> onSuccess;
     private final Consumer<Flow> onFailure;
     private final Consumer<Flow> onCancel;
     private final ChannelFuture actualFuture;
 
-    public FlowFutureImpl(final FlowStore flowStorage,
+    public FlowFutureImpl(final FlowStorage flowStorage,
                           final ChannelFuture actualFuture,
                           final Consumer<Flow> onSuccess,
                           final Consumer<Flow> onFailure,

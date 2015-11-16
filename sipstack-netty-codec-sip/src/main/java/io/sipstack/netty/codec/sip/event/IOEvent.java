@@ -177,6 +177,22 @@ public interface IOEvent {
         return false;
     }
 
+    default boolean isSipTimerTimeout1() {
+        return false;
+    }
+
+    default boolean isSipTimerTimeout2() {
+        return false;
+    }
+
+    default boolean isSipTimerTimeout3() {
+        return false;
+    }
+
+    default boolean isSipTimerTimeout4() {
+        return false;
+    }
+
     default boolean isSipTimerA() {
         return false;
     }

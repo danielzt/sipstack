@@ -15,6 +15,7 @@ import io.sipstack.net.InboundOutboundHandlerAdapter;
 
 import java.net.SocketAddress;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
@@ -149,7 +150,7 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
     }
 
     /**
-     * When a channel handler processes a message (such as the invite server io.sipstack.transaction.transaction)
+     * When a channel handler processes a message (such as the invite server transaction)
      * it can choose to forward the message to the next handler in the pipeline. This
      * is a helper method to ensure that a particular message was indeed forwarded.
      * @param msg
@@ -158,6 +159,32 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
         assertThat(channelReadObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(), is(true));
     }
 
+    /**
+     * Find a message that was supposed to have been forwarded based on the type of the
+     * message. Typically, you probably want to just use {@link #assertMessageForwarded(Object)}
+     * but it is using equals to find the object and sometimes you may not have the full
+     * object since it was an internally generated event and if you re-create the raw event
+     * then we are breaking encapsulation.
+     *
+     * @param msg
+     * @param <T>
+     * @return
+     */
+    public <T> T findForwardedMessageByType(final Class<T> clazz) {
+        final Optional<Object> element = channelReadObjects.stream().filter(o -> {
+            try {
+                final T t = (T)o;
+                return true;
+            } catch (final ClassCastException e) {
+                return false;
+            }
+        }).findFirst();
+        if (!element.isPresent()) {
+            fail("No message of type \"" + clazz.getCanonicalName() + "\" has been forwareded");
+        }
+
+        return (T)element.get();
+    }
 
     public void assertMessageWritten(final Object msg) {
         assertThat(writeObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(),

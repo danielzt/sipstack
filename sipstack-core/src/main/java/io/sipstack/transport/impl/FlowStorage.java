@@ -6,7 +6,7 @@ import io.sipstack.transport.FlowId;
 /**
  * @author jonas@jonasborjesson.com
  */
-public interface FlowStore {
+public interface FlowStorage {
 
     /**
      * Ensure a flow exists for this connection object. If one didn't exist, a new

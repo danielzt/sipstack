@@ -1,5 +1,6 @@
 package io.sipstack.transport.impl;
 
+import gov.nist.javax.sip.message.SIPMessage;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -17,12 +18,16 @@ import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.*;
 import io.sipstack.netty.codec.sip.event.ConnectionIOEvent;
 import io.sipstack.netty.codec.sip.event.IOEvent;
+import io.sipstack.netty.codec.sip.event.SipMessageBuilderIOEvent;
+import io.sipstack.netty.codec.sip.event.SipRequestBuilderIOEvent;
+import io.sipstack.transaction.impl.InviteClientTransactionActor;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 import io.sipstack.transport.FlowId;
 import io.sipstack.transport.TransportLayer;
 import io.sipstack.transport.event.FlowEvent;
 import io.sipstack.transport.event.FlowTerminatedEvent;
+import io.sipstack.transport.event.SipBuilderFlowEvent;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -71,7 +76,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
     public DefaultTransportLayer(final TransportLayerConfiguration config,
                                  final Clock clock,
                                  final InternalScheduler scheduler) {
-        this(config, clock, new DefaultFlowStorage(config.getFlow()), scheduler);
+        this(config, clock, new DefaultFlowStorage(config), scheduler);
     }
 
     public void useNetworkLayer(final NetworkLayer network) {
@@ -103,13 +108,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
             }
 
             final Connection connection = event.connection();
-            // TODO: invoke transaction here
-
-            // final SipMessage sipMsg = event.toSipMessageIOEvent().message();
-            // final FlowEvent flowEvent = sipMsg.isRequest() ? FlowEvent.create(flow, sipMsg.toRequest()) :
-                    // FlowEvent.create(flow, sipMsg.toResponse());
-            FlowActor actor = null;
-            actor = flowStorage.ensureFlow(connection);
+            final FlowActor actor = flowStorage.ensureFlow(connection);
 
             if (actor != null) {
                 // invoke actor
@@ -117,7 +116,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
                 // At the end of the day, it really consumes the raw events from the
                 // low level stack. However, when we push events upstream we have to
                 // create a FlowEvent so that object also encapsulates the actual flow
-                invokeActor(ctx, actor, event);
+                invokeActor(true, ctx, actor, event);
             }
 
             // TODO: invoke FlowActor and then we may potentially be sending this
@@ -172,11 +171,22 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
             // At the end of the day, it really consumes the raw events from the
             // low level stack. However, when we push events upstream we have to
             // create a FlowEvent so that object also encapsulates the actual flow
-            invokeActor(ctx, actor, event);
+            invokeActor(true, ctx, actor, event);
         }
     }
 
-    private void invokeActor(final ChannelHandlerContext channelCtx, final FlowActor actor, final IOEvent event) {
+    /**
+     * Invoke a {@link FlowActor} for a particular event.
+     *
+     * @param upstream unlike many other actors, the flow actor doesn't have a natural concept of direction
+     *                 (compare with e.g. {@link InviteClientTransactionActor}) so we have to pass in the direction
+     *                 since we need to know that in case the actor just does a "forward" on the event it got.
+     *                 Forward means simply to pass the event in the direction it came from.
+     * @param channelCtx the netty channel context
+     * @param actor the actual actor
+     * @param event the event we will pass onto the actor.
+     */
+    private void invokeActor(final boolean upstream, final ChannelHandlerContext channelCtx, final FlowActor actor, final IOEvent event) {
         try {
             synchronized (actor) {
                 final GenericSingleContext<IOEvent> ctx = new GenericSingleContext<IOEvent>(clock, channelCtx, scheduler, actor.id(), this);
@@ -184,11 +194,23 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
 
                 // always favor downstream
                 ctx.downstream().ifPresent(e -> {
-                    System.err.println("TODO: Received a downstream event from the Flow Actor.");
+                    channelCtx.writeAndFlush(e);
                 });
 
                 ctx.forward().ifPresent(e -> {
-                    System.err.println("TODO: Received an forwarded event from the Flow Actor.");
+                    if (upstream) {
+                        // Remember that the transport layer will ONLY emit FlowEvents to the
+                        // next layer. The entire architecture is based on that each layer transforms
+                        // the incoming event to something "richer" as the event goes up the pipeline.
+                        if (event.isSipMessageIOEvent()) {
+                            final SipMessage sipMsg = event.toSipMessageIOEvent().message();
+                            final Flow flow = actor.flow();
+                            final FlowEvent flowEvent = FlowEvent.create(flow, sipMsg);
+                            channelCtx.fireChannelRead(flowEvent);
+                        }
+                    } else {
+
+                    }
                 });
 
                 ctx.upstream().ifPresent(e -> {
@@ -242,15 +264,25 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
      */
     @Override
     public void write(final ChannelHandlerContext ctx, final Object msg, final ChannelPromise promise) throws Exception {
-        final FlowEvent event = (FlowEvent)msg;
-        if (event.isSipFlowEvent()) {
-            final SipMessage sip = event.toSipFlowEvent().message();
+        try {
+            final FlowEvent event = (FlowEvent)msg;
+            final Flow flow = event.flow();
+            final FlowActor actor = flowStorage.get(FlowId.create(flow.id().get()));
+            if (actor != null) {
 
-            // TODO: what if the flow doesn't have a connection present, such as in
-            // the case of faulty flows (broken etc)? We probably should generate a
-            // transport failed event of some sort.
-            final InternalFlow flow = (InternalFlow)event.flow();
-            flow.connection().ifPresent(c -> ctx.write(IOEvent.create(c, sip), promise));
+                if (event.isSipFlowEvent()) {
+                    final SipMessage sipMsg = event.toSipFlowEvent().message();
+                    final IOEvent ioEvent = IOEvent.create(actor.connection(), sipMsg);
+                    invokeActor(false, ctx, actor, ioEvent);
+                } else if (event.isSipBuilderFlowEvent()) {
+                    final SipMessage.Builder<? extends SipMessage> builder = event.toSipBuilderFlowEvent().getBuilder();
+                    final SipMessageBuilderIOEvent ioEvent = IOEvent.create(actor.connection(), builder);
+                    invokeActor(false, ctx, actor, ioEvent);
+                }
+            }
+        } catch (final ClassCastException e) {
+            // TODO: signal something
+            e.printStackTrace();;
         }
     }
 
@@ -267,7 +299,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
             final FlowActor actor = flowStorage.get(id);
             if (actor != null) {
                 final IOEvent event = io.sipstack.netty.codec.sip.event.SipTimerEvent.create(timer.timer());
-                invokeActor(timer.ctx(), actor, event);
+                invokeActor(true, timer.ctx(), actor, event);
             }
         } catch (final ClassCastException e) {
             // TODO: log error and move on?
@@ -354,7 +386,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
             } else {
                 // for unreliable transports, we will simply create a connection as is without
                 // actually "connecting".
-                final Connection connection = new UdpConnection(lp.getChannel(), remoteAddress);
+                final Connection connection = new UdpConnection(lp.getChannel(), remoteAddress, lp.getVipAddress().orElse(null));
                 final FlowActor newActor = flowStorage.ensureFlow(connection);
 
                 flowFuture = new SuccessfulFlowFuture();

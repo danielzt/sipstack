@@ -1,5 +1,10 @@
 package io.sipstack.netty.codec.sip;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
+import io.pkts.buffer.Buffer;
+import io.pkts.packet.sip.SipMessage;
+
 import java.time.Duration;
 
 /**
@@ -20,5 +25,14 @@ public class Utils {
      */
     public static Duration calculateBackoffTimer(final int count, final long baseTime, final long maxTime) {
         return Duration.ofMillis(Math.min(baseTime * (int) Math.pow(2, count), maxTime));
+    }
+
+    public static ByteBuf toByteBuf(final Channel channel, final SipMessage msg) {
+        final Buffer b = msg.toBuffer();
+        final int capacity = b.capacity();
+        final ByteBuf buffer = channel.alloc().buffer(capacity, capacity);
+        final byte[] rawByteArray = b.getRawArray();
+        buffer.writeBytes(rawByteArray);
+        return buffer;
     }
 }

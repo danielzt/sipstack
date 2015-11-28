@@ -52,6 +52,15 @@ public class DefaultTransportLayerTest extends TransportLayerTestBase {
         final Connection connection = initiateNewFlow(channel, defaultInviteRequest);
     }
 
+    @Test
+    public void testSipOptionsPingForTcpFlow() throws Exception {
+        final InetSocketAddress remoteAddress = new InetSocketAddress("192.168.0.100", 9999);
+        final MockChannel channel = createNewChannel(remoteAddress);
+        final Connection connection = initiateNewFlow(channel, defaultInviteRequest);
+
+    }
+
+
     /**
      * When someone connects over TCP we will create a channel but it is possible for an attacker
      * to just establish a bunch of connections and not actually do anything with them. Therefore
@@ -101,85 +110,6 @@ public class DefaultTransportLayerTest extends TransportLayerTestBase {
         // and it should not be in the storage anymore
         assertFlowDoesNotExist(connection);
     }
-
-    /**
-     * Convenience method for initiating a new flow based off an event, which is either a {@link SipMessage} or
-     * if you pass in null (slightly awkward) then a {@link ConnectionOpenedIOEvent} will be passed in instead.
-     *
-     * Also note that SIP messages will be passed through the netty pipeline through the
-     * channelRead method but the various connection events is pushed through
-     * the userEventTriggered.
-     *
-     * Also note that a timer is scheduled for both events but with different values.
-     * For the {@link ConnectionOpenedIOEvent} the timer is for ensuring that we get
-     * something across the flow and if not, the flow will be killed off.
-     * For {@link SipMessage}s, which takes us to the ACTIVE state right away, then
-     * the timout is for keep-alive traffic.
-     *
-     * @param channel
-     * @param msg
-     * @return
-     * @throws Exception
-     */
-    private Connection initiateNewFlow(final MockChannel channel, final SipMessage msg) throws Exception {
-        final Connection connection = createTcpConnection(channel, (InetSocketAddress)channel.remoteAddress());
-        final IOEvent event = msg != null ?
-                IOEvent.create(connection, msg) :
-                ConnectionOpenedIOEvent.create(connection, defaultClock.getCurrentTimeMillis());
-
-        if (msg != null) {
-            transportLayer.channelRead(defaultChannelCtx, event);
-            assertTimerScheduled(SipTimer.Timeout); // TODO: need to check the duration scheduled
-        } else {
-            transportLayer.userEventTriggered(defaultChannelCtx, event);
-            assertTimerScheduled(SipTimer.Timeout); // TODO: need to check the duration scheduled
-        }
-
-        assertFlowExists(connection);
-        return connection;
-    }
-
-    /**
-     * Initiate a new flow based on a {@link ConnectionOpenedIOEvent}. If you rather initiate
-     * a new flow based off of a {@link SipMessage} then just
-     * use the {@link DefaultTransportLayerTest#initiateNewFlow(MockChannel, SipMessage)} instead.
-     *
-     * @param channel
-     * @return
-     * @throws Exception
-     */
-    private Connection initiateNewFlow(final MockChannel channel) throws Exception {
-        return initiateNewFlow(channel, null);
-    }
-
-    private MockChannel initiateNewFlow() throws Exception {
-        final InetSocketAddress remoteAddress = new InetSocketAddress("192.168.0.100", 9999);
-        final MockChannel channel = createNewChannel(remoteAddress);
-        initiateNewFlow(channel);
-        return channel;
-    }
-
-    public Connection createUdpConnection(final Channel channel, final InetSocketAddress remoteAddress) {
-        return new UdpConnection(channel, remoteAddress);
-    }
-
-    public Connection createTcpConnection(final Channel channel, final InetSocketAddress remoteAddress) {
-        return new TcpConnection(channel, remoteAddress);
-    }
-
-    public MockChannel createNewChannel(final InetSocketAddress remoteAddress) {
-        final InetSocketAddress localAddress = new InetSocketAddress("127.0.0.1", 5060);
-
-        // TODO: want to mock up the channel so that it
-        // returns the correct values as well.
-
-        // TODO: what should be choose here...
-        final ChannelHandlerContext ctx = defaultChannelCtx;
-        final ChannelOutboundHandler handler = transportLayer;
-
-        return new MockChannel(ctx, handler, localAddress, remoteAddress);
-    }
-
 
 
 }

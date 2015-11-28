@@ -4,6 +4,8 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
+import io.pkts.buffer.Buffer;
+import io.pkts.packet.sip.address.SipURI;
 
 import java.net.InetSocketAddress;
 import java.util.Optional;
@@ -24,11 +26,34 @@ public interface Connection {
     Optional<Object> fetchObject();
 
     /**
+     * A connection may optionally have a VIP address, which for the
+     * actual connection itself doesn't matter but there are cases
+     * where you e.g. want to stamp a different address, a VIP address,
+     * in the Via and Contact-headers of your SIP message. This is
+     * common when you have some sort of load balancer or your machine
+     * is NAT:ed and therefore, you want to have that external facing
+     * address stamped instead.
+     *
+     * @return
+     */
+    Optional<SipURI> getVipAddress();
+
+    /**
      * Get the local port to which this {@link Connection} is listening to.
      * 
      * @return
      */
     int getLocalPort();
+
+    /**
+     * Just a convenience method for obtaining the default port for this
+     * type of connection. If the connection represents a UDP "connection" or
+     * a TCP connection then 5060 will be returned. If the connection is
+     * TLS then 5061 will be returned.
+     *
+     * @return
+     */
+    int getDefaultPort();
 
     /**
      * Get the local ip-address to which this {@link Connection} is listening to
@@ -45,6 +70,8 @@ public interface Connection {
      * @return
      */
     String getLocalIpAddress();
+
+    Buffer getLocalIpAddressAsBuffer();
 
     /**
      * Get the remote address to which this {@link Connection} is connected to.

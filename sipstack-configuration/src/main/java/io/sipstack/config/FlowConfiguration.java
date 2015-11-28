@@ -4,6 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Duration;
 
+import static io.sipstack.config.KeepAliveConfiguration.KEEP_ALIVE_MODE.ACTIVE;
+import static io.sipstack.config.KeepAliveConfiguration.KEEP_ALIVE_MODE.NONE;
+import static io.sipstack.config.KeepAliveConfiguration.KEEP_ALIVE_MODE.PASSIVE;
+
 /**
  * @author jonas@jonasborjesson.com
  */
@@ -31,6 +35,35 @@ public class FlowConfiguration {
 
     public KeepAliveConfiguration getKeepAliveConfiguration() {
         return keepAliveConfiguration;
+    }
+
+    /**
+     * Convenience method for checking if the keep-alive (ping) mode is set to
+     * active.
+     *
+     * @return
+     */
+    public boolean isPingModeActive() {
+        return keepAliveConfiguration.getMode() == ACTIVE;
+    }
+
+    /**
+     * Convenience method for checking if the keep-alive (ping) mode is set to
+     * passive.
+     *
+     * @return
+     */
+    public boolean isPingModePassive() {
+        return keepAliveConfiguration.getMode() == PASSIVE;
+    }
+
+    /**
+     * Convenience method for checking if the keep-alive (ping) mode is off.
+     *
+     * @return
+     */
+    public boolean isPingModeOff() {
+        return keepAliveConfiguration.getMode() == NONE;
     }
 
     /**

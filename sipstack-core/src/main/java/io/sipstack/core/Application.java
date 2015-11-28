@@ -155,7 +155,6 @@ public abstract class Application<T extends Configuration> {
 
             // Transport layer is responsible for managing connections,
             // i.e. Flows.
-            System.err.println("Creating the transport layer here");
             final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport(), clock, scheduler);
             networkBuilder.withHandler("transport-layer", transportLayer);
 

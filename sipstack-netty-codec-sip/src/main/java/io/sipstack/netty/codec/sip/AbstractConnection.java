@@ -8,7 +8,9 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
 import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.SipParser;
 
 import java.io.IOException;
@@ -25,6 +27,7 @@ public abstract class AbstractConnection implements Connection {
     private final ConnectionId id;
     private final Channel channel;
     private final InetSocketAddress remote;
+    private final Optional<SipURI> vipAddress;
     private final static AttributeKey<Object> key = AttributeKey.newInstance("generic_object");
 
     /*
@@ -32,10 +35,19 @@ public abstract class AbstractConnection implements Connection {
      * { this.ctx = ctx; this.channel = null; this.remote = remote; }
      */
 
-    protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote) {
+    protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote, final SipURI vipAddress) {
         this.id = ConnectionId.create(transport, (InetSocketAddress)channel.localAddress(), remote);
         this.channel = channel;
         this.remote = remote;
+        this.vipAddress = Optional.ofNullable(vipAddress);
+    }
+
+    protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote) {
+        this(transport, channel, remote, null);
+    }
+
+    public Optional<SipURI> getVipAddress() {
+        return vipAddress;
     }
 
     public final void storeObject(final Object o) {
@@ -84,6 +96,11 @@ public abstract class AbstractConnection implements Connection {
     }
 
     @Override
+    public final Buffer getLocalIpAddressAsBuffer() {
+        return Buffers.wrap(getLocalIpAddress());
+    }
+
+    @Override
     public final InetSocketAddress getRemoteAddress() {
         return this.remote;
     }
@@ -116,7 +133,6 @@ public abstract class AbstractConnection implements Connection {
 
     @Override
     public boolean isTLS() {
-
         return false;
     }
 

@@ -1,6 +1,7 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
+import io.pkts.packet.sip.address.SipURI;
 
 import java.net.InetSocketAddress;
 
@@ -11,8 +12,19 @@ import java.net.InetSocketAddress;
  */
 public final class UdpConnection extends AbstractConnection {
 
+    public UdpConnection(final Channel channel, final InetSocketAddress remoteAddress, final SipURI vipAddress) {
+        super(Transport.udp, channel, remoteAddress, vipAddress);
+    }
+
     public UdpConnection(final Channel channel, final InetSocketAddress remoteAddress) {
-        super(Transport.udp, channel, remoteAddress);
+        super(Transport.udp, channel, remoteAddress, null);
+    }
+
+
+
+    @Override
+    public int getDefaultPort() {
+        return 5060;
     }
 
     /**
@@ -28,12 +40,6 @@ public final class UdpConnection extends AbstractConnection {
      */
     @Override
     public void send(final Object o) {
-        // final DatagramPacket pkt = new DatagramPacket(toByteBuf(msg), getRemoteAddress());
-        // channel().writeAndFlush(pkt);
-        // System.err.println("UDPConnection: sending");
-
-        // final SipMessageIOEventImpl event = new SipMessageIOEventImpl(this, msg, System.currentTimeMillis());
-        // channel().writeAndFlush(event);
         channel().writeAndFlush(o);
     }
 

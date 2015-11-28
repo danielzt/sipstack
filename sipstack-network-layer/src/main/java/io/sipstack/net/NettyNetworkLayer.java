@@ -5,23 +5,15 @@ package io.sipstack.net;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.config.NetworkInterfaceConfiguration;
-import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
-import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
-import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.netty.codec.sip.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,11 +21,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotEmpty;
@@ -116,6 +104,7 @@ public class NettyNetworkLayer implements NetworkLayer {
         private EventLoopGroup bossGroup;
         private EventLoopGroup workerGroup;
         private EventLoopGroup udpGroup;
+        private Clock clock;
 
         /**
          * The TCP based bootstrap.
@@ -144,6 +133,11 @@ public class NettyNetworkLayer implements NetworkLayer {
             // TODO: was too lazy to create a wrapper class.
             this.handlerNames.add(handlerName);
             handlers.add(handler);
+            return this;
+        }
+
+        public Builder withClock(final Clock clock) {
+            this.clock = clock;
             return this;
         }
 
@@ -183,6 +177,8 @@ public class NettyNetworkLayer implements NetworkLayer {
                 workerGroup = udpGroup;
             }
 
+            final Clock clock = this.clock != null ? this.clock : new SystemClock();
+
             final List<NettyNetworkInterface.Builder> builders = new ArrayList<NettyNetworkInterface.Builder>();
             if (this.ifs.isEmpty()) {
                 final Inet4Address address = findPrimaryAddress();
@@ -191,8 +187,8 @@ public class NettyNetworkLayer implements NetworkLayer {
             } else {
                 this.ifs.forEach(i -> {
                     final NettyNetworkInterface.Builder ifBuilder = NettyNetworkInterface.with(i);
-                    ifBuilder.udpBootstrap(ensureUDPBootstrap());
-                    ifBuilder.tcpBootstrap(ensureTCPBootstrap());
+                    ifBuilder.udpBootstrap(ensureUDPBootstrap(clock, i.getVipAddress()));
+                    ifBuilder.tcpBootstrap(ensureTCPBootstrap(clock, i.getVipAddress()));
                     builders.add(ifBuilder);
                 });
             }
@@ -203,7 +199,10 @@ public class NettyNetworkLayer implements NetworkLayer {
             return new NettyNetworkLayer(latch, Collections.unmodifiableList(ifs));
         }
 
-        private Bootstrap ensureUDPBootstrap() {
+        private Bootstrap ensureUDPBootstrap(final Clock clock, final SipURI vipAddress) {
+            // TODO: this won't be correct when we listen to multiple ports
+            // and they may have different vip addresses etc. we'll deal with that
+            // later...
             if (this.bootstrap == null) {
                 final Bootstrap b = new Bootstrap();
                 b.group(this.udpGroup)
@@ -212,8 +211,8 @@ public class NettyNetworkLayer implements NetworkLayer {
                     @Override
                     protected void initChannel(final DatagramChannel ch) throws Exception {
                         final ChannelPipeline pipeline = ch.pipeline();
-                        pipeline.addLast("decoder", new SipMessageDatagramDecoder());
-                        pipeline.addLast("encoder", new SipMessageEncoder());
+                        pipeline.addLast("decoder", new SipMessageDatagramDecoder(clock, vipAddress));
+                        pipeline.addLast("encoder", new SipMessageDatagramEncoder());
                         for (int i = 0; i < handlers.size(); ++i) {
                             pipeline.addLast(handlerNames.get(i), handlers.get(i));
                         }
@@ -229,7 +228,7 @@ public class NettyNetworkLayer implements NetworkLayer {
             return this.bootstrap;
         }
 
-        private ServerBootstrap ensureTCPBootstrap() {
+        private ServerBootstrap ensureTCPBootstrap(final Clock clock, final SipURI vipAddress) {
             if (this.serverBootstrap == null) {
                 final ServerBootstrap b = new ServerBootstrap();
 
@@ -239,8 +238,8 @@ public class NettyNetworkLayer implements NetworkLayer {
                     @Override
                     public void initChannel(final SocketChannel ch) throws Exception {
                         final ChannelPipeline pipeline = ch.pipeline();
-                        pipeline.addLast("decoder", new SipMessageStreamDecoder());
-                        pipeline.addLast("encoder", new SipMessageEncoder());
+                        pipeline.addLast("decoder", new SipMessageStreamDecoder(clock, vipAddress));
+                        pipeline.addLast("encoder", new SipMessageStreamEncoder());
                         for (int i = 0; i < handlers.size(); ++i) {
                             pipeline.addLast(handlerNames.get(i), handlers.get(i));
                         }
@@ -250,6 +249,7 @@ public class NettyNetworkLayer implements NetworkLayer {
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.TCP_NODELAY, true);
+                // TODO: should make all the above TCP options configurable
                 this.serverBootstrap = b;
             }
             return this.serverBootstrap;

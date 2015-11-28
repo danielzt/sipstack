@@ -131,6 +131,14 @@ public abstract class SipTimerEvent extends Event {
                     return new TimerM(ctx, key);
                 case Timeout:
                     return new TimerTimeout(ctx, key);
+                case Timeout1:
+                    return new TimerTimeout1(ctx, key);
+                case Timeout2:
+                    return new TimerTimeout2(ctx, key);
+                case Timeout3:
+                    return new TimerTimeout3(ctx, key);
+                case Timeout4:
+                    return new TimerTimeout4(ctx, key);
                 default:
                     throw new RuntimeException("Don't know what you are talking about.");
             }
@@ -149,6 +157,70 @@ public abstract class SipTimerEvent extends Event {
             @Override
             public SipTimer timer() {
                 return SipTimer.Timeout;
+            }
+        }
+
+        private static class TimerTimeout1 extends SipTimerEvent {
+            private TimerTimeout1(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
+            }
+
+            @Override
+            public boolean isSipTimerTimeout1() {
+                return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.Timeout1;
+            }
+        }
+
+        private static class TimerTimeout2 extends SipTimerEvent {
+            private TimerTimeout2(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
+            }
+
+            @Override
+            public boolean isSipTimerTimeout2() {
+                return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.Timeout2;
+            }
+        }
+
+        private static class TimerTimeout3 extends SipTimerEvent {
+            private TimerTimeout3(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
+            }
+
+            @Override
+            public boolean isSipTimerTimeout3() {
+                return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.Timeout3;
+            }
+        }
+
+        private static class TimerTimeout4 extends SipTimerEvent {
+            private TimerTimeout4(final ChannelHandlerContext ctx, final Object key) {
+                super(ctx, key);
+            }
+
+            @Override
+            public boolean isSipTimerTimeout4() {
+                return true;
+            }
+
+            @Override
+            public SipTimer timer() {
+                return SipTimer.Timeout4;
             }
         }
 

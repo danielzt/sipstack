@@ -3,11 +3,13 @@
  */
 package io.sipstack.netty.codec.sip;
 
+import gov.nist.javax.sip.address.SipUri;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.pkts.buffer.Buffer;
+import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.SipInitialLine;
 import io.sipstack.netty.codec.sip.event.*;
 
@@ -39,21 +41,27 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     private final Clock clock;
 
+    private final SipURI vipAddress;
+
     /**
      * Contains the raw framed message.
      */
     private RawMessage message;
 
+    public SipMessageStreamDecoder() {
+        this(new SystemClock(), null);
+    }
+
+    public SipMessageStreamDecoder(final Clock clock) {
+        this(clock, null);
+    }
     /**
      * 
      */
-    public SipMessageStreamDecoder(final Clock clock) {
+    public SipMessageStreamDecoder(final Clock clock, final SipURI vipAddress) {
         this.clock = clock;
+        this.vipAddress = vipAddress;
         reset();
-    }
-
-    public SipMessageStreamDecoder() {
-        this(new SystemClock());
     }
 
     @Override
@@ -104,7 +112,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     private ConnectionIOEvent create(final ChannelHandlerContext ctx, final BiFunction<Connection, Long, ConnectionIOEvent> f) {
         final Channel channel = ctx.channel();
-        final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress());
+        final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
         final Long arrivalTime = clock.getCurrentTimeMillis();
         return f.apply(connection, arrivalTime);
     }
@@ -129,7 +137,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
         if (this.message.isComplete()) {
             final long arrivalTime = this.clock.getCurrentTimeMillis();
             final Channel channel = ctx.channel();
-            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress());
+            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
             final SipMessageIOEvent msg = toSipMessageIOEvent(connection, this.message);
             out.add(msg);
             reset();

@@ -1,6 +1,7 @@
 package io.sipstack.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.sipstack.netty.codec.sip.Transport;
 
 import java.time.Duration;
 
@@ -29,6 +30,47 @@ public class KeepAliveConfiguration {
     @JsonProperty
     private Duration interval = Duration.ofSeconds(5);
 
+    @JsonProperty
+    private boolean enforcePong = false;
+
+    @JsonProperty
+    private KeepAliveMethodConfiguration udp = new KeepAliveMethodConfiguration();
+
+    @JsonProperty
+    private KeepAliveMethodConfiguration tcp = new KeepAliveMethodConfiguration();
+
+    @JsonProperty
+    private KeepAliveMethodConfiguration ws = new KeepAliveMethodConfiguration();
+
+    public KeepAliveMethodConfiguration getKeepAliveMethodConfiguration(final Transport transport) {
+        switch(transport) {
+            case udp:
+            case sctp:
+                return udp;
+            case tcp:
+            case tls:
+                return tcp;
+            case ws:
+            case wss:
+                return ws;
+            default:
+                throw new IllegalArgumentException("unknown transport");
+        }
+    }
+
+
+    public KeepAliveMethodConfiguration getUdpKeepAliveMethodConfiguratioh() {
+        return udp;
+    }
+
+    public KeepAliveMethodConfiguration getTcpKeepAliveMethodConfiguratioh() {
+        return tcp;
+    }
+
+    public KeepAliveMethodConfiguration getWsKeepAliveMethodConfiguratioh() {
+        return ws;
+    }
+
     /**
      * See javadoc on {@link KEEP_ALIVE_MODE}.
      *
@@ -42,6 +84,13 @@ public class KeepAliveConfiguration {
         this.mode = mode == null ? KEEP_ALIVE_MODE.NONE : mode;
     }
 
+    /**
+     * If we are in {@link KEEP_ALIVE_MODE#ACTIVE} mode then we will actively monitor the traffic
+     * and if this timer fires, we will start issuing keep-alive traffic.
+     *
+     * For the other modes, this setting has no meaning.
+     * @return
+     */
     public Duration getIdleTimeout() {
         return idleTimeout;
     }
@@ -50,6 +99,15 @@ public class KeepAliveConfiguration {
         this.idleTimeout = idleTimeout;
     }
 
+    /**
+     * If we are in {@link KEEP_ALIVE_MODE#ACTIVE} mode and the idle timeout has
+     * fired we will start issuing keep-alive traffic.
+     *
+     * and if this timer fires, we will start issuing keep-alive traffic.
+     *
+     * For the other modes, this setting has no meaning.
+     * @return
+     */
     public int getMaxFailed() {
         return maxFailed;
     }
@@ -64,6 +122,20 @@ public class KeepAliveConfiguration {
 
     public void setInterval(final Duration interval) {
         this.interval = interval;
+    }
+
+    /**
+     * If we are sending out PING traffic, because we are in ACTIVE mode and the idle timer
+     * has fired, then this setting controls whether or not we are forcing the remote
+     * UA to respond with a pong. If we do not get a pong, then we consider that a
+     * failed attempt, which counts towards the "maxFailed" attempt setting.
+     */
+    public boolean getEnforcePong() {
+        return enforcePong;
+    }
+
+    public void setEnforcePong(final boolean value) {
+        enforcePong = value;
     }
 
     /**

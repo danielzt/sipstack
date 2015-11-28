@@ -3,6 +3,7 @@ package io.sipstack.actor;
 import org.slf4j.Logger;
 
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 
 /**
@@ -60,9 +61,16 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
      *
      * @param state the currentState in quesiton.
      */
-    protected void when(final S state, Consumer<T> execute) {
+    protected void when(final S state, final Consumer<T> execute) {
         states[state.ordinal()] = execute;
     }
+
+    // TODO: playing around with guards as well.
+    /*
+    protected void when(final S state, final Predicate<T> guard, final Consumer<T> execute) {
+        states[state.ordinal()] = execute;
+    }
+    */
 
     /**
      * When entering a particular currentState, perform the following action.
@@ -70,7 +78,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
      * @param state the currentState in question
      * @param action the action to execute when we enter the currentState
      */
-    protected void onEnter(S state, Consumer<T> action) {
+    protected void onEnter(final S state, final Consumer<T> action) {
         onEnterActions[state.ordinal()] = action;
     }
 
@@ -80,7 +88,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
      * @param state the currentState in question
      * @param action the action to execute when we leave the currentState
      */
-    protected void onExit(S state, Consumer<T> action) {
+    protected void onExit(final S state, final Consumer<T> action) {
         onExitActions[state.ordinal()] = action;
     }
 
@@ -107,8 +115,13 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
         return currentState == terminalState;
     }
 
-    protected final void become(final S newState) {
-        logger().info("{} {} -> {}", this.id, currentState, newState);
+    protected final void become(final S newState, final String msg) {
+        // TODO: perhaps make it configurable for how the state transition is logged?
+        if (msg == null) {
+            logger().info("{} {} -> {}", this.id, currentState, newState);
+        } else {
+            logger().info("{} {} -> {} {}", this.id, currentState, newState, msg);
+        }
 
         if (currentState != newState) {
             final Consumer<T> exitAction = onExitActions[currentState.ordinal()];
@@ -123,6 +136,11 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
         }
 
         currentState = newState;
+
+    }
+
+    protected final void become(final S newState) {
+        become(newState, null);
     }
 
     protected void unhandled(final T event) {

@@ -8,6 +8,7 @@ import io.netty.handler.codec.MessageToMessageDecoder;
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.SipParser;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 
@@ -27,13 +28,20 @@ import java.util.List;
 public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<DatagramPacket> {
 
     private final Clock clock;
+    private final SipURI vipAddress;
 
     public SipMessageDatagramDecoder() {
-        this.clock = new SystemClock();
+        this(new SystemClock(), null);
     }
 
-    public SipMessageDatagramDecoder(final Clock clock) {
+    /**
+     *
+     * @param clock
+     * @param vipAddress
+     */
+    public SipMessageDatagramDecoder(final Clock clock, final SipURI vipAddress) {
         this.clock = clock;
+        this.vipAddress = vipAddress;
     }
 
     @Override
@@ -118,7 +126,7 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
         final Buffer buffer = Buffers.wrap(b);
         SipParser.consumeSWS(buffer);
         final SipMessage sipMessage = SipParser.frame(buffer);
-        final Connection connection = new UdpConnection(ctx.channel(), msg.sender());
+        final Connection connection = new UdpConnection(ctx.channel(), msg.sender(), vipAddress);
         if (sipMessage.isRequest()) {
             out.add(IOEvent.create(connection, sipMessage.toRequest()));
         } else {

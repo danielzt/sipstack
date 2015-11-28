@@ -1,0 +1,16 @@
+# Test yaml file used by unit test.
+
+transport:
+  flow:
+    keepAlive:
+
+      mode: PASSIVE
+
+      idleTimeout: 123
+
+      maxFailed: 12
+
+      interval: 9
+
+      # default is false so ensure it is...
+      # enforcePong: false

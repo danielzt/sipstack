@@ -17,7 +17,7 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
-import io.sipstack.netty.codec.sip.SipMessageEncoder;
+import io.sipstack.netty.codec.sip.SipMessageDatagramEncoder;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
@@ -69,7 +69,7 @@ public final class UAS extends SimpleChannelInboundHandler<SipMessageIOEventImpl
             protected void initChannel(final DatagramChannel ch) throws Exception {
                 final ChannelPipeline pipeline = ch.pipeline();
                 pipeline.addLast("decoder", new SipMessageDatagramDecoder());
-                pipeline.addLast("encoder", new SipMessageEncoder());
+                pipeline.addLast("encoder", new SipMessageDatagramEncoder());
                 pipeline.addLast("handler", uas);
             }
         });

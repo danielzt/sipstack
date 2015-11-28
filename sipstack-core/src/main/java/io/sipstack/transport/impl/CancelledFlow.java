@@ -1,5 +1,7 @@
 package io.sipstack.transport.impl;
 
+import io.sipstack.transport.FlowState;
+
 import java.util.Optional;
 
 /**
@@ -8,7 +10,7 @@ import java.util.Optional;
 public class CancelledFlow extends InternalFlow {
 
     public CancelledFlow() {
-        super(Optional.empty());
+        super(Optional.empty(), FlowState.CLOSED);
     }
 
     public boolean isValid() {

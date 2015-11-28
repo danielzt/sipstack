@@ -4,7 +4,9 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.sipstack.transport.Flow;
+import io.sipstack.transport.event.impl.SipRequestBuilderFlowEventImpl;
 import io.sipstack.transport.event.impl.SipRequestFlowEventImpl;
+import io.sipstack.transport.event.impl.SipResponseBuilderFlowEventImpl;
 import io.sipstack.transport.event.impl.SipResponseFlowEventImpl;
 
 /**
@@ -13,6 +15,60 @@ import io.sipstack.transport.event.impl.SipResponseFlowEventImpl;
 public interface FlowEvent {
 
     Flow flow();
+
+    // =====================================
+    // === SIP flow builder events
+    // =====================================
+
+    default boolean isSipBuilderFlowEvent() {
+        return false;
+    }
+
+    default SipBuilderFlowEvent toSipBuilderFlowEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipFlowEvent.class.getName());
+    }
+
+
+    /*
+    static SipBuilderFlowEvent create(final Flow flow, final SipMessage.Builder<? extends SipMessage> builder) {
+        if (builder.isSipRequestBuilder()) {
+            return create(flow, builder.toSipRequestBuilder());
+        }
+        return create(flow, builder.toSipResponseBuilder());
+    }
+    */
+
+    // =====================================
+    // === SIP request builder flow events
+    // =====================================
+    default boolean isSipRequestBuilderFlowEvent() {
+        return false;
+    }
+
+    default SipRequestBuilderFlowEvent toSipRequestBuilderFlowEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipRequestBuilderFlowEvent.class.getName());
+    }
+
+
+    static SipRequestBuilderFlowEvent create(final Flow flow, final SipMessage.Builder<SipRequest> builder) {
+        return new SipRequestBuilderFlowEventImpl(flow, builder);
+    }
+
+    // =====================================
+    // === SIP response builder flow events
+    // =====================================
+    default boolean isSipResponseBuilderFlowEvent() {
+        return false;
+    }
+
+    default SipResponseBuilderFlowEvent toSipResponseBuilderFlowEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipResponseBuilderFlowEvent.class.getName());
+    }
+
+
+    static SipResponseBuilderFlowEvent create(final Flow flow, final SipMessage.Builder<SipResponse> builder) {
+        return new SipResponseBuilderFlowEventImpl(flow, builder);
+    }
 
     // =====================================
     // === SIP flow events

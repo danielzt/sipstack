@@ -57,6 +57,7 @@ public class FlowFutureImpl implements FlowFuture, GenericFutureListener<Channel
             // TODO: lower levels can we be sure that a flow is created and as such as we only
             // TODO: need to do a "get" on the flowStorage??? Assume that "bind" etc is called before
             // TODO: this as well as the registered and active ones...
+            // TODO: we also need to get the VIP address in here...
             final Connection connection = new UdpConnection(channel, (InetSocketAddress)channel.remoteAddress());
             final FlowActor actor = flowStorage.ensureFlow(connection);
             onSuccess.accept(actor.flow());

@@ -1,5 +1,6 @@
 package io.sipstack.transaction.impl;
 
+import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.header.CallIdHeader;
@@ -233,14 +234,15 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
      * @throws Exception
      */
     public SipTransactionEvent initiateNewTransaction(final String method) throws Exception {
-        final SipRequest request = generateRequest(method);
+        final SipMessage.Builder<SipRequest> builder = generateRequest(method).copy();
 
         // change the branch since we will otherwise actually hit the
         // same transaction and then this will be a re-transmission
         // instead which is not what we want.
-        request.setHeader(CallIdHeader.create());
-        final ViaHeader via = request.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
-        request.setHeader(via);
+        builder.withCallIdHeader(CallIdHeader.create());
+        builder.onTopMostViaHeader(v -> v.withBranch());
+
+        final SipRequest request = builder.build();
 
         final AtomicReference<Transaction> tRef = new AtomicReference<>();
         transactionLayer.createFlow("127.0.0.1")

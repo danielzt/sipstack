@@ -6,5 +6,5 @@ package io.sipstack.transport;
  * @author jonas@jonasborjesson.com
  */
 public enum FlowState {
-    INIT, READY, ACTIVE, WAIT_PONG, CLOSING, CLOSED;
+    INIT, READY, ACTIVE, PING, CLOSING, CLOSED;
 }

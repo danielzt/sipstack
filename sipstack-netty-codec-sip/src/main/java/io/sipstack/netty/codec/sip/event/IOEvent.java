@@ -3,8 +3,11 @@ package io.sipstack.netty.codec.sip.event;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.impl.SipMessageBuilder;
 import io.sipstack.netty.codec.sip.Connection;
+import io.sipstack.netty.codec.sip.event.impl.SipRequestBuilderIOEventImpl;
 import io.sipstack.netty.codec.sip.event.impl.SipRequestIOEventImpl;
+import io.sipstack.netty.codec.sip.event.impl.SipResponseBuilderIOEventImpl;
 import io.sipstack.netty.codec.sip.event.impl.SipResponseIOEventImpl;
 
 /**
@@ -64,6 +67,61 @@ public interface IOEvent {
     default ConnectionIOEvent toConnectionIOEvent() {
         throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + ConnectionIOEvent.class.getName());
     }
+
+    // =====================================
+    // === SIP message builder IO events
+    // =====================================
+
+    /**
+     * Check whether or not the event is a {@link SipMessageBuilderIOEvent}.
+     *
+     * @return
+     */
+    default boolean isSipMessageBuilderIOEvent() {
+        return false;
+    }
+
+    default SipMessageBuilderIOEvent toSipMessageBuilderIOEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipMessageBuilderIOEvent.class.getName());
+    }
+
+    static SipMessageBuilderIOEvent create(final Connection connection, final SipMessage.Builder<? extends SipMessage> builder) {
+        if (builder.isSipRequestBuilder()) {
+            return new SipRequestBuilderIOEventImpl(connection, System.currentTimeMillis(), builder.toSipRequestBuilder());
+        } else {
+            return new SipResponseBuilderIOEventImpl(connection, System.currentTimeMillis(), builder.toSipResponseBuilder());
+        }
+    }
+
+    // =====================================
+    // === SIP Request builder IO events
+    // =====================================
+
+    default boolean isSipRequestBuilderIOEvent() {
+        return false;
+    }
+
+    default SipRequestBuilderIOEvent toSipRequestBuilderIOEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipRequestBuilderIOEvent.class.getName());
+    }
+
+    // =====================================
+    // === SIP Response builder IO events
+    // =====================================
+
+    default boolean isSipResponseBuilderIOEvent() {
+        return false;
+    }
+
+    default SipResponseBuilderIOEvent toSipResponseBuilderIOEvent() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipResponseBuilderIOEvent.class.getName());
+    }
+
+
+    // =====================================
+    // === SIP message IO events
+    // =====================================
+
 
     /**
      * Check whether or not the event is a {@link SipMessageIOEvent}.

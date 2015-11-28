@@ -15,6 +15,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
+import io.pkts.packet.sip.address.SipURI;
 import org.mockito.Mockito;
 
 import java.net.InetSocketAddress;

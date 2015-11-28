@@ -25,15 +25,47 @@ import java.util.function.Consumer;
  * to use stun but this implementation can be configured to use a
  * variety of strategies for issuing and/or responding to a ping.
  *
+ * Also note that this {@link Flow} object is a representation
+ * of the underlying flow state machine at a particular point
+ * in time. Hence, see this object as a snapshot so if you ask
+ * to see the current state of the underlying flow, then that
+ * state was correct at the time the snapshot was taken but
+ * may not be longer.
+ *
  * @author jonas@jonasborjesson.com
  */
 public interface Flow {
 
     /**
      * The difference between a {@link ConnectionId} and a
+     *
      * @return
      */
     Optional<ConnectionId> id();
+
+    /**
+     * The state of the flow state machine at the time when the {@link io.sipstack.transport.event.FlowEvent}
+     * was generated. Hence, you can't hold on to the reference of this {@link Flow} object and expect the
+     * state to be true at some later point in time.
+     *
+     * @return
+     */
+    FlowState getState();
+
+    /**
+     * Kill the flow, which has the effect of purging this flow
+     * out of memory. Also, if the underlying transport is TCP based
+     * then the connection will also be terminated.
+     *
+     * This operation is asynchronous and there is a chance that
+     * messages are inflight and will still be delivered through
+     * this flow.
+     *
+     * Killing a flow twice has no effect.
+     */
+    default void kill() {
+        // TODO
+    }
 
     default boolean isValid() {
         return true;

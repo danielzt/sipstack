@@ -11,7 +11,10 @@ import io.netty.channel.ChannelPromise;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.EventExecutor;
+import io.pkts.packet.sip.SipMessage;
 import io.sipstack.net.InboundOutboundHandlerAdapter;
+import io.sipstack.netty.codec.sip.event.IOEvent;
+import io.sipstack.transport.event.FlowEvent;
 
 import java.net.SocketAddress;
 import java.util.List;
@@ -21,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.*;
 
 /**
@@ -70,7 +74,6 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
         fireChannelReadLatch.set(new CountDownLatch(1));
         writeLatch.set(new CountDownLatch(1));
     }
-
 
     @Override
     public Channel channel() {
@@ -153,10 +156,74 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
      * When a channel handler processes a message (such as the invite server transaction)
      * it can choose to forward the message to the next handler in the pipeline. This
      * is a helper method to ensure that a particular message was indeed forwarded.
+     *
+     * Note thought that quite often you may just want to know that a particular SIP
+     * message was forwarded but since a sip message itself is most of the times
+     * wrapped in some other event you will not find it through this method. Therefore,
+     * you may consider using the {@link MockChannelHandlerContext#assertSipMessageForwarded(SipMessage)}
+     * in that case.
+     *
      * @param msg
      */
     public void assertMessageForwarded(final Object msg) {
         assertThat(channelReadObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(), is(true));
+    }
+
+    /**
+     * Since most of the times a SIP message is wrapped in some other type of event
+     * and as such, in order to find that particular sip message you have to find
+     * the wrapping event, unwrap it and then compare them. Well, this method does
+     * that for you...
+     *
+     * @param msg
+     */
+    public void assertSipMessageForwarded(final SipMessage msg) {
+        final Optional<SipMessage> forwarded = findForwardedSipMessage(msg);
+        assertThat("No such SIP message have been forwarded up the chain", forwarded.isPresent(), is(true));
+    }
+
+    /**
+     * Sometimes you want to ensure that a particular message was NOT forwarded
+     * @param msg
+     */
+    public void assertSipMessageNotForwarded(final SipMessage msg) {
+        final Optional<SipMessage> forwarded = findForwardedSipMessage(msg);
+        assertThat("Seems like the SIP message was forwarded after all", forwarded.isPresent(), is(false));
+    }
+
+    /**
+     * Convenience method for locating a sip message that has been pushed upstream
+     * in the event pipeline.
+     *
+     * @param msg
+     * @return
+     */
+    public Optional<SipMessage> findForwardedSipMessage(final SipMessage msg) {
+        return channelReadObjects.stream().filter(o -> msg.equals(unwrapEvent(o))).map(e -> unwrapEvent(e)).findFirst();
+    }
+
+    /**
+     * Try and unwrap the event in order to find the SipMessage within. If
+     * the object isn't a sip message event of some sort then null will be
+     * returned.
+     *
+     * @param o
+     * @return
+     */
+    public SipMessage unwrapEvent(final Object o) {
+        if (o instanceof IOEvent) {
+            final IOEvent ioEvent = (IOEvent)o;
+            if (ioEvent.isSipMessageIOEvent()) {
+                return ioEvent.toSipMessageIOEvent().message();
+            }
+        } else if (o instanceof FlowEvent) {
+            final FlowEvent flowEvent = (FlowEvent) o;
+            if (flowEvent.isSipFlowEvent()) {
+                return flowEvent.toSipFlowEvent().message();
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -171,24 +238,26 @@ public class MockChannelHandlerContext implements ChannelHandlerContext {
      * @return
      */
     public <T> T findForwardedMessageByType(final Class<T> clazz) {
-        final Optional<Object> element = channelReadObjects.stream().filter(o -> {
-            try {
-                final T t = (T)o;
-                return true;
-            } catch (final ClassCastException e) {
-                return false;
-            }
-        }).findFirst();
-        if (!element.isPresent()) {
-            fail("No message of type \"" + clazz.getCanonicalName() + "\" has been forwareded");
-        }
-
-        return (T)element.get();
+        return findMessageByType(clazz, channelReadObjects);
     }
 
     public void assertMessageWritten(final Object msg) {
         assertThat(writeObjects.stream().filter(o -> o.equals(msg)).findFirst().isPresent(),
                 is(true));
+    }
+
+    public <T> T findWrittenMessageByType(final Class<T> clazz) {
+        return findMessageByType(clazz, writeObjects);
+    }
+
+    private <T> T findMessageByType(final Class<T> clazz, final List<Object> list) {
+        final Optional<Object> element = list.stream().filter(o -> clazz.isAssignableFrom(o.getClass())).findFirst();
+
+        if (!element.isPresent()) {
+            fail("No message of type \"" + clazz.getCanonicalName() + "\" has been forwareded");
+        }
+
+        return (T)element.get();
     }
 
     @Override

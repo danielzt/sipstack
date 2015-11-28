@@ -17,12 +17,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.pkts.buffer.Buffer;
-import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
-import io.sipstack.netty.codec.sip.SipMessageEncoder;
+import io.sipstack.netty.codec.sip.*;
 import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
-import io.sipstack.netty.codec.sip.SipMessageStreamDecoder;
-import io.sipstack.netty.codec.sip.UdpConnection;
 
 import java.net.InetSocketAddress;
 
@@ -95,7 +91,7 @@ public class SimpleSipStack {
             protected void initChannel(final DatagramChannel ch) throws Exception {
                 final ChannelPipeline pipeline = ch.pipeline();
                 pipeline.addLast("decoder", new SipMessageDatagramDecoder());
-                pipeline.addLast("encoder", new SipMessageEncoder());
+                pipeline.addLast("encoder", new SipMessageDatagramEncoder());
                 pipeline.addLast("handler", handler);
             }
         });
@@ -112,7 +108,7 @@ public class SimpleSipStack {
             public void initChannel(final SocketChannel ch) throws Exception {
                 final ChannelPipeline pipeline = ch.pipeline();
                 pipeline.addLast("decoder", new SipMessageStreamDecoder());
-                pipeline.addLast("encoder", new SipMessageEncoder());
+                pipeline.addLast("encoder", new SipMessageStreamEncoder());
                 pipeline.addLast("handler", handler);
             }
         })

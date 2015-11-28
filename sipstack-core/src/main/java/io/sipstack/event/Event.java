@@ -109,6 +109,22 @@ public abstract class Event {
         return false;
     }
 
+    public boolean isSipTimerTimeout1() {
+        return false;
+    }
+
+    public boolean isSipTimerTimeout2() {
+        return false;
+    }
+
+    public boolean isSipTimerTimeout3() {
+        return false;
+    }
+
+    public boolean isSipTimerTimeout4() {
+        return false;
+    }
+
     public boolean isSipTimerA() {
         return false;
     }

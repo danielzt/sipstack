@@ -1,5 +1,9 @@
 package io.sipstack;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.datatype.jsr310.JSR310Module;
 import io.netty.channel.ChannelHandlerContext;
 import io.pkts.Pcap;
 import io.pkts.packet.sip.SipMessage;
@@ -19,6 +23,7 @@ import io.sipstack.netty.codec.sip.Transport;
 import org.junit.Before;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -176,6 +181,24 @@ public class SipStackTestBase {
 
         pcap.loop(streamHandler);
         return streams;
+    }
+    /**
+     * Helper method for loading a configuration.
+     *
+     * Note, the path of the resources being loaded is based on the
+     * {@link SipStackTestBase}.
+     *
+     * @param clazz
+     * @param resource
+     * @return
+     * @throws Exception
+     */
+    public <T> T loadConfiguration(final Class<T> clazz, final String resource) throws Exception {
+        final InputStream stream = SipStackTestBase.class.getResourceAsStream(resource);
+        final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+        final SimpleModule module = new SimpleModule();
+        mapper.registerModule(new JSR310Module());
+        return mapper.readValue(stream, clazz);
     }
 
     protected SipStream loadSipStream(final String resource) throws Exception {

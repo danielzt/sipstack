@@ -6,6 +6,7 @@ import io.netty.channel.ChannelOutboundHandler;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.config.FlowConfiguration;
+import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transport.Flow;
@@ -156,8 +157,8 @@ public class MockTransportLayer implements TransportLayer {
             // TODO: need to mock out the transport eventually as well.
 
             final MockChannelFuture mockFuture = new MockChannelFuture(channel);
-            final FlowConfiguration flowConfiguration = new FlowConfiguration();
-            final FlowStorage flowStorage = new DefaultFlowStorage(flowConfiguration);
+            final TransportLayerConfiguration config = new TransportLayerConfiguration();
+            final FlowStorage flowStorage = new DefaultFlowStorage(config);
             final FlowFutureImpl flowFuture = new FlowFutureImpl(flowStorage, mockFuture, onSuccess, onFailure, onCancelled);
 
             // this will cause the future to call the callback right away because

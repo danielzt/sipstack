@@ -4,6 +4,7 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
+import io.pkts.packet.sip.address.SipURI;
 
 import java.net.InetSocketAddress;
 
@@ -14,8 +15,17 @@ import java.net.InetSocketAddress;
 public final class TcpConnection extends AbstractConnection {
 
 
+    public TcpConnection(final Channel channel, final InetSocketAddress remote, final SipURI vipAddress) {
+        super(Transport.tcp, channel, remote, vipAddress);
+    }
+
     public TcpConnection(final Channel channel, final InetSocketAddress remote) {
-        super(Transport.tcp, channel, remote);
+        super(Transport.tcp, channel, remote, null);
+    }
+
+    @Override
+    public int getDefaultPort() {
+        return 5060;
     }
 
     /**
@@ -23,7 +33,6 @@ public final class TcpConnection extends AbstractConnection {
      */
     @Override
     public void send(final Object o) {
-        // channel().writeAndFlush(toByteBuf(msg));
         channel().writeAndFlush(o);
     }
 

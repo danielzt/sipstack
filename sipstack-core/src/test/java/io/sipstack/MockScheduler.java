@@ -71,11 +71,11 @@ public class MockScheduler implements InternalScheduler {
             for (final MockCancellable c : scheduledTasks) {
                 ++index;
                 if (c.event.isSipTimerEvent() && c.event.toSipTimerEvent().timer() == timer) {
-                    break;
+                    return index;
                 }
             }
         }
-        return index;
+        return -1;
     }
 
     public int countCurrentTasks() {

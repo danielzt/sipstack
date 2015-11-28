@@ -1,6 +1,7 @@
 package io.sipstack.transport.impl;
 
 import io.sipstack.actor.Actor;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowId;
 
@@ -46,4 +47,6 @@ public interface FlowActor extends Actor {
      * @return
      */
     FlowId id();
+
+    Connection connection();
 }

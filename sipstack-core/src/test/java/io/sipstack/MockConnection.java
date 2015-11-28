@@ -1,6 +1,9 @@
 package io.sipstack;
 
+import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.Transport;
@@ -99,8 +102,18 @@ public class MockConnection implements Connection {
     }
 
     @Override
+    public Optional<SipURI> getVipAddress() {
+        return Optional.empty();
+    }
+
+    @Override
     public int getLocalPort() {
         return id.getLocalPort();
+    }
+
+    @Override
+    public int getDefaultPort() {
+        return 5060;
     }
 
     @Override
@@ -111,6 +124,11 @@ public class MockConnection implements Connection {
     @Override
     public String getLocalIpAddress() {
         return id.getLocalIpAddress();
+    }
+
+    @Override
+    public final Buffer getLocalIpAddressAsBuffer() {
+        return Buffers.wrap(getLocalIpAddress());
     }
 
     @Override

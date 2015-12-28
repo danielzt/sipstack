@@ -1,0 +1,98 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <prerequisites>
+     <maven>3.0.0</maven>
+  </prerequisites>
+
+  <parent>
+    <groupId>io.sipstack</groupId>
+    <artifactId>sipstack-parent</artifactId>
+    <version>0.1.1-SNAPSHOT</version>
+  </parent>
+
+  <name>sipstack.io io.sipstack.transaction.transaction layer</name>
+  <artifactId>sipstack-io.sipstack.transaction.transaction</artifactId>
+  <packaging>jar</packaging>
+  <description />
+
+  <dependencies>
+
+     <dependency>
+       <groupId>io.netty</groupId>
+       <artifactId>netty-all</artifactId>
+     </dependency>
+
+    <dependency>
+        <groupId>com.typesafe.akka</groupId>
+        <artifactId>akka-actor_${scala-tools.version}</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-library</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.sipstack</groupId>
+      <artifactId>sipstack-configuration</artifactId>
+    </dependency>
+
+     <dependency>
+       <groupId>io.sipstack</groupId>
+       <artifactId>sipstack-netty-codec-sip</artifactId>
+     </dependency>
+
+    <dependency>
+      <groupId>io.pkts</groupId>
+      <artifactId>pkts-sip</artifactId>
+    </dependency>
+
+   <dependency> 
+     <groupId>org.slf4j</groupId>
+     <artifactId>slf4j-api</artifactId>
+   </dependency>
+
+    <!-- Test Dependencies -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>org.scalatest</groupId>
+        <artifactId>scalatest_${scala-tools.version}</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-all</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>scala-compile-first</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>scala-test-compile</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+    </plugins>
+  </build>
+
+</project>

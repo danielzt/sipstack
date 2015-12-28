@@ -1,0 +1,125 @@
+# Test yaml file used by unit test.
+
+transport:
+  flow:
+
+    # A flow can be created in a number of different ways and establishing
+    # a TCP connection is one of them. However, attacking any type of server
+    # on the public Internet is quite easy by just establishing a bunch
+    # of TCP connections and then simply not send any traffic across it
+    # whereby the server under attack very likely will run out of
+    # file descriptors. Therefore, if a flow is created by an incoming
+    # TCP connection and we do not get any data across that flow (connection)
+    # within this amount of time we will kill the flow and hence, the connection.
+    #
+    # Note, an attacker czan still create an enormous amount of connections
+    # so this is not the only defense you need. You probably will have to configure
+    # your favorite firewall to limit the number of incoming connections etc etc.
+    initialIdleTimeout: 10
+
+    # The longest a flow is allowed to live when there are no
+    # messages flowing across it. I.e., if this flow doesn't
+    # see any messages, in either direction, then after X seconds
+    # the flow will shut down. Note, if you run with ACTIVE keep-alive
+    # mode then this setting has no effect since the flow will issue
+    # traffic on its own.
+    #
+    # Note that if you run with PASSIVE keep-alive mode then if the
+    # client doesn't issue keep-alive traffic then the flow obviously
+    # doesn't see any traffic and therefore it will, once again,
+    # shut down.
+    timeout: 120
+
+    keepAlive:
+
+      # Which mode the keep-alive functionality should operate under.
+      # Valid values are:
+      # NONE - turn everything off.
+      # PASSIVE - we will simply just respond to a ping if we get one but
+      # ACTIVE - we will actively issue keep-alive traffic if we do not recieve
+      #          any. In this mode, the "interval" and "maxFailed" kicks in...
+      mode: NONE
+
+      # For how long this flow can sit idle without taking any traffic across it.
+      # If this timer fires and we are in ACTIVE mode, then we will start to issue
+      # keep-alive traffic.
+      #
+      # For the other modes, this setting has no meaning.
+      #
+      # Value is in seconds
+      idleTimeout: 40
+
+      # If we start issuing keep-alive traffic, which we only do in ACTIVE mode and
+      # if the idle timeout has fired, then how many times can the keep-alive traffic
+      # fail before we give up and kill the flow?
+      #
+      # For the other modes, this setting has no meaning.
+      #
+      # Also note that if you are using SIP OPTIONS ping then these settings
+      # do not apply because then we will follow SIP rules for transactions.
+      maxFailed: 3
+
+      # If a keep-alive probe fails, for how long do we wait until we try and send another
+      # one?
+      #
+      # For the other modes, this setting has no meaning.
+      #
+      # Also note that if you are using SIP OPTIONS ping then this setting
+      # do not apply because then we will follow SIP rules for transactions.
+      #
+      # Value is in seconds
+      interval: 5
+
+      # If we are sending out PING traffic, because we are in ACTIVE mode and the idle timer
+      # has fired, then this setting controls whether or not we are forcing the remote
+      # UA to respond with a pong. If we do not get a pong, then we consider that a
+      # failed attempt, which counts towards the "maxFailed" attempt setting.
+      enforcePong: true
+
+      # Now, configure what type of ping/pong traffic we are going to accept/generate.
+      # There will be slightly different options for UDP based vs TCP based
+      # where of course a SIP OPTION ping is allowed in both but it is recommended
+      # that for TCP you use double CRLF as ping and a single CRLF for pong. For UDP,
+      # STUN is the preferred choice but many stacks can't handle that and typically
+      # is happier with SIP OPTIONS
+      udp:
+        use: SIP_OPTIONS
+        accept:
+          - SIP_OPTIONS
+          - STUN
+
+        # if we use SIP_OPTIONS as our active ping mechanism then we can
+        # optionally configure how certain aspects of that OPTIONS request
+        # should look like. Of course, the host:port of the request URI will
+        # be to whatever the flow is pointing and the transport is also determined
+        # by the flow.
+        sipOptions:
+          # If not specified, the request-uri user will be set to "ping"
+          targetUser: bob
+          # If not specified, the From-user will be set to "ping"
+          fromUser: alice
+          # If not specified, the from-host will be the local IP of the flow
+          fromHost: aboutsip.com
+          # If not specified, the To-user will be "ping"
+          toUser: bob
+          # If not specified, the to-host will be the remote IP of the flow
+          toHost: pkts.io
+
+        # sipOptions:
+          # target:
+            # user: whatever
+            # host: cant.set.it.com
+        # sipOptions:
+          # target: sip:hello@host.will.be.ignored.com
+          # from: sip:to@host.will.be.ignored.com
+          # to: sip:bob@mycompany.com
+
+      tcp:
+        use: DOUBLE_CRLF
+        accept:
+          - DOUBLE_CRLF
+          - SIP_OPTIONS
+      ws:
+        use: DOUBLE_CRLF
+        accept:
+          - SIP_OPTIONS

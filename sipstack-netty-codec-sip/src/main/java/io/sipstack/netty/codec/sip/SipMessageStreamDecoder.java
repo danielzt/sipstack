@@ -3,21 +3,21 @@
  */
 package io.sipstack.netty.codec.sip;
 
+import gov.nist.javax.sip.address.SipUri;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.pkts.buffer.Buffer;
-import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.SipInitialLine;
-import io.pkts.packet.sip.impl.SipRequestImpl;
-import io.pkts.packet.sip.impl.SipRequestLine;
-import io.pkts.packet.sip.impl.SipResponseImpl;
-import io.pkts.packet.sip.impl.SipResponseLine;
+import io.sipstack.netty.codec.sip.event.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 /**
  * @author jonas
@@ -41,26 +41,80 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     private final Clock clock;
 
+    private final SipURI vipAddress;
+
     /**
      * Contains the raw framed message.
      */
     private RawMessage message;
 
+    public SipMessageStreamDecoder() {
+        this(new SystemClock(), null);
+    }
+
+    public SipMessageStreamDecoder(final Clock clock) {
+        this(clock, null);
+    }
     /**
      * 
      */
-    public SipMessageStreamDecoder(final Clock clock) {
+    public SipMessageStreamDecoder(final Clock clock, final SipURI vipAddress) {
         this.clock = clock;
+        this.vipAddress = vipAddress;
         reset();
-    }
-
-    public SipMessageStreamDecoder() {
-        this(new SystemClock());
     }
 
     @Override
     public boolean isSingleDecode() {
         return true;
+    }
+
+    @Override
+    public void channelRegistered(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("registered");
+        ctx.fireUserEventTriggered(create(ctx, ConnectionOpenedIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("un-registered");
+        ctx.fireUserEventTriggered(create(ctx, ConnectionClosedIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelActive(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("active");
+        ctx.fireUserEventTriggered(create(ctx, ConnectionActiveIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
+        System.err.println("in-active");
+        ctx.fireUserEventTriggered(create(ctx, ConnectionInactiveIOEvent::create));
+    }
+
+    /**
+     * From ChannelInboundHandler
+     */
+    @Override
+    public void channelWritabilityChanged(final ChannelHandlerContext ctx) throws Exception {
+        // just consume the event
+    }
+
+    private ConnectionIOEvent create(final ChannelHandlerContext ctx, final BiFunction<Connection, Long, ConnectionIOEvent> f) {
+        final Channel channel = ctx.channel();
+        final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
+        final Long arrivalTime = clock.getCurrentTimeMillis();
+        return f.apply(connection, arrivalTime);
     }
 
     @Override
@@ -82,23 +136,29 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
         if (this.message.isComplete()) {
             final long arrivalTime = this.clock.getCurrentTimeMillis();
-            final SipMessage msg = toSipMessage(this.message);
             final Channel channel = ctx.channel();
-            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress());
-            out.add(new DefaultSipMessageEvent(connection, msg, arrivalTime));
+            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
+            final SipMessageIOEvent msg = toSipMessageIOEvent(connection, this.message);
+            out.add(msg);
             reset();
         }
     }
 
-    private SipMessage toSipMessage(final RawMessage raw) {
+    private SipMessageIOEvent toSipMessageIOEvent(final Connection connection, final RawMessage raw) {
+        if (true) {
+            throw new RuntimeException("Need to redo this now with the immutable way of doing things");
+        }
         final SipInitialLine initialLine = SipInitialLine.parse(raw.getInitialLine());
         final Buffer headers = raw.getHeaders();
         final Buffer payload = raw.getPayload();
         if (initialLine.isRequestLine()) {
-            return new SipRequestImpl((SipRequestLine) initialLine, headers, payload);
+            // final SipRequest request = new SipRequestImpl((SipRequestLine) initialLine, headers, payload);
+            // return IOEvent.create(connection, request);
         } else {
-            return new SipResponseImpl((SipResponseLine) initialLine, headers, payload);
+            // final SipResponse response = new SipResponseImpl((SipResponseLine) initialLine, headers, payload);
+            // return IOEvent.create(connection, response);
         }
+        return null;
     }
 
     private void dropConnection(final ChannelHandlerContext ctx, final String reason) {

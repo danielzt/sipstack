@@ -1,0 +1,50 @@
+# Test yaml for some of the Ping tests.
+# This configuration file has pings set to active and
+# all transports (udp, tcp, ws) has the SIP_OPTIONS
+# set as the method to use for the active ping.
+transport:
+  flow:
+
+    initialIdleTimeout: 10
+
+    timeout: 120
+
+    keepAlive:
+
+      mode: PASSIVE
+
+      idleTimeout: 40
+
+      maxFailed: 3
+
+      interval: 5
+
+      enforcePong: true
+
+      udp:
+        use: SIP_OPTIONS
+        accept:
+          - SIP_OPTIONS
+          - STUN
+
+        sipOptions:
+          targetUser: bob
+          fromUser: alice
+          toUser: bob
+
+      tcp:
+        use: SIP_OPTIONS
+        accept:
+          - DOUBLE_CRLF
+          - SIP_OPTIONS
+
+        sipOptions:
+          targetUser: bob
+          fromUser: alice
+          toUser: bob
+
+
+      ws:
+        use: SIP_OPTIONS
+        accept:
+          - SIP_OPTIONS

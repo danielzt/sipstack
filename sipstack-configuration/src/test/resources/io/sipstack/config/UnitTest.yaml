@@ -1,0 +1,9 @@
+# Test yaml file used by unit test.
+
+interface:
+     - name: default
+       listen: 127.0.0.1:5060
+       transport: [udp, tcp]
+       vipAddress: 64.92.13.45:5060
+
+

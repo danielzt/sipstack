@@ -15,9 +15,11 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
+import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
-import io.sipstack.netty.codec.sip.SipMessageEncoder;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.SipMessageDatagramEncoder;
+import io.sipstack.netty.codec.sip.event.IOEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 import java.net.InetSocketAddress;
 
@@ -36,11 +38,11 @@ import java.net.InetSocketAddress;
  *
  */
 @Sharable
-public final class UAS extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class UAS extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final SipMessage msg = event.getMessage();
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
+        final SipMessage msg = event.message();
 
         // just consume the ACK
         if (msg.isAck()) {
@@ -49,8 +51,9 @@ public final class UAS extends SimpleChannelInboundHandler<SipMessageEvent> {
 
         // for all other requests, just generate a 200 OK response.
         if (msg.isRequest()) {
-            final SipResponse response = msg.createResponse(200);
-            event.getConnection().send(response);
+            final SipResponse response = msg.createResponse(200).build();
+            final Connection connection = event.connection();
+            connection.send(IOEvent.create(connection, response));
         }
     }
 
@@ -66,7 +69,7 @@ public final class UAS extends SimpleChannelInboundHandler<SipMessageEvent> {
             protected void initChannel(final DatagramChannel ch) throws Exception {
                 final ChannelPipeline pipeline = ch.pipeline();
                 pipeline.addLast("decoder", new SipMessageDatagramDecoder());
-                pipeline.addLast("encoder", new SipMessageEncoder());
+                pipeline.addLast("encoder", new SipMessageDatagramEncoder());
                 pipeline.addLast("handler", uas);
             }
         });

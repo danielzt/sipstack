@@ -6,39 +6,77 @@ package io.sipstack.netty.codec.sip;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.util.AttributeKey;
 import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.SipParser;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Optional;
 
 /**
  * @author jonas@jonasborjesson.com
  */
 public abstract class AbstractConnection implements Connection {
 
-    // private final ChannelHandlerContext ctx;
+    private final ConnectionId id;
     private final Channel channel;
     private final InetSocketAddress remote;
+    private final Optional<SipURI> vipAddress;
+    private final static AttributeKey<Object> key = AttributeKey.newInstance("generic_object");
 
     /*
      * protected AbstractConnection(final ChannelHandlerContext ctx, final InetSocketAddress remote)
      * { this.ctx = ctx; this.channel = null; this.remote = remote; }
      */
 
-    protected AbstractConnection(final Channel channel, final InetSocketAddress remote) {
-        // this.ctx = null;
+    protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote, final SipURI vipAddress) {
+        this.id = ConnectionId.create(transport, (InetSocketAddress)channel.localAddress(), remote);
         this.channel = channel;
         this.remote = remote;
+        this.vipAddress = Optional.ofNullable(vipAddress);
+    }
+
+    protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote) {
+        this(transport, channel, remote, null);
+    }
+
+    public Optional<SipURI> getVipAddress() {
+        return vipAddress;
+    }
+
+    public final void storeObject(final Object o) {
+        this.channel.attr(key).set(o);
+    }
+
+    public final Optional<Object> fetchObject() {
+        return Optional.ofNullable(this.channel.attr(key).get());
     }
 
     protected Channel channel() {
         return this.channel;
     }
 
+    @Override
+    public Transport getTransport() {
+        return this.id.getProtocol();
+    }
+
+    @Override
+    public ConnectionId id() {
+        return this.id;
+    }
+
+    @Override
+    public void close() {
+        // TODO: do we need to do more?
+        channel.close();
+    }
     @Override
     public byte[] getRawRemoteIpAddress() {
         return this.remote.getAddress().getAddress();
@@ -55,6 +93,11 @@ public abstract class AbstractConnection implements Connection {
     public final String getLocalIpAddress() {
         final SocketAddress local = this.channel.localAddress();
         return ((InetSocketAddress) local).getAddress().getHostAddress();
+    }
+
+    @Override
+    public final Buffer getLocalIpAddressAsBuffer() {
+        return Buffers.wrap(getLocalIpAddress());
     }
 
     @Override
@@ -90,7 +133,6 @@ public abstract class AbstractConnection implements Connection {
 
     @Override
     public boolean isTLS() {
-
         return false;
     }
 

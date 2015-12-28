@@ -16,7 +16,7 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.example.netty.sip.SimpleSipStack;
 import io.sipstack.example.netty.sip.registrar.Binding;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ import java.util.List;
  * @author jonas@jonasborjesson.com
  * 
  */
-public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     private final LocationService locationService = LocationService.getInstance();
 
@@ -37,9 +37,9 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
 
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final Connection connection = event.getConnection();
-        final SipMessage msg = event.getMessage();
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
+        final Connection connection = event.connection();
+        final SipMessage msg = event.message();
 
         if (msg.isRequest() && msg.isOptions()) {
             // many clients will send out an OPTIONS request as a ping mechanism
@@ -68,7 +68,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
 
     private SipURI lookupLocation(final SipRequest request) {
         final SipURI requestURI = (SipURI) request.getRequestUri();
-        final SipURI aor = SipURI.with().user(requestURI.getUser()).host(requestURI.getHost()).build();
+        final SipURI aor = SipURI.withUser(requestURI.getUser()).withHost(requestURI.getHost()).build();
         final List<Binding> bindings = this.locationService.getBindings(aor);
 
         // if there are no bindings for this AOR then return
@@ -143,7 +143,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
         final Connection connection = this.stack.connect(destination.getHost(), port == -1 ? 5060 : port);
 
         // SIP is pretty powerful but there are a lot of little details to get things working.
-        // E.g., this sample application is acting as a stateless proxy and in order to
+        // E.g., this sample io.sipstack.application.application is acting as a stateless proxy and in order to
         // correctly relay re-transmissions or e.g. CANCELs we have to make sure to always
         // generate the same branch-id of the same request. Since a CANCEL will have the same
         // branch-id as the request it cancels, we must ensure we generate the same branch-id as
@@ -160,7 +160,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
         myBranch.write((byte) 'a');
         myBranch.write((byte) 'b');
         myBranch.write((byte) 'c');
-        final ViaHeader via = ViaHeader.with().host("10.0.1.28").port(5060).transportUDP().branch(myBranch).build();
+        final ViaHeader via = ViaHeader.withHost("10.0.1.28").withPort(5060).withTransportUdp().withBranch(myBranch).build();
 
         // This is how you should generate the branch parameter if you are a stateful proxy:
         // Note the ViaHeader.generateBranch()...
@@ -193,7 +193,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
         // the aor is not allowed to register under this domain
         // generate a 404 according to specfication
         if (!validateDomain(domain, aor)) {
-            return request.createResponse(404);
+            return request.createResponse(404).build();
         }
 
         final Binding.Builder builder = Binding.with();
@@ -208,12 +208,13 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
 
         final Binding binding = builder.build();
         final List<Binding> currentBindings = this.locationService.updateBindings(binding);
-        final SipResponse response = request.createResponse(200);
+        final SipResponse response = request.createResponse(200).build();
         currentBindings.forEach(b -> {
-            final SipURI contactURI = b.getContact();
-            contactURI.setParameter("expires", b.getExpires());
-            final ContactHeader contact = ContactHeader.with(contactURI).build();
-            response.addHeader(contact);
+            // TODO: need to change this eventually to use the new builder stuff
+            // final SipURI contactURI = b.getContact();
+            // contactURI.setParameter("expires", b.getExpires());
+            // final ContactHeader contact = ContactHeader.withSipURI(contactURI).build();
+            // response.addHeader(contact);
         });
 
         return response;
@@ -255,7 +256,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
      */
     private SipURI getAOR(final SipRequest request) {
         final SipURI sipURI = (SipURI) request.getToHeader().getAddress().getURI();
-        return SipURI.with().user(sipURI.getUser()).host(sipURI.getHost()).build();
+        return SipURI.withUser(sipURI.getUser()).withHost(sipURI.getHost()).build();
     }
 
 }

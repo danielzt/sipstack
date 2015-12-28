@@ -1,0 +1,134 @@
+
+sip:
+    interface:
+         - name: local
+           listen: 127.0.0.1
+           transport: [udp, tcp]
+           vipAddress: 64.92.13.45:5060
+
+    transport:
+      flow:
+    
+        # A flow can be created in a number of different ways and establishing
+        # a TCP connection is one of them. However, attacking any type of server
+        # on the public Internet is quite easy by just establishing a bunch
+        # of TCP connections and then simply not send any traffic across it
+        # whereby the server under attack very likely will run out of
+        # file descriptors. Therefore, if a flow is created by an incoming
+        # TCP connection and we do not get any data across that flow (connection)
+        # within this amount of time we will kill the flow and hence, the connection.
+        #
+        # Note, an attacker czan still create an enormous amount of connections
+        # so this is not the only defense you need. You probably will have to configure
+        # your favorite firewall to limit the number of incoming connections etc etc.
+        initialIdleTimeout: 10
+
+        timeout: 120
+    
+        keepAlive:
+    
+          # Which mode the keep-alive functionality should operate under.
+          # Valid values are:
+          # NONE - turn everything off.
+          # PASSIVE - we will simply just respond to a ping if we get one but
+          # ACTIVE - we will actively issue keep-alive traffic if we do not recieve
+          #          any. In this mode, the "interval" and "maxFailed" kicks in...
+          mode: ACTIVE
+    
+          # For how long this flow can sit idle without taking any traffic across it.
+          # If this timer fires and we are in ACTIVE mode, then we will start to issue
+          # keep-alive traffic.
+          #
+          # For the other modes, this setting has no meaning.
+          #
+          # Value is in seconds
+          idleTimeout: 3
+    
+          # If we start issuing keep-alive traffic, which we only do in ACTIVE mode and
+          # if the idle timeout has fired, then how many times can the keep-alive traffic
+          # fail before we give up and kill the flow?
+          #
+          # For the other modes, this setting has no meaning.
+          #
+          # Also note that if you are using SIP OPTIONS ping then these settings
+          # do not apply because then we will follow SIP rules for transactions.
+          maxFailed: 3
+    
+          # If a keep-alive probe fails, for how long do we wait until we try and send another
+          # one?
+          #
+          #
+          # For the other modes, this setting has no meaning.
+          #
+          # Also note that if you are using SIP OPTIONS ping then these settings
+          # do not apply because then we will follow SIP rules for transactions.
+          #
+          # Value is in seconds
+          interval: 5
+    
+          # If we are sending out PING traffic, because we are in ACTIVE mode and the idle timer
+          # has fired, then this setting controls whether or not we are forcing the remote
+          # UA to respond with a pong. If we do not get a pong, then we consider that a
+          # failed attempt, which counts towards the "maxFailed" attempt setting.
+          enforcePong: true
+    
+          udp:
+            use: SIP_OPTIONS
+            accept:
+              - SIP_OPTIONS
+              - STUN
+    
+          tcp:
+            use: SIP_OPTIONS
+            accept:
+              - DOUBLE_CRLF
+              - SIP_OPTIONS
+          ws:
+            use: DOUBLE_CRLF
+            accept:
+              - SIP_OPTIONS
+        
+
+hektor:
+    dispatchers:
+        my-dispatcher:
+            executor: worker-thread-executor
+            workerThreadExecutor:
+                noOfWorkers: 6
+            throughput: 75
+
+    # io.sipstack.transaction.transaction:
+     #     timers:
+      #        t1: PT0.5
+       #       t2: PT4
+        #      t4: PT5 
+
+         # - name: eth0
+           # listen: 10.0.1.34
+           # transport: [udp, tcp]
+           # vipAddress: 64.92.13.45:5060
+
+    # listen: 
+        # - 127.0.0.1:5060;transport=tcp as 64.92.13.45:5090 
+        # - 127.0.0.1:5060;transport=udp as 64.92.13.45:5090
+        # - 192.168.0.100:5060;transport=udp 
+
+     # dns:
+         # naptr: true
+         # srv: true
+         # cache: true
+
+     # transportLayer - perhaps implicit
+     
+     # The Transaction Layer
+     # transactions:
+          # enabled: true
+          # timers:
+               # t1: 50ms
+               # t2: 50ms
+
+     # The Transaction User Layer
+     # transactionUserLayer:
+          # enabled: true   # If this is enabled, the Transaction Layer must be enabled too
+      
+

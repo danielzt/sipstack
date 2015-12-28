@@ -26,6 +26,11 @@
       <artifactId>pkts-sip</artifactId>
     </dependency>
 
+    <dependency>
+         <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+    </dependency>
+
    <dependency> 
      <groupId>org.slf4j</groupId>
      <artifactId>slf4j-api</artifactId>
@@ -33,14 +38,29 @@
 
     <!-- Test Dependencies -->
     <dependency>
+      <groupId>io.pkts</groupId>
+      <artifactId>pkts-streams</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-all</artifactId>
+      <scope>test</scope>
     </dependency>
+
+   <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <scope>test</scope>
+   </dependency>
+
   </dependencies>
 
 </project>

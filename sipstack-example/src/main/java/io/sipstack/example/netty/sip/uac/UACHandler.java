@@ -16,13 +16,13 @@ import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.ToHeader;
 import io.pkts.packet.sip.header.ViaHeader;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 /**
  * @author jonas@jonasborjesson.com
  */
 @Sharable
-public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class UACHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     /**
      * Generating an ACK to a 2xx response is the same as any other subsequent request. However, a
@@ -59,7 +59,7 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
 
         // Since this is an ACK, the cseq should have the same cseq number as the response,
         // i.e., the same as the original INVITE that we are ACK:ing.
-        final CSeqHeader cseq = CSeqHeader.with().cseq(response.getCSeqHeader().getSeqNumber()).method("ACK").build();
+        final CSeqHeader cseq = CSeqHeader.withMethod("ACK").withCSeq(response.getCSeqHeader().getSeqNumber()).build();
         final CallIdHeader callId = response.getCallIDHeader();
 
         // If there are Record-Route headers in the response, they must be
@@ -73,22 +73,23 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
         // any transport protocol and it can actually change from message
         // to message but in this simple example we will just use the
         // same last time so we will only have to generate a new branch id
-        final ViaHeader via = response.getViaHeader().clone();
-        via.setBranch(ViaHeader.generateBranch());
+
+        // TODO: this doesn't work right now. We need to change the response to a builder as well before we can change the Via header
+        final ViaHeader via = response.getViaHeader().copy().withBranch(ViaHeader.generateBranch()).build();
 
         // now we have all the pieces so let's put it together
         final SipRequest.Builder builder = SipRequest.ack(requestURI);
-        builder.from(from);
-        builder.to(to);
-        builder.callId(callId);
-        builder.cseq(cseq);
-        builder.via(via);
+        builder.withFromHeader(from);
+        builder.withToHeader(to);
+        builder.withCallIdHeader(callId);
+        builder.withCSeqHeader(cseq);
+        builder.withViaHeader(via);
         return builder.build();
     }
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final SipMessage msg = event.getMessage();
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
+        final SipMessage msg = event.message();
 
         if (msg.isInvite() && msg.isResponse()) {
             final SipResponse response = msg.toResponse();
@@ -97,10 +98,8 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
                 // actual client you would start playing your favorite
                 // ring tone now.
             } else if (response.isFinal()) {
-                System.err.println("ok, final");
                 final SipRequest ack = generateAck(response);
-                System.err.println(ack);
-                event.getConnection().send(ack);
+                event.connection().send(ack);
             }
         }
 
@@ -111,8 +110,8 @@ public final class UACHandler extends SimpleChannelInboundHandler<SipMessageEven
 
         // for all requests, just generate a 200 OK response.
         if (msg.isRequest()) {
-            final SipResponse response = msg.createResponse(200);
-            event.getConnection().send(response);
+            final SipResponse response = msg.createResponse(200).build();
+            event.connection().send(response);
         }
     }
 

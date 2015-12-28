@@ -10,9 +10,9 @@ import io.pkts.packet.sip.header.RouteHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.example.netty.sip.SimpleSipStack;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
-public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     private SimpleSipStack stack;
 
@@ -25,8 +25,8 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageEv
     }
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final SipMessage msg = event.getMessage();
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
+        final SipMessage msg = event.message();
 
         try {
             if (msg.isRequest()) {
@@ -49,13 +49,13 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageEv
             // codes that really tells the story so that the UAC at least have a
             // fighting chance to figure out what it did wrong.
             e.printStackTrace();
-            final SipResponse response = msg.toRequest().createResponse(400);
-            event.getConnection().send(response);
+            final SipResponse response = msg.toRequest().createResponse(400).build();
+            event.connection().send(response);
         } catch (final Exception e) {
             // something went wrong, send a 500 back...
             e.printStackTrace();
-            final SipResponse response = msg.toRequest().createResponse(500);
-            event.getConnection().send(response);
+            final SipResponse response = msg.toRequest().createResponse(500).build();
+            event.connection().send(response);
         }
     }
 
@@ -81,10 +81,15 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageEv
      */
     private void proxyTo(final SipURI destination, final SipRequest msg) {
         final Connection connection = this.stack.connect(destination.getHost(), destination.getPort());
-        final ViaHeader via =
-                ViaHeader.with().host("127.0.0.1").port(5060).transportUDP().branch(ViaHeader.generateBranch()).build();
-        msg.addHeaderFirst(via);
-        connection.send(msg);
+        final ViaHeader via = ViaHeader.withHost("127.0.0.1")
+                .withPort(5060)
+                .withTransportUdp()
+                .withBranch(ViaHeader.generateBranch())
+                .build();
+        // msg.addHeaderFirst(via);
+
+        final SipMessage proxyMsg = msg.copy().withTopMostViaHeader(via).build();
+        connection.send(proxyMsg);
     }
 
     /**

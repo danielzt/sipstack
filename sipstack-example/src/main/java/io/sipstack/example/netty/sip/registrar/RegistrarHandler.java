@@ -11,7 +11,7 @@ import io.pkts.packet.sip.address.URI;
 import io.pkts.packet.sip.header.ContactHeader;
 import io.pkts.packet.sip.header.ExpiresHeader;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageEvent;
+import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,21 +19,21 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessageEvent> {
+public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 
     /**
      * Our "location store". Normally you would hide this behind some interface that probably
      * persist to disk, as a distributed cache but for our purposes we'll just keep it here.
      * 
      * And yes, Google Guava Table is better suited but didn't want to pull in too many
-     * dependences...
+     * dependencies...
      */
     private final Map<SipURI, List<Binding>> locationStore = new HashMap<SipURI, List<Binding>>();
 
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageEvent event) throws Exception {
-        final Connection connection = event.getConnection();
-        final SipMessage msg = event.getMessage();
+    protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEventImpl event) throws Exception {
+        final Connection connection = event.connection();
+        final SipMessage msg = event.message();
 
         if (msg.isRequest() && msg.isRegister()) {
             final SipResponse response = processRegisterRequest(msg.toRequest());
@@ -78,7 +78,7 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
         // the aor is not allowed to register under this domain
         // generate a 404 according to specfication
         if (!validateDomain(domain, aor)) {
-            return request.createResponse(404);
+            return request.createResponse(404).build();
         }
 
         final Binding.Builder builder = Binding.with();
@@ -93,11 +93,12 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
 
         final Binding binding = builder.build();
         final List<Binding> currentBindings = updateBindings(binding);
-        final SipResponse response = request.createResponse(200);
+        final SipResponse response = request.createResponse(200).build();
         currentBindings.forEach(b -> {
-            final SipURI contactURI = b.getContact();
-            contactURI.setParameter("expires", b.getExpires());
-            response.addHeader(ContactHeader.with(contactURI).build());
+            final SipURI contactURI = b.getContact().copy()
+                    .withParameter("expires", b.getExpires())
+                    .build();
+            response.addHeader(ContactHeader.withSipURI(contactURI).build());
         });
 
         return response;
@@ -187,7 +188,7 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
      */
     private SipURI getAOR(final SipRequest request) {
         final SipURI sipURI = (SipURI) request.getToHeader().getAddress().getURI();
-        return SipURI.with().user(sipURI.getUser()).host(sipURI.getHost()).build();
+        return SipURI.withUser(sipURI.getUser()).withHost(sipURI.getHost()).build();
     }
 
 }

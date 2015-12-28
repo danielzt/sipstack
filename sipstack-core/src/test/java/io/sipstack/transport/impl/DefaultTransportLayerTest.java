@@ -1,13 +1,12 @@
 package io.sipstack.transport.impl;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelOutboundHandler;
-import io.pkts.packet.sip.SipMessage;
-import io.sipstack.netty.codec.sip.*;
-import io.sipstack.netty.codec.sip.event.*;
+import io.sipstack.netty.codec.sip.Connection;
+import io.sipstack.netty.codec.sip.SipTimer;
+import io.sipstack.netty.codec.sip.event.ConnectionClosedIOEvent;
+import io.sipstack.netty.codec.sip.event.ConnectionInactiveIOEvent;
+import io.sipstack.netty.codec.sip.event.ConnectionOpenedIOEvent;
+import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.transaction.impl.MockChannel;
-import io.sipstack.transport.FlowId;
 import io.sipstack.transport.event.FlowTerminatedEvent;
 import org.hamcrest.CoreMatchers;
 import org.junit.Before;
@@ -15,7 +14,7 @@ import org.junit.Test;
 
 import java.net.InetSocketAddress;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -73,7 +72,7 @@ public class DefaultTransportLayerTest extends TransportLayerTestBase {
     public void testFlowShutsDownDueToNoInitialTraffic() throws Exception {
         final MockChannel channel = initiateNewFlow();
         assertThat(channel.hasCloseBeenCalled(), CoreMatchers.is(false));
-        defaultScheduler.fire(SipTimer.Timeout);
+        defaultScheduler.fire(SipTimer.Timeout1);
         assertThat(channel.hasCloseBeenCalled(), CoreMatchers.is(true));
     }
 

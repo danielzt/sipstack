@@ -5,8 +5,6 @@ import io.sipstack.core.SipTimerListener;
 import io.sipstack.event.SipTimerEvent;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SipTimer;
-import io.sipstack.transaction.TransactionId;
-import io.sipstack.transaction.impl.DefaultTransactionLayer;
 
 import java.time.Duration;
 import java.util.ArrayList;

@@ -76,7 +76,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
     public DefaultTransportLayer(final TransportLayerConfiguration config,
                                  final Clock clock,
                                  final InternalScheduler scheduler) {
-        this(config, clock, new DefaultFlowStorage(config), scheduler);
+        this(config, clock, new DefaultFlowStorage(config, clock), scheduler);
     }
 
     public void useNetworkLayer(final NetworkLayer network) {
@@ -209,7 +209,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
                             channelCtx.fireChannelRead(flowEvent);
                         }
                     } else {
-
+                        channelCtx.write(e);
                     }
                 });
 

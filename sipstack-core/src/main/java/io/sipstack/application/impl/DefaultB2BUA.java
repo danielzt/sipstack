@@ -107,7 +107,7 @@ public class DefaultB2BUA implements B2BUA {
             // Copy content
             builder.header(SipHeader.create("Content-Type", "application/sdp"));
             builder.header(request.getHeader("Content-Length").get());
-            builder.content(request.getRawContent());
+            builder.content(request.getContent());
 
             requestHandlers.forEach(h -> h.accept(request, builder));
 

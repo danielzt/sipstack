@@ -31,6 +31,8 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
      */
     private final Consumer<T>[] onExitActions;
 
+    private Consumer<T> alwaysAction;
+
     /**
      * Just a unique identifier for this actor and really only used for logging purposes.
      */
@@ -57,6 +59,15 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     /**
+     * Always execute the function upton every event the actor receive.
+     *
+     * @param execute
+     */
+    protected void always(final Consumer<T> execute) {
+        this.alwaysAction = execute;
+    }
+
+    /**
      * When in a particular currentState, perform the following function.
      *
      * @param state the currentState in quesiton.
@@ -66,11 +77,9 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     // TODO: playing around with guards as well.
-    /*
     protected void when(final S state, final Predicate<T> guard, final Consumer<T> execute) {
         states[state.ordinal()] = execute;
     }
-    */
 
     /**
      * When entering a particular currentState, perform the following action.
@@ -97,11 +106,16 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
         try {
             currentEvent = (T) msg;
             currentContext = ctx;
+
+            if (alwaysAction != null) {
+                alwaysAction.accept(currentEvent);
+            }
+
             if (states[currentState.ordinal()] != null) {
                 states[currentState.ordinal()].accept(currentEvent);
             } else {
                 // TODO: if we are in a state that doesn't have
-                // a behavior defined we should
+                // a behavior defined we should do what?
                 logger().warn("State \"{}\" is not defined. Message will be dropped", currentState);
             }
         } catch (final ClassCastException e) {
@@ -149,6 +163,10 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
 
     protected void logWarn(final String msg, Object ... args) {
         logger().warn("{} " + msg, this.id, args);
+    }
+
+    protected void logInfo(final String msg, Object ... args) {
+        logger().info("{} " + msg, this.id, args);
     }
 
     public final S state() {

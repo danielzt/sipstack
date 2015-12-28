@@ -40,7 +40,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     @Test(timeout = 500)
     public void testTrying() throws Exception {
         // TODO: we should send every type of request there is.
-        final SipTransactionEvent holder = initiateNewTransaction("bye");
+        initiateNewTransaction("bye");
     }
 
     /**
@@ -106,7 +106,7 @@ public class NonInviteClientTransactionActorTest extends TransactionTestBase {
     @Test(timeout = 500)
     public void testTransitionToCompletedFromProceeding() throws Exception {
         // TODO: test all combinations of provisional and all known SIP methods
-        final SipTransactionEvent holder = transitionFromTryingToProceeding("bye", 100);
+        transitionFromTryingToProceeding("bye", 100);
     }
 
     /**

@@ -1,5 +1,6 @@
 package io.sipstack.transaction.impl;
 
+import io.sipstack.ControllableClock;
 import io.sipstack.SipStackTestBase;
 import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.netty.codec.sip.Clock;
@@ -13,7 +14,7 @@ import org.junit.Before;
 public class TransactionTestBase extends SipStackTestBase {
 
     protected TransactionLayerConfiguration config;
-    protected final Clock clock = new SystemClock();
+    protected final ControllableClock clock = new ControllableClock();
 
     protected MockTransactionUser myApplication;
 
@@ -43,7 +44,7 @@ public class TransactionTestBase extends SipStackTestBase {
         myApplication = new MockTransactionUser();
 
         mockChannelContext = new MockChannelHandlerContext();
-        transports = new MockTransportLayer(mockChannelContext);
+        transports = new MockTransportLayer(mockChannelContext, clock);
 
         transactionLayer = new DefaultTransactionLayer(transports, new SystemClock(), defaultScheduler, config);
 

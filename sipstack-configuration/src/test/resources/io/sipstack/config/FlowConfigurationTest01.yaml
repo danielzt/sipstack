@@ -62,10 +62,9 @@ transport:
       # If a keep-alive probe fails, for how long do we wait until we try and send another
       # one?
       #
-      #
       # For the other modes, this setting has no meaning.
       #
-      # Also note that if you are using SIP OPTIONS ping then these settings
+      # Also note that if you are using SIP OPTIONS ping then this setting
       # do not apply because then we will follow SIP rules for transactions.
       #
       # Value is in seconds

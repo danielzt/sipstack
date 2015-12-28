@@ -49,11 +49,6 @@ public interface FlowEvent {
         throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + SipRequestBuilderFlowEvent.class.getName());
     }
 
-
-    static SipRequestBuilderFlowEvent create(final Flow flow, final SipMessage.Builder<SipRequest> builder) {
-        return new SipRequestBuilderFlowEventImpl(flow, builder);
-    }
-
     // =====================================
     // === SIP response builder flow events
     // =====================================

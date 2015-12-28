@@ -22,7 +22,7 @@ public class KeepAliveConfiguration {
     private KEEP_ALIVE_MODE mode = KEEP_ALIVE_MODE.ACTIVE;
 
     @JsonProperty
-    private Duration idleTimeout = Duration.ofSeconds(120);
+    private Duration idleTimeout = Duration.ofSeconds(20);
 
     @JsonProperty
     private int maxFailed = 3;
@@ -57,7 +57,6 @@ public class KeepAliveConfiguration {
                 throw new IllegalArgumentException("unknown transport");
         }
     }
-
 
     public KeepAliveMethodConfiguration getUdpKeepAliveMethodConfiguratioh() {
         return udp;

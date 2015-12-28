@@ -5,6 +5,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandler;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.address.SipURI;
+import io.sipstack.ControllableClock;
 import io.sipstack.MockChannelHandlerContext;
 import io.sipstack.MockScheduler;
 import io.sipstack.SipStackTestBase;
@@ -34,7 +35,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
  */
 public class TransportLayerTestBase extends SipStackTestBase {
 
-    protected Clock defaultClock;
+    protected ControllableClock defaultClock;
 
     protected DefaultTransportLayer transportLayer;
 
@@ -60,7 +61,7 @@ public class TransportLayerTestBase extends SipStackTestBase {
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        defaultClock = new SystemClock();
+        defaultClock = new ControllableClock();
 
         final TransportLayerConfiguration config = new TransportLayerConfiguration();
         config.getFlow().setDefaultStorageSize(100);
@@ -69,7 +70,7 @@ public class TransportLayerTestBase extends SipStackTestBase {
 
     public void reset(final TransportLayerConfiguration config) {
         defaultScheduler = new MockScheduler(new CountDownLatch(1));
-        defaultFlowStorage = new DefaultFlowStorage(config);
+        defaultFlowStorage = new DefaultFlowStorage(config, defaultClock);
         transportLayer = createTransportLayer(config);
         defaultChannelCtx = new MockChannelHandlerContext(transportLayer);
     }
@@ -136,10 +137,6 @@ public class TransportLayerTestBase extends SipStackTestBase {
             transportLayer.userEventTriggered(defaultChannelCtx, event);
             assertTimerScheduled(SipTimer.Timeout1);
         }
-
-        // The timer called "Timeout" is used as the life-time timer for the
-        // flow and will always be scheduled.
-        assertTimerScheduled(SipTimer.Timeout);
 
         assertFlowExists(connection);
 

@@ -13,6 +13,8 @@ import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.netty.codec.sip.event.SipRequestBuilderIOEvent;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.event.FlowEvent;
+import io.sipstack.transport.event.SipRequestBuilderFlowEvent;
+import io.sipstack.transport.event.SipResponseBuilderFlowEvent;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Before;
@@ -167,7 +169,8 @@ public abstract class FlowOutboundTrafficTest extends TransportLayerTestBase {
         final Connection connection = (Connection)objects[0];
         final Flow flow = (Flow) objects[1];
 
-        final FlowEvent event = FlowEvent.create(flow, builder);
+        final FlowEvent event = builder.isSipRequestBuilder() ? SipRequestBuilderFlowEvent.create(flow, builder.toSipRequestBuilder()) :
+                SipResponseBuilderFlowEvent.create(flow, builder.toSipResponseBuilder());
         transportLayer.write(defaultChannelCtx, event, null);
         final SipRequestBuilderIOEvent builderEvent =
                 defaultChannelCtx.findWrittenMessageByType(SipRequestBuilderIOEvent.class);

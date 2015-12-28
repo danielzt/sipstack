@@ -7,6 +7,7 @@ import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.config.FlowConfiguration;
 import io.sipstack.config.TransportLayerConfiguration;
+import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transport.Flow;
@@ -38,14 +39,16 @@ public class MockTransportLayer implements TransportLayer {
 
     private final ChannelHandlerContext ctx;
     private ChannelOutboundHandler handler;
+    private Clock clock;
 
     /**
      *
      * @param ctx
      * @param topOfPipeLine
      */
-    public MockTransportLayer(final ChannelHandlerContext ctx) {
+    public MockTransportLayer(final ChannelHandlerContext ctx, final Clock clock) {
         this.ctx = ctx;
+        this.clock = clock;
     }
 
     public void setChannelOutboundHandler(final ChannelOutboundHandler handler) {
@@ -86,7 +89,7 @@ public class MockTransportLayer implements TransportLayer {
     @Override
     public Flow.Builder createFlow(final String host) throws IllegalArgumentException {
         PreConditions.ensureNotEmpty(host, "Host cannot be empty");
-        return new MockFlowBuilder(ctx, handler, host);
+        return new MockFlowBuilder(ctx, handler, host, clock);
     }
 
     /**
@@ -106,11 +109,16 @@ public class MockTransportLayer implements TransportLayer {
         private String host;
         private int port;
         private Transport transport;
+        private final Clock clock;
 
-        private MockFlowBuilder(final ChannelHandlerContext ctx, final ChannelOutboundHandler handler, final String host) {
+        private MockFlowBuilder(final ChannelHandlerContext ctx,
+                                final ChannelOutboundHandler handler,
+                                final String host,
+                                final Clock clock) {
             this.ctx = ctx;
             this.handler = handler;
             this.host = host;
+            this.clock = clock;
         }
 
         @Override
@@ -158,7 +166,7 @@ public class MockTransportLayer implements TransportLayer {
 
             final MockChannelFuture mockFuture = new MockChannelFuture(channel);
             final TransportLayerConfiguration config = new TransportLayerConfiguration();
-            final FlowStorage flowStorage = new DefaultFlowStorage(config);
+            final FlowStorage flowStorage = new DefaultFlowStorage(config, clock);
             final FlowFutureImpl flowFuture = new FlowFutureImpl(flowStorage, mockFuture, onSuccess, onFailure, onCancelled);
 
             // this will cause the future to call the callback right away because

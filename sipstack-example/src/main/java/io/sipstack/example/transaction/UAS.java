@@ -5,10 +5,14 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipResponse;
+import io.sipstack.actor.HashWheelScheduler;
+import io.sipstack.actor.InternalScheduler;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.net.NettyNetworkLayer;
 import io.sipstack.net.NetworkLayer;
+import io.sipstack.netty.codec.sip.Clock;
+import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.event.TransactionEvent;
 import io.sipstack.transaction.impl.DefaultTransactionLayer;
@@ -60,6 +64,8 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
         final SipConfiguration sipConfig = new SipConfiguration();
 
         // configure a listening address. Both udp and tcp...
+        // again, normally you would define this in your configuration
+        // file so there would be no need to do this programmatically
         sipConfig.listen(ip, port, Transport.udp, Transport.tcp);
 
         // Somewhat silly since we just configured it but grab the configured
@@ -73,17 +79,24 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
         // you will see that it will actually also insert the netty handler for framing
         // and parsing the incoming byte streams...
 
+        // The transport and transaction layers both need a scheduler so that they
+        // can schedule events and everything in sipstack.io is using the clock
+        // interface for getting the current time (easier to unit test that way)
+        // so create those and pass them in...
+        final InternalScheduler scheduler = new HashWheelScheduler();
+        final Clock clock = new SystemClock();
+
         // Any SIP stack really needs a transport layer, which is responsible
         // for maintaining connections etc. This layer MUST be the first one
         // in our netty handler chain.
-        final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport(), null, null);
+        final DefaultTransportLayer transportLayer = new DefaultTransportLayer(sipConfig.getTransport(), clock, scheduler);
         networkBuilder.withHandler("transport-layer", transportLayer);
 
         // The transaction layer is responsible for transaction
         // management and is typically always present in a SIP stack.
         // This layer MUST come after the Transport Layer but BEFORE
         // the application layer, which is the one we will build.
-        final DefaultTransactionLayer transactionLayer = new DefaultTransactionLayer(transportLayer, sipConfig.getTransaction());
+        final DefaultTransactionLayer transactionLayer = new DefaultTransactionLayer(transportLayer, clock, scheduler, sipConfig.getTransaction());
         networkBuilder.withHandler("transaction-layer", transactionLayer);
 
         // Finally, add your own Netty handler to the chain, which must be the last
@@ -93,9 +106,10 @@ public class UAS extends SimpleChannelInboundHandler<TransactionEvent> {
         // Build the network
         final NettyNetworkLayer server = networkBuilder.build();
 
-        // catch 22. The transport layers needs a reference to the network layer
+        // catch 22. The transport layer needs a reference to the network layer
         // and the network layer needs transport layer to be part of the
-        // netty chain.
+        // netty chain. Not pretty but couldn't figure out a better way
+        // but if you do, please let me know!
         transportLayer.useNetworkLayer(server);
 
         return server;

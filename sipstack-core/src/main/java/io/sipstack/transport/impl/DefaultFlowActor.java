@@ -1,20 +1,19 @@
 package io.sipstack.transport.impl;
 
 import io.pkts.buffer.Buffer;
-import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.address.Address;
 import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.header.FromHeader;
 import io.pkts.packet.sip.header.ToHeader;
-import io.pkts.packet.sip.impl.SipMessageBuilder;
 import io.sipstack.actor.ActorSupport;
 import io.sipstack.actor.Cancellable;
 import io.sipstack.config.FlowConfiguration;
 import io.sipstack.config.KeepAliveMethodConfiguration;
 import io.sipstack.config.SipOptionsPingConfiguration;
 import io.sipstack.config.TransportLayerConfiguration;
+import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipTimer;
 import io.sipstack.netty.codec.sip.event.*;
@@ -22,7 +21,6 @@ import io.sipstack.transaction.TransactionId;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowId;
 import io.sipstack.transport.FlowState;
-import io.sipstack.transport.event.FlowEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +44,14 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
     private final TransportLayerConfiguration transportLayerConfiguration;
 
     private final Connection connection;
+
+    /**
+     * The time when the last message was processed and is used for
+     * keeping track of whether e.g. a PING is necessary to send out.
+     */
+    private long lastMessageProcessed;
+
+    private final Clock clock;
 
     /**
      * If we are using SIP OPTIONS as a ping mechanism, we need to save
@@ -81,15 +87,21 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
      */
     private Optional<Cancellable> timeoutTimer = Optional.empty();
 
-    protected DefaultFlowActor(final TransportLayerConfiguration transportConfig, final FlowId flowId, final Connection connection) {
+    protected DefaultFlowActor(final TransportLayerConfiguration transportConfig,
+                               final FlowId flowId,
+                               final Connection connection,
+                               final Clock clock) {
         super(connection.id().toString(), FlowState.INIT, FlowState.CLOSED, FlowState.values());
         this.transportLayerConfiguration = transportConfig;
         this.config = transportConfig.getFlow();
         this.connection = connection;
         this.flowId = flowId;
+        this.clock = clock;
 
         this.keepAliveMethodConfig =
                 config.getKeepAliveConfiguration().getKeepAliveMethodConfiguration(connection.getTransport());
+
+        always(this::alwaysExecute);
 
         when(FlowState.INIT, this::onInit);
 
@@ -100,6 +112,9 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
         onEnter(FlowState.ACTIVE, this::onEnterActive);
         when(FlowState.ACTIVE, this::onActive);
         onExit(FlowState.ACTIVE, this::onExitActive);
+
+        // Using guards we could just write this
+        // when(FlowState.ACTIVE, e -> e.isSipTimerTimeout2(), this::onSipTimerTimeout2InActive);
 
         // Setup the PING state only if we are in active ping mode.
         // Which type of ping we will do is also dependent on configuration
@@ -127,11 +142,26 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
     }
 
     // =====================
+    // === Always execute the following for all events
+    // =====================
+    private void alwaysExecute(final IOEvent event) {
+        if (event.isSipMessageIOEvent() || event.isSipMessageBuilderIOEvent()) {
+            this.lastMessageProcessed = clock.getCurrentTimeMillis();
+        }
+    }
+
+    // =====================
     // === Init State
     // =====================
 
     private void onInit(final IOEvent event) {
-        lifeTimeTimer = Optional.of(ctx().scheduler().schedule(SipTimer.Timeout, config.getTimeout()));
+
+        // if we are not in active ping mode we need to schedule the max lifetime
+        // timer of the flow.
+        if (!config.isPingModeActive()) {
+            lifeTimeTimer = Optional.of(ctx().scheduler().schedule(SipTimer.Timeout, config.getTimeout()));
+        }
+
         if (event.isSipMessageIOEvent()) {
             processSipMessageEvent(event.toSipMessageIOEvent());
             become(FlowState.ACTIVE, "SIP message received");
@@ -245,20 +275,37 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
             become(FlowState.PING);
         } else if (event.isPongMessageIOEvent()) {
             // just consume
-        } else if (event.isSipTimerEvent()) {
-            final SipTimerEvent timerEvent = event.toSipTimerEvent();
-            if (timerEvent.isSipTimerTimeout()) {
-                // TODO
-                System.err.println("The  life-time timer fired, need to check when the last message was received...");
-            } else if (timerEvent.isSipTimerTimeout2()) {
-                become(FlowState.PING, "Idle timer fired");
-            }
+        } else if (event.isSipTimerTimeout()) {
+            onFlowLifeTimeTimerTimeout(event);
+        } else if (event.isSipTimerTimeout2()) {
+            onSipTimerTimeout2InActive(event);
         } else {
             unhandled(event);
         }
 
         // TODO: need some close event. Probably should add that to the Flow itself.
         // something like flow.kill()
+    }
+
+    private void onFlowLifeTimeTimerTimeout(final IOEvent event) {
+        final Duration duration = this.config.getTimeout();
+        final long diffInSeconds = (clock.getCurrentTimeMillis() - lastMessageProcessed) / 1000;
+        final Duration diff = duration.minusSeconds(diffInSeconds);
+        if (diff.isNegative() || diff.isZero()) {
+            become(FlowState.CLOSING, "No traffic received in " + diffInSeconds + " seconds. Closing flow");
+        } else {
+            ctx().scheduler().schedule(SipTimer.Timeout, diff);
+        }
+    }
+
+    private void onSipTimerTimeout2InActive(final IOEvent event) {
+        final Duration duration = this.config.getKeepAliveConfiguration().getIdleTimeout();
+        final Duration diff = duration.minusMillis(clock.getCurrentTimeMillis() - lastMessageProcessed);
+        if (diff.isNegative() || diff.isZero()) {
+            become(FlowState.PING, "Idle timer fired");
+        } else {
+            ctx().scheduler().schedule(SipTimer.Timeout2, diff);
+        }
     }
 
     /**
@@ -343,6 +390,7 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
     // === When we use SIP OPTIONS as ping
     // ============================================
     private void onEnterSipOptionsPing(final IOEvent event) {
+        timeoutTimer = Optional.of(ctx().scheduler().schedule(SipTimer.Timeout3, Duration.ofMillis(500)));
         if (config.getKeepAliveConfiguration().getEnforcePong()) {
             // we are essentially re-inventing a basic transaction here
             // and the reason for not using an actual transaction is that
@@ -351,7 +399,6 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
             // because we don't enforce the pong, in which case we cannot use a
             // transaction.
             // TODO: need to use the regular T1 values etc.
-            timeoutTimer = Optional.of(ctx().scheduler().schedule(SipTimer.Timeout3, Duration.ofMillis(500)));
         }
 
         final SipURI target = getSipOptionsTarget();
@@ -391,7 +438,11 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
                 become(FlowState.ACTIVE, "Data received over the flow");
                 ctx().forward(event);
             }
+        } else if (event.isSipTimerTimeout3()) {
+            System.err.println("Man, no pong and nothing else has been received...");
+            // TODO: schedule the timer again and back off.
         }
+
     }
 
     private boolean isOutstandingSipOptionsPong(final SipMessageIOEvent event) {

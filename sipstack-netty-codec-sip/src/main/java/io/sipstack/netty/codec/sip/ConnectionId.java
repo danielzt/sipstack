@@ -137,6 +137,7 @@ public interface ConnectionId {
         private final String encodedAsString;
         private final Buffer encodedAsBuffer;
         private final int hashCode;
+        private final String humanReadableString;
 
         private IPv4ConnectionId(final Transport protocol, final byte[] localIp, final int localPort,
                 final byte[] remoteIp, final int remotePort) {
@@ -149,6 +150,12 @@ public interface ConnectionId {
             this.hashCode = calculateHashCode();
             this.encodedAsString = encodeConnection();
             this.encodedAsBuffer = Buffers.wrap(encodedAsString);
+            final StringBuilder sb = new StringBuilder(convertToStringIP(localIp));
+            sb.append(":").append(localPort);
+            sb.append(":").append(protocol);
+            sb.append(":").append(convertToStringIP(remoteIp));
+            sb.append(":").append(remotePort);
+            this.humanReadableString = sb.toString();
         }
 
         @Override
@@ -165,6 +172,11 @@ public interface ConnectionId {
             result = prime * result + Arrays.hashCode(this.remoteIp);
             result = prime * result + this.remotePort;
             return result;
+        }
+
+        @Override
+        public String toString() {
+            return this.humanReadableString;
         }
 
         @Override

@@ -40,7 +40,7 @@ public class InviteClientTransactionActorTest extends TransactionTestBase {
      */
     @Test
     public void testSendAckOn200() throws Exception {
-        final SipTransactionEvent event = initiateTransition(200);
+        initiateTransition(200);
         transports.assertAndConsumeRequest("ack");
     }
 

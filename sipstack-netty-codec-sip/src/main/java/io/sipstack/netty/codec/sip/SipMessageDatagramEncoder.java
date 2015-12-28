@@ -17,13 +17,18 @@ public class SipMessageDatagramEncoder extends MessageToMessageEncoder<IOEvent> 
 
     @Override
     protected void encode(final ChannelHandlerContext ctx, final IOEvent event, final List<Object> out) throws Exception {
-        System.err.println("SipMessageDatagramEncoder");
         final Connection connection = event.connection();
 
         if (event.isSipMessageIOEvent()) {
             final SipMessage msg = event.toSipMessageIOEvent().message();
             final DatagramPacket pkt = new DatagramPacket(Utils.toByteBuf(ctx.channel(), msg), connection.getRemoteAddress());
             out.add(pkt);
+        } else if (event.isSipMessageBuilderIOEvent()) {
+            System.err.println("Builder event, building...");
+            final SipMessage msg = event.toSipMessageBuilderIOEvent().getBuilder().build();
+            final DatagramPacket pkt = new DatagramPacket(Utils.toByteBuf(ctx.channel(), msg), connection.getRemoteAddress());
+            out.add(pkt);
         }
     }
+
 }

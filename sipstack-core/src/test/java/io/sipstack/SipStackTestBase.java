@@ -25,6 +25,7 @@ import org.junit.Before;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -218,12 +219,20 @@ public class SipStackTestBase {
      * @return the cancellable that we just asserted actually exists and is correct.
      */
     public MockCancellable assertTimerScheduled(final SipTimer timer) throws InterruptedException {
+        return assertTimerScheduled(timer, null);
+    }
+
+    public MockCancellable assertTimerScheduled(final SipTimer timer, final Duration delay) throws InterruptedException {
         defaultScheduler.latch.await(2, TimeUnit.SECONDS);
         final Optional<MockCancellable> cancellable = defaultScheduler.isScheduled(timer);
         if (!cancellable.isPresent()) {
             fail("No timer " + timer + " scheduled");
         }
-        return cancellable.get();
+        final MockCancellable t = cancellable.get();
+        if (delay != null) {
+            assertThat(t.delay, is(delay));
+        }
+        return t;
     }
 
     public MockCancellable assertTimerCancelled(final SipTimer timer) throws InterruptedException {

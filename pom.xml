@@ -73,6 +73,7 @@
     <module>sipstack-io.sipstack.transaction.transaction</module>
 -->
     <module>sipstack-example</module>
+    <module>sipstack-example-proxy</module>
   </modules>
 
   <dependencyManagement>

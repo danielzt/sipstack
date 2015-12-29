@@ -10,7 +10,10 @@ import io.pkts.packet.sip.header.RouteHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.example.netty.sip.SimpleSipStack;
 import io.sipstack.netty.codec.sip.Connection;
+import io.sipstack.netty.codec.sip.UdpConnection;
 import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;
+
+import java.net.InetSocketAddress;
 
 public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageIOEventImpl> {
 

@@ -108,6 +108,16 @@ public class MockChannel implements Channel {
     }
 
     @Override
+    public long bytesBeforeUnwritable() {
+        return 0;
+    }
+
+    @Override
+    public long bytesBeforeWritable() {
+        return 0;
+    }
+
+    @Override
     public Unsafe unsafe() {
         return null;
     }

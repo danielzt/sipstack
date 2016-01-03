@@ -152,6 +152,11 @@ public class MockConnection implements Connection {
     }
 
     @Override
+    public final Buffer getRemoteIpAddressAsBuffer() {
+        return Buffers.wrap(getRemoteIpAddress());
+    }
+
+    @Override
     public Transport getTransport() {
         return id.getProtocol();
     }

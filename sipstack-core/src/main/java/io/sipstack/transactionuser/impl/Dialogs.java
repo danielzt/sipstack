@@ -169,7 +169,7 @@ public class Dialogs {
             final ViaHeader via = ViaHeader
                     .withHost(LOCAL_HOST)
                     .withPort(5060)
-                    .withTransportUdp()
+                    .withTransportUDP()
                     .withBranch(ViaHeader.generateBranch())
                     .build();
             request.addHeaderFirst(via);

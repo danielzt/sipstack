@@ -1,34 +1,42 @@
-package io.sipstack.example.proxy.simple001;
+package io.sipstack.example.proxy.simple002;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
 import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.header.RouteHeader;
 import io.pkts.packet.sip.header.ViaHeader;
-import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.SipMessageDatagramDecoder;
-import io.sipstack.netty.codec.sip.SipMessageDatagramEncoder;
-import io.sipstack.netty.codec.sip.UdpConnection;
+import io.sipstack.netty.codec.sip.*;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.netty.codec.sip.event.SipMessageIOEvent;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This is a very simple proxy example written on top of the raw
  * netty + pkts.io support as exposed through sipstack.io.
+ *
+ * The main difference between this proxy example and the proxy 001
+ * example is that we are now also listening to TCP and as such, we
+ * actually have to pay attention to which protocol we are supposed
+ * to use when we proxy to the next destination.
  *
  * @author jonas@jonasborjesson.com
  */
@@ -38,6 +46,8 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
     private final SimpleProxyConfiguration config;
 
     private Channel udpChannel;
+
+    private Channel tcpChannel;
 
     public Proxy(final SimpleProxyConfiguration config) {
         this.config = config;
@@ -53,6 +63,10 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
      */
     public void setUdpChannel(final Channel udpChannel) {
         this.udpChannel = udpChannel;
+    }
+
+    public void setTcpChannel(final Channel tcpChannel) {
+        this.tcpChannel = tcpChannel;
     }
 
     /**
@@ -73,24 +87,30 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
         return new UdpConnection(udpChannel, remoteAddress);
     }
 
+    private final Map<ConnectionId, Connection> connections = new ConcurrentHashMap<>();
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEvent event) throws Exception {
+        final Connection connection = event.connection();
+        if (connection.isTCP()) {
+            connections.put(connection.id(), connection);
+        }
+
         final SipMessage msg = event.message();
 
         if (msg.isRequest()) {
             final SipURI next = getNextHop(msg.toRequest());
-            proxyTo(next, msg.toRequest());
+            proxyTo(next, connection, msg.toRequest());
         } else {
             // Responses follow via headers to just pop the top-most via header
             // and then use the information found in the second via.
             // Of course, in a real stack we should check that the top-most via
             // actually pointed to us but this is a simple example so we'll continue
             // to live in happy land...
+            final ConnectionId connectionId = ConnectionId.decode(msg.getViaHeader().getParameter("connection"));
+            final Connection outboundConnection = connections.get(connectionId);
             final SipResponse response = msg.toResponse().copy().withPoppedVia().build();
-            final ViaHeader via = response.getViaHeader();
-            final Connection connection = connect(via.getHost(), via.getPort());
-            connection.send(IOEvent.create(connection, response));
+            outboundConnection.send(IOEvent.create(outboundConnection, response));
         }
     }
 
@@ -100,10 +120,13 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
      * for responses to find their way back the exact same path as the request took.
      *
      * @param destination
+     * @param connection the connection over which we received the sip message.
+     *                   We need this connection to stamp the correct information
+     *                   in the Via-header that came in across
      * @param msg
      */
-    private void proxyTo(final SipURI destination, final SipRequest msg) {
-        final Connection connection = connect(destination.getHost(), destination.getPort());
+    private void proxyTo(final SipURI destination, final Connection connection, final SipRequest msg) {
+        final Connection outboundConnection = connect(destination.getHost(), destination.getPort());
 
         // Create a new Via-header that points back to us
         final ViaHeader via = ViaHeader.withHost(config.getListenAddress())
@@ -111,12 +134,18 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
                 .withTransportUDP()
                 .withBranch()
                 .withRPortFlag()
+                .withParameter(Buffers.wrap("connection"), connection.id().encode())
                 .build();
 
         // Create the proxy request, where we will add our Via-header
         // as well as decrement the Max-Forwards header.
         final SipMessage proxyMsg = msg.copy()
                 .withTopMostViaHeader(via)
+                .onViaHeader((index, v) -> {
+                    if (index == 1) {
+                        v.withReceived(connection.getRemoteIpAddressAsBuffer()).withRPort(connection.getRemotePort());
+                    }
+                })
                 .onMaxForwardsHeader(max -> max.decrement())
                 .build();
 
@@ -128,7 +157,7 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
         // But, again, this is an example of how to use the most low-level
         // support from sipstack.io to get a SIP Proxy going so it is
         // what it is...
-        connection.send(IOEvent.create(connection, proxyMsg));
+        outboundConnection.send(IOEvent.create(outboundConnection, proxyMsg));
     }
 
     /**
@@ -187,6 +216,7 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
 
         final Proxy proxy = new Proxy(config);
 
+        // Create the UDP listening point
         final EventLoopGroup udpGroup = new NioEventLoopGroup();
         final Bootstrap b = new Bootstrap();
         b.group(udpGroup)
@@ -201,8 +231,30 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
                     }
                 });
 
+        final ServerBootstrap serverBootstrap = new ServerBootstrap();
+        final EventLoopGroup bossGroup = new NioEventLoopGroup();
+        final EventLoopGroup workerGroup = new NioEventLoopGroup();
+
+        serverBootstrap.group(bossGroup, workerGroup)
+                .channel(NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    public void initChannel(final SocketChannel ch) throws Exception {
+                        final ChannelPipeline pipeline = ch.pipeline();
+                        pipeline.addLast("decoder", new SipMessageStreamDecoder());
+                        pipeline.addLast("encoder", new SipMessageStreamEncoder());
+                        pipeline.addLast("handler", proxy);
+                    }
+                })
+                .option(ChannelOption.SO_BACKLOG, 128)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
+                .childOption(ChannelOption.SO_KEEPALIVE, true)
+                .childOption(ChannelOption.TCP_NODELAY, true);
+
         final InetSocketAddress socketAddress = new InetSocketAddress(config.getListenAddress(), config.getListenPort());
         final Channel udpChannel = b.bind(socketAddress).sync().channel();
+        final Channel tcpChannel = serverBootstrap.bind(socketAddress).sync().channel();
+        proxy.setTcpChannel(tcpChannel);
         proxy.setUdpChannel(udpChannel);
         udpChannel.closeFuture().await();
     }

@@ -160,7 +160,7 @@ public final class ProxyRegistrarHandler extends SimpleChannelInboundHandler<Sip
         myBranch.write((byte) 'a');
         myBranch.write((byte) 'b');
         myBranch.write((byte) 'c');
-        final ViaHeader via = ViaHeader.withHost("10.0.1.28").withPort(5060).withTransportUdp().withBranch(myBranch).build();
+        final ViaHeader via = ViaHeader.withHost("10.0.1.28").withPort(5060).withTransportUDP().withBranch(myBranch).build();
 
         // This is how you should generate the branch parameter if you are a stateful proxy:
         // Note the ViaHeader.generateBranch()...

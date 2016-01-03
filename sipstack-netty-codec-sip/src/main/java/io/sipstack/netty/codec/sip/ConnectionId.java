@@ -5,10 +5,12 @@ package io.sipstack.netty.codec.sip;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
+import io.pkts.packet.sip.impl.PreConditions;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 
+import static io.pkts.packet.sip.impl.PreConditions.ensureNotEmpty;
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 /**
@@ -75,6 +77,10 @@ public interface ConnectionId {
         return new IPv4ConnectionId(transport, rawLocal, localPort, rawRemote, remotePort);
     }
 
+    static ConnectionId decode(final Buffer encoded) {
+        ensureNotEmpty(encoded, "Unable to decode null or empty buffer to a ConnectionId");
+        return decode(encoded.toString());
+    }
 
     static ConnectionId decode(final String encoded) {
         final byte[] decoded = new byte[encoded.length() / 2];

@@ -20,8 +20,6 @@ public final class UdpConnection extends AbstractConnection {
         super(Transport.udp, channel, remoteAddress, null);
     }
 
-
-
     @Override
     public int getDefaultPort() {
         return 5060;

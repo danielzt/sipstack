@@ -14,9 +14,11 @@ public class SipMessageStreamEncoder extends MessageToByteEncoder<IOEvent> {
 
     @Override
     protected void encode(final ChannelHandlerContext ctx, final IOEvent msg, final ByteBuf out) throws Exception {
-        System.err.println("yeah???");
         if (msg.isSipMessageIOEvent()) {
-            out.writeBytes(msg.toSipMessageIOEvent().message().toBuffer().getArray());
+            // TODO: dont do this. It will copy the buffer again...
+            final byte[] data = msg.toSipMessageIOEvent().message().toBuffer().getArray();
+            out.writeBytes(data);
+            // ctx.flush();
         }
     }
 }

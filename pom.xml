@@ -46,8 +46,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <args4j.version>2.0.29</args4j.version> 
-    <netty.version>4.1.0.Beta5</netty.version> 
-    <pkts.version>1.0.6-SNAPSHOT</pkts.version> 
+    <netty.version>4.1.0.Beta8</netty.version> 
+    <pkts.version>2.0.3-SNAPSHOT</pkts.version>
     <sl4j.version>1.7.7</sl4j.version> 
     <logback.version>1.1.2</logback.version> 
     <log4j.version>1.2.14</log4j.version> 

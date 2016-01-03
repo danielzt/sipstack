@@ -86,7 +86,7 @@ public final class ProxyHandler extends SimpleChannelInboundHandler<SipMessageIO
         final Connection connection = this.stack.connect(destination.getHost(), destination.getPort());
         final ViaHeader via = ViaHeader.withHost("127.0.0.1")
                 .withPort(5060)
-                .withTransportUdp()
+                .withTransportUDP()
                 .withBranch(ViaHeader.generateBranch())
                 .build();
         // msg.addHeaderFirst(via);

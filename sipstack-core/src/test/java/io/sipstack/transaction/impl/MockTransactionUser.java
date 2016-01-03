@@ -126,7 +126,7 @@ public class MockTransactionUser implements TransactionUser {
             final ViaHeader via = ViaHeader
                     .withHost("127.0.0.1")
                     .withPort(5099)
-                    .withTransportUdp()
+                    .withTransportUDP()
                     .withBranch(ViaHeader.generateBranch())
                     .build();
 

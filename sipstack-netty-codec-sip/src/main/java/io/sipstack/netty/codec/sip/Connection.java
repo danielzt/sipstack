@@ -103,6 +103,8 @@ public interface Connection {
      */
     String getRemoteIpAddress();
 
+    Buffer getRemoteIpAddressAsBuffer();
+
     Transport getTransport();
 
     /**

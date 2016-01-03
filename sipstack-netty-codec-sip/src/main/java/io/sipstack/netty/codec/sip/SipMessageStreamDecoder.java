@@ -5,23 +5,32 @@ package io.sipstack.netty.codec.sip;
 
 import gov.nist.javax.sip.address.SipUri;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.pkts.buffer.Buffer;
+import io.pkts.buffer.Buffers;
+import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.SipInitialLine;
+import io.pkts.packet.sip.impl.SipMessageStreamBuilder;
+import io.pkts.packet.sip.impl.SipMessageStreamBuilder.Configuration;
+import io.pkts.packet.sip.impl.SipMessageStreamBuilder.DefaultConfiguration;
 import io.sipstack.netty.codec.sip.event.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 /**
- * @author jonas
- * 
+ * NOTE! This is NOT a sharable class because it is very much stateful and
+ * as such we need a new one for every new pipeline.
+ *
+ * @author jonas@jonasborjesson.com
  */
 public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
@@ -48,6 +57,8 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     private RawMessage message;
 
+    private SipMessageStreamBuilder messageBuilder;
+
     public SipMessageStreamDecoder() {
         this(new SystemClock(), null);
     }
@@ -61,7 +72,8 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
     public SipMessageStreamDecoder(final Clock clock, final SipURI vipAddress) {
         this.clock = clock;
         this.vipAddress = vipAddress;
-        reset();
+        final Configuration config = new DefaultConfiguration();
+        messageBuilder = new SipMessageStreamBuilder(config);
     }
 
     @Override
@@ -71,7 +83,6 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     @Override
     public void channelRegistered(final ChannelHandlerContext ctx) throws Exception {
-        System.err.println("registered");
         ctx.fireUserEventTriggered(create(ctx, ConnectionOpenedIOEvent::create));
     }
 
@@ -80,7 +91,6 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
-        System.err.println("un-registered");
         ctx.fireUserEventTriggered(create(ctx, ConnectionClosedIOEvent::create));
     }
 
@@ -89,7 +99,6 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelActive(final ChannelHandlerContext ctx) throws Exception {
-        System.err.println("active");
         ctx.fireUserEventTriggered(create(ctx, ConnectionActiveIOEvent::create));
     }
 
@@ -98,7 +107,6 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
-        System.err.println("in-active");
         ctx.fireUserEventTriggered(create(ctx, ConnectionInactiveIOEvent::create));
     }
 
@@ -108,6 +116,12 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
     @Override
     public void channelWritabilityChanged(final ChannelHandlerContext ctx) throws Exception {
         // just consume the event
+    }
+
+    @Override
+    public void channelReadComplete(final ChannelHandlerContext ctx) throws Exception {
+        // System.err.println("Done reading in the UDP decoder");
+        // ctx.flush();
     }
 
     private ConnectionIOEvent create(final ChannelHandlerContext ctx, final BiFunction<Connection, Long, ConnectionIOEvent> f) {
@@ -120,20 +134,55 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
     @Override
     protected void decode(final ChannelHandlerContext ctx, final ByteBuf buffer, final List<Object> out)
             throws Exception {
-        try {
-            while (!this.message.isComplete() && buffer.isReadable()) {
-                final byte b = buffer.readByte();
-                this.message.write(b);
-            }
-        } catch (final MaxMessageSizeExceededException e) {
-            dropConnection(ctx, e.getMessage());
+
+        // final long ts = System.currentTimeMillis();
+        final int availableBytes = buffer.readableBytes();
+        final byte[] data = new byte[availableBytes];
+        buffer.readBytes(data);
+
+        // final int bytesToCopy = Math.min(availableBytes, messageBuilder.getWritableBytes());
+        // buffer.readBytes(array, messageBuilder.getWriterIndex(), bytesToCopy);
+
+        // if (messageBuilder.processNewData(bytesToCopy)) {
+        if (messageBuilder.process(data)) {
+            final SipMessage sipMessage = messageBuilder.build();
+            final long arrivalTime = this.clock.getCurrentTimeMillis();
+            // System.err.println("Processing timer for TCP message: " + (arrivalTime - ts));
+            // System.err.println("This is what we decoded");
+            // System.err.print(sipMessage);
+            // System.err.println("<------");
+            final Channel channel = ctx.channel();
+            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
+            final SipMessageIOEvent msg = IOEvent.create(connection, sipMessage);
+            out.add(msg);
+        } else {
+            System.out.println("AHHHHHH I couldn't parse it completely, which seems odd...");
+        }
+
+        if (messageBuilder.hasUnprocessData() && messageBuilder.process()) {
+            // System.err.println("Guess we have more stuff on the line...");
+            final SipMessage sipMessage = messageBuilder.build();
+            // System.err.println("This is what we decoded the second time around");
+            // System.err.print(sipMessage);
+            // System.err.println("<------");
+            final Channel channel = ctx.channel();
+            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
+            final SipMessageIOEvent msg = IOEvent.create(connection, sipMessage);
+            out.add(msg);
+        }
+
+        // buffer.readerIndex(buffer.readerIndex() + buf.getReaderIndex());
+
+        // } catch (final MaxMessageSizeExceededException e) {
+            // dropConnection(ctx, e.getMessage());
             // TODO: mark this connection as dead since the future
             // for closing this decoder may take a while to actually
             // do its job
-        } catch (final IOException e) {
-            e.printStackTrace();
-        }
+        // } catch (final IOException e) {
+            // e.printStackTrace();
+        // }
 
+        /*
         if (this.message.isComplete()) {
             final long arrivalTime = this.clock.getCurrentTimeMillis();
             final Channel channel = ctx.channel();
@@ -142,31 +191,10 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
             out.add(msg);
             reset();
         }
-    }
-
-    private SipMessageIOEvent toSipMessageIOEvent(final Connection connection, final RawMessage raw) {
-        if (true) {
-            throw new RuntimeException("Need to redo this now with the immutable way of doing things");
-        }
-        final SipInitialLine initialLine = SipInitialLine.parse(raw.getInitialLine());
-        final Buffer headers = raw.getHeaders();
-        final Buffer payload = raw.getPayload();
-        if (initialLine.isRequestLine()) {
-            // final SipRequest request = new SipRequestImpl((SipRequestLine) initialLine, headers, payload);
-            // return IOEvent.create(connection, request);
-        } else {
-            // final SipResponse response = new SipResponseImpl((SipResponseLine) initialLine, headers, payload);
-            // return IOEvent.create(connection, response);
-        }
-        return null;
+        */
     }
 
     private void dropConnection(final ChannelHandlerContext ctx, final String reason) {
-    }
-
-    private void reset() {
-        this.message = new RawMessage(MAX_ALLOWED_INITIAL_LINE_SIZE, MAX_ALLOWED_HEADERS_SIZE,
-                MAX_ALLOWED_CONTENT_LENGTH);
     }
 
 }

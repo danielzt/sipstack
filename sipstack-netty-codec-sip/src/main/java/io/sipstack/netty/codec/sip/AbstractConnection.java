@@ -73,6 +73,11 @@ public abstract class AbstractConnection implements Connection {
     }
 
     @Override
+    public String toString() {
+        return this.id.toString();
+    }
+
+    @Override
     public void close() {
         // TODO: do we need to do more?
         channel.close();
@@ -108,6 +113,11 @@ public abstract class AbstractConnection implements Connection {
     @Override
     public final String getRemoteIpAddress() {
         return this.remote.getAddress().getHostAddress();
+    }
+
+    @Override
+    public final Buffer getRemoteIpAddressAsBuffer() {
+        return Buffers.wrap(getRemoteIpAddress());
     }
 
     @Override

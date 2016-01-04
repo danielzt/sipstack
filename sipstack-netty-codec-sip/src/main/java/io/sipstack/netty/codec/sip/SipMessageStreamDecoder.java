@@ -136,39 +136,34 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
             throws Exception {
 
         // final long ts = System.currentTimeMillis();
-        final int availableBytes = buffer.readableBytes();
-        final byte[] data = new byte[availableBytes];
-        buffer.readBytes(data);
+        // TODO: if you push a tonnes of traffic over a single TCP connection
+        // it may be that we actually receive buffers that are larger than we
+        // have actually allocated in our message builder. What we should do is
+        // to only fill up max data
+        while (buffer.isReadable()) {
 
-        // final int bytesToCopy = Math.min(availableBytes, messageBuilder.getWritableBytes());
-        // buffer.readBytes(array, messageBuilder.getWriterIndex(), bytesToCopy);
+            final int availableBytes = buffer.readableBytes();
+            final int writableBytes = messageBuilder.getWritableBytes();
+            final int toWrite = Math.min(availableBytes, writableBytes);
+            final byte[] data = new byte[toWrite];
+            buffer.readBytes(data);
 
-        // if (messageBuilder.processNewData(bytesToCopy)) {
-        if (messageBuilder.process(data)) {
-            final SipMessage sipMessage = messageBuilder.build();
-            final long arrivalTime = this.clock.getCurrentTimeMillis();
-            // System.err.println("Processing timer for TCP message: " + (arrivalTime - ts));
-            // System.err.println("This is what we decoded");
-            // System.err.print(sipMessage);
-            // System.err.println("<------");
-            final Channel channel = ctx.channel();
-            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
-            final SipMessageIOEvent msg = IOEvent.create(connection, sipMessage);
-            out.add(msg);
-        } else {
-            System.out.println("AHHHHHH I couldn't parse it completely, which seems odd...");
-        }
+            // final int bytesToCopy = Math.min(availableBytes, messageBuilder.getWritableBytes());
+            // buffer.readBytes(array, messageBuilder.getWriterIndex(), bytesToCopy);
 
-        if (messageBuilder.hasUnprocessData() && messageBuilder.process()) {
-            // System.err.println("Guess we have more stuff on the line...");
-            final SipMessage sipMessage = messageBuilder.build();
-            // System.err.println("This is what we decoded the second time around");
-            // System.err.print(sipMessage);
-            // System.err.println("<------");
-            final Channel channel = ctx.channel();
-            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
-            final SipMessageIOEvent msg = IOEvent.create(connection, sipMessage);
-            out.add(msg);
+            // if (messageBuilder.processNewData(bytesToCopy)) {
+            if (messageBuilder.process(data)) {
+                final SipMessage sipMessage = messageBuilder.build();
+                final long arrivalTime = this.clock.getCurrentTimeMillis();
+                final Channel channel = ctx.channel();
+                final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
+                final SipMessageIOEvent msg = IOEvent.create(connection, sipMessage);
+                out.add(msg);
+
+                if (messageBuilder.hasUnprocessData() && messageBuilder.process()) {
+                    out.add(IOEvent.create(connection, messageBuilder.build()));
+                }
+            }
         }
 
         // buffer.readerIndex(buffer.readerIndex() + buf.getReaderIndex());

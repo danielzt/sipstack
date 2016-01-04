@@ -160,7 +160,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
                 final SipMessageIOEvent msg = IOEvent.create(connection, sipMessage);
                 out.add(msg);
 
-                if (messageBuilder.hasUnprocessData() && messageBuilder.process()) {
+                while (messageBuilder.hasUnprocessData() && messageBuilder.process()) {
                     out.add(IOEvent.create(connection, messageBuilder.build()));
                 }
             }

@@ -44,9 +44,10 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
     /**
      * The maximum allowed size of ALL headers combined (in bytes).
      */
-    public static final int MAX_ALLOWED_HEADERS_SIZE = 8192;
+    public static final int MAX_ALLOWED_HEADERS_SIZE = 2048;
+    // public static final int MAX_ALLOWED_HEADERS_SIZE = 8192;
 
-    public static final int MAX_ALLOWED_CONTENT_LENGTH = 2048;
+    public static final int MAX_ALLOWED_CONTENT_LENGTH = 1024;
 
     private final Clock clock;
 
@@ -72,7 +73,9 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
     public SipMessageStreamDecoder(final Clock clock, final SipURI vipAddress) {
         this.clock = clock;
         this.vipAddress = vipAddress;
-        final Configuration config = new DefaultConfiguration();
+        final DefaultConfiguration config = new DefaultConfiguration();
+        config.setMaxAllowedHeadersSize(2048);
+        config.setMaxAllowedContentLength(1024);
         messageBuilder = new SipMessageStreamBuilder(config);
     }
 
@@ -148,10 +151,6 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
             final byte[] data = new byte[toWrite];
             buffer.readBytes(data);
 
-            // final int bytesToCopy = Math.min(availableBytes, messageBuilder.getWritableBytes());
-            // buffer.readBytes(array, messageBuilder.getWriterIndex(), bytesToCopy);
-
-            // if (messageBuilder.processNewData(bytesToCopy)) {
             if (messageBuilder.process(data)) {
                 final SipMessage sipMessage = messageBuilder.build();
                 final long arrivalTime = this.clock.getCurrentTimeMillis();
@@ -165,28 +164,6 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
                 }
             }
         }
-
-        // buffer.readerIndex(buffer.readerIndex() + buf.getReaderIndex());
-
-        // } catch (final MaxMessageSizeExceededException e) {
-            // dropConnection(ctx, e.getMessage());
-            // TODO: mark this connection as dead since the future
-            // for closing this decoder may take a while to actually
-            // do its job
-        // } catch (final IOException e) {
-            // e.printStackTrace();
-        // }
-
-        /*
-        if (this.message.isComplete()) {
-            final long arrivalTime = this.clock.getCurrentTimeMillis();
-            final Channel channel = ctx.channel();
-            final Connection connection = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), vipAddress);
-            final SipMessageIOEvent msg = toSipMessageIOEvent(connection, this.message);
-            out.add(msg);
-            reset();
-        }
-        */
     }
 
     private void dropConnection(final ChannelHandlerContext ctx, final String reason) {

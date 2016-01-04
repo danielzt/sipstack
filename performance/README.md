@@ -7,6 +7,8 @@ Proxy TCP to UDP. Two SIPps pushing TCP over one connection each. One SIPp actin
 
 No JVM parameter changes whatsoever. Just default everything.
 
+800 CPS is ok but around 1000-1100:ish things went south...
+
 CPU: 124%
 GC: only young generation collections (see details below)
 
@@ -46,6 +48,9 @@ Idea: add a limit to how much traffic we are accepting across a single TCP conne
 
 === Jan 3 Test 003 ===
 
+previous commit: dd1443fe541389f8c38f28002240cb24a587b485
+this commit: 606d226abeef51e58e75ca9638b2293ee1abbf41
+
 Exacte same as 002 but made a small change to the code. Do a diff of the commits to see what.
 
  S0C    S1C    S0U    S1U      EC       EU        OC         OU       MC     MU    CCSC   CCSU   YGC     YGCT    FGC    FGCT     GCT   
@@ -59,4 +64,71 @@ Exacte same as 002 but made a small change to the code. Do a diff of the commits
 512.0  512.0   0.0   160.0  70656.0  31335.5   171008.0   37280.6   15744.0 15324.9 1920.0 1818.5   1369    1.787   0      0.000    1.787
 512.0  512.0   0.0   160.0  70656.0  31335.5   171008.0   37280.6   15744.0 15324.9 1920.0 1818.5   1369    1.787   0      0.000    1.787
 512.0  512.0   0.0   160.0  70656.0  32503.5   171008.0   37280.6   15744.0 15324.9 1920.0 1818.5   1369    1.787   0      0.000    1.787
+
+=== Jan 3 Test 004 ===
+
+Went back to a single SIPp instance to see if the above commits made any difference for it and yep, it did!
+
+1500 CPS, which was sustained for about 10 min, showed no issue whatsoever. CPU at 87%. No dropped calls, retransmissions or anything like that reported by SIPp so really good actually. And 99.999% of the calls had a avg response of less than 10ms
+
+Cranked it up to 2030 CPS across this single TCP connection and still amazing! CPU incrased to 110-120% but still no issues reported by SIPp. As in, no retransmissions or anything. This load was sustained for about 5 min.... hmmm... a few retransmissions after about 5 min. Not sure why. jstat doesn't seem to indicate that a full GC took place either. I did change swap Workspace, which will take CPU i guess so perhaps that interferred with the test. Since then, the test is just going strong.
+
+Cranked it up to 2500 CPS and now it started to break apart. 6 timeouts after a few min of this load. 2100 retransmissions and CPU is up to 125%. Think we hit the limit for one TCP connection can handle with the current code. And again, we haven't actually changed any of the GC settings or anything. Everything is default.
+
+Hmmm... after that one burst of timeouts it calmed down and is n ow handling the 2500 CPS just fine.
+
+Cranked it up to 3100 CPS. Lots of retransmissions right away. CPU is up to 170% for the java process. Lots of timeouts as well and SIPP UAC isn't able to push that many calls other than in a very spiky fashion. Ok, for now, 3100 CPS is too much. 2000 is def safe. 2500 may be ok.
+
+
+=== Jan 3 Test 005 ===
+
+Exact same as 004 but with the difference that we changed the max allowed message size to be:
+1024 for initial line
+2048 for header
+1024 for body
+so a total of 4k where the previous one had:
+
+1024 for initial line
+4096 for header
+4096 for body
+
+so 11k total. The reason is that we are still slightly inefficient with copying memory a little too frequently so wanted to see how big of an impact changing these values actually has. Still a major copy happening when I write the message out so changing that one should make a difference too. Unfortunately I haven't kept track of memory in the other tests. Actually, should be in the GC stats...
+
+1500 CPS sustained. Similar result as in 004 but perhaps slightly lower CPU of 75-82%. Was 87 before.
+
+2030 CPS sustained. Some retransmissions, which the previous one had as well. COU between 98-110% so perhaps slightly lower again...
+
+2500 CPS sustained. Same as previous. CPU is 130-135%, which is slightly higher. Otherwise everything is the same...
+
+Conclusion: may be a slight improvement but not earth shattering!
+
+
+ S0C    S1C    S0U    S1U      EC       EU        OC         OU       MC     MU    CCSC   CCSU   YGC     YGCT    FGC    FGCT     GCT   
+512.0  512.0  512.0   0.0   51712.0  19707.5   171008.0   13312.9   15488.0 15200.6 1920.0 1789.9   5064    3.399   0      0.000    3.399
+512.0  512.0   96.0   0.0   58880.0  13864.1   171008.0   13376.9   15488.0 15200.6 1920.0 1789.9   5068    3.403   0      0.000    3.403
+512.0  512.0   96.0   0.0   54784.0  24084.8   171008.0   13456.9   15488.0 15200.6 1920.0 1789.9   5072    3.406   0      0.000    3.406
+512.0  512.0   96.0   0.0   50688.0  36955.6   171008.0   13544.9   15488.0 15200.6 1920.0 1789.9   5076    3.408   0      0.000    3.408
+512.0  512.0   0.0    96.0  46592.0  18609.7   171008.0   13640.9   15488.0 15200.6 1920.0 1789.9   5081    3.411   0      0.000    3.411
+512.0  512.0   64.0   0.0   44032.0  14094.2   171008.0   13728.9   15488.0 15200.6 1920.0 1789.9   5086    3.415   0      0.000    3.415
+512.0  512.0   0.0    96.0  41472.0  24069.1   171008.0   13816.9   15488.0 15200.6 1920.0 1789.9   5091    3.418   0      0.000    3.418
+512.0  512.0   0.0    96.0  38400.0   7250.1   171008.0   13920.9   15488.0 15200.6 1920.0 1789.9   5097    3.423   0      0.000    3.423
+512.0  512.0   0.0    96.0  35328.0   9548.5   171008.0   14016.9   15488.0 15200.6 1920.0 1789.9   5103    3.427   0      0.000    3.427
+512.0  512.0   96.0   0.0   31744.0    0.0     171008.0   14112.9   15488.0 15200.6 1920.0 1789.9   5110    3.432   0      0.000    3.432
+
+=== Jan 3 Test 006 ===
+
+Changed so that we do not copy the memory again in the SipMessageStreamEncoder where we turn the SIP message into a byte array. Didn't seem to do a huge difference actually but still is a good idea though... See commit for the diff...
+
+
+ S0C    S1C    S0U    S1U      EC       EU        OC         OU       MC     MU    CCSC   CCSU   YGC     YGCT    FGC    FGCT     GCT   
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
+512.0  512.0  128.0   0.0   53760.0  13975.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
 

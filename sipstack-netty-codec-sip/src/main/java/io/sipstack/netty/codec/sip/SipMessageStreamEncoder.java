@@ -3,6 +3,7 @@ package io.sipstack.netty.codec.sip;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
+import io.pkts.buffer.Buffer;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 
 /**
@@ -15,9 +16,14 @@ public class SipMessageStreamEncoder extends MessageToByteEncoder<IOEvent> {
     @Override
     protected void encode(final ChannelHandlerContext ctx, final IOEvent msg, final ByteBuf out) throws Exception {
         if (msg.isSipMessageIOEvent()) {
-            // TODO: dont do this. It will copy the buffer again...
-            final byte[] data = msg.toSipMessageIOEvent().message().toBuffer().getArray();
-            out.writeBytes(data);
+
+            // Note: you don't want to do msgBuffer.getArray() since that will create
+            // a copy and we are trying to avoid that. However, accessing the raw array
+            // also means that you have to pay attention to which portion of that data
+            // is actually visitble to the buffer.
+            final Buffer msgBuffer = msg.toSipMessageIOEvent().message().toBuffer();
+            final byte[] rawData = msgBuffer.getRawArray();
+            out.writeBytes(rawData, msgBuffer.getLowerBoundary() + msgBuffer.getReaderIndex(), msgBuffer.getReadableBytes());
             // ctx.flush();
         }
     }

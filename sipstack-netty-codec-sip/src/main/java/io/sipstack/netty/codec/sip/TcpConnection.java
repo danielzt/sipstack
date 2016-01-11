@@ -7,9 +7,11 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPromise;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
 /**
  *
@@ -18,7 +20,7 @@ import java.net.InetSocketAddress;
 public final class TcpConnection extends AbstractConnection {
 
 
-    public TcpConnection(final Channel channel, final InetSocketAddress remote, final SipURI vipAddress) {
+    public TcpConnection(final Channel channel, final InetSocketAddress remote, final Optional<SipURI> vipAddress) {
         super(Transport.tcp, channel, remote, vipAddress);
     }
 

@@ -254,7 +254,7 @@ public class TrunkingServiceApplicationInstance extends ApplicationInstance {
                 .withDisplayName(remoteAddress.getDisplayName())
                 .build();
         final FromHeader from = FromHeader.withAddress(fromAddress)
-                .withUser(((SipURI) remoteAddress.getURI()).getUser())
+                .withUser(((SipURI) remoteAddress.getURI()).getUser().orElse(null))
                 .build();
         linked.withFromHeader(from);
     }

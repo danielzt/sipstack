@@ -1,7 +1,7 @@
 package io.sipstack.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.sipstack.netty.codec.sip.Transport;
+import io.pkts.packet.sip.Transport;
 
 import java.time.Duration;
 

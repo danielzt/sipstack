@@ -1,7 +1,7 @@
 /**
  * 
  */
-package io.sipstack.net;
+package io.sipstack.net.netty;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
@@ -11,8 +11,13 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.config.NetworkInterfaceConfiguration;
+import io.sipstack.net.ListeningPoint;
+import io.sipstack.net.NetworkInterface;
+import io.sipstack.net.NetworkLayer;
 import io.sipstack.netty.codec.sip.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +27,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotEmpty;
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
@@ -67,17 +75,36 @@ public class NettyNetworkLayer implements NetworkLayer {
 
     @Override
     public void start() {
-        this.interfaces.forEach(NettyNetworkInterface::up);
+        final List<CompletableFuture<Void>> futures = new CopyOnWriteArrayList<>();
+        this.interfaces.forEach(i -> futures.add(i.up()));
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 
     @Override
-    public ChannelFuture connect(final InetSocketAddress address, final Transport transport) {
-        return this.defaultInterface.connect(address, transport);
+    public CompletableFuture<Connection> connect(final Transport transport, final InetSocketAddress address) {
+        return this.defaultInterface.connect(transport, address);
     }
 
     @Override
     public void sync() throws InterruptedException {
         this.latch.await();
+    }
+
+    @Override
+    public NetworkInterface getDefaultNetworkInterface() {
+        return this.defaultInterface;
+    }
+
+    @Override
+    public Optional<? extends NetworkInterface> getNetworkInterface(final String name) {
+        return interfaces.stream()
+                .filter(i -> i.getName().equals(name))
+                .findFirst();
+    }
+
+    @Override
+    public List<? extends NetworkInterface> getNetworkInterfaces() {
+        return interfaces;
     }
 
     @Override
@@ -118,7 +145,6 @@ public class NettyNetworkLayer implements NetworkLayer {
 
         private final Channel udpListeningPoint = null;
 
-        // private List<InboundOutboundHandlerAdapter> handlers = new ArrayList<>();
         private List<ChannelHandler> handlers = new ArrayList<>();
         private List<String> handlerNames = new ArrayList<>();
 
@@ -158,11 +184,7 @@ public class NettyNetworkLayer implements NetworkLayer {
 
         public NettyNetworkLayer build() {
 
-            // Need to create final a handler for final bridging between the final low level and final the io.sipstack.application.application level
-            // final. Cant have the final Server implement the final netty interfaces since final the Builder is final setting it final up.
-            // Really should create final a NetworkActor etc final to handle final all of this.
-
-            // TODO: check that if you e.g. specify dialog layer then you must also specify io.sipstack.transaction.transaction layer
+            // TODO: check that if you e.g. specify dialog layer then you must also specify transaction layer
 
             if (bossGroup == null) {
                 bossGroup = new NioEventLoopGroup();
@@ -189,6 +211,7 @@ public class NettyNetworkLayer implements NetworkLayer {
                     final NettyNetworkInterface.Builder ifBuilder = NettyNetworkInterface.with(i);
                     ifBuilder.udpBootstrap(ensureUDPBootstrap(clock, i.getVipAddress()));
                     ifBuilder.tcpBootstrap(ensureTCPBootstrap(clock, i.getVipAddress()));
+                    ifBuilder.tcpServerBootstrap(ensureTCPServerBootstrap(clock, i.getVipAddress()));
                     builders.add(ifBuilder);
                 });
             }
@@ -228,7 +251,27 @@ public class NettyNetworkLayer implements NetworkLayer {
             return this.bootstrap;
         }
 
-        private ServerBootstrap ensureTCPBootstrap(final Clock clock, final SipURI vipAddress) {
+        private Bootstrap ensureTCPBootstrap(final Clock clock, final SipURI vipAddress) {
+            final Bootstrap tcpBootstrap = new Bootstrap();
+            tcpBootstrap.group(workerGroup)
+                    .channel(NioSocketChannel.class)
+                    .option(ChannelOption.SO_KEEPALIVE, true)
+                    .option(ChannelOption.TCP_NODELAY, true)
+                    .handler(new ChannelInitializer<SocketChannel>() {
+                        @Override
+                        protected void initChannel(final SocketChannel ch) throws Exception {
+                            final ChannelPipeline pipeline = ch.pipeline();
+                            pipeline.addLast("decoder", new SipMessageStreamDecoder(clock, vipAddress));
+                            pipeline.addLast("encoder", new SipMessageStreamEncoder());
+                            for (int i = 0; i < handlers.size(); ++i) {
+                                pipeline.addLast(handlerNames.get(i), handlers.get(i));
+                            }
+                        }
+                    });
+            return tcpBootstrap;
+        }
+
+        private ServerBootstrap ensureTCPServerBootstrap(final Clock clock, final SipURI vipAddress) {
             if (this.serverBootstrap == null) {
                 final ServerBootstrap b = new ServerBootstrap();
 

@@ -14,6 +14,7 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.pkts.packet.sip.Transport;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -36,6 +37,47 @@ public class ConnectionIdTest {
      */
     @After
     public void tearDown() throws Exception {
+    }
+
+    @Test
+    public void testLocalConnectionEndpointId() throws Exception {
+        final ConnectionId id1 = createConnection(Transport.udp, "192.168.0.101", 7777, "10.36.10.11", 8765);
+        final ConnectionEndpointId remoteId1 = id1.getLocalConnectionEndpointId();
+
+        assertThat(remoteId1.getIpAddress(), is("192.168.0.101"));
+        assertThat(remoteId1.getRawIpAddress(), is(id1.getRawLocalIpAddress()));
+        assertThat(remoteId1.getPort(), is(7777));
+
+        assertThat(remoteId1.toString(), is("udp:192.168.0.101:7777"));
+    }
+
+    @Test
+    public void testRemoteConnectionEndpointId() throws Exception {
+        final ConnectionId id1 = createConnection(Transport.udp, "192.168.0.101", 7777, "10.36.10.11", 8765);
+        final ConnectionEndpointId remoteId1 = id1.getRemoteConnectionEndpointId();
+
+        assertThat(remoteId1.getIpAddress(), is("10.36.10.11"));
+        assertThat(remoteId1.getRawIpAddress(), is(id1.getRawRemoteIpAddress()));
+        assertThat(remoteId1.getPort(), is(8765));
+
+        assertThat(remoteId1.toString(), is("udp:10.36.10.11:8765"));
+    }
+
+    @Test
+    public void testRemoteConnectionEndpointIdHashCode() throws Exception {
+        final Map<ConnectionEndpointId, String> ids = new HashMap<>();
+        final ConnectionEndpointId id1 = createConnection(Transport.udp, "192.168.0.101", 7777, "10.36.10.11", 8765).getRemoteConnectionEndpointId();
+        final ConnectionEndpointId id2 = createConnection(Transport.tls, "192.168.0.102", 8888, "10.36.10.12", 8766).getRemoteConnectionEndpointId();
+        final ConnectionEndpointId id3 = createConnection(Transport.tls, "192.168.0.103", 9999, "10.36.10.13", 8767).getRemoteConnectionEndpointId();
+
+        ids.put(id1, "one");
+        ids.put(id2, "two");
+        ids.put(id3, "three");
+
+        assertThat(ids.size(), is(3));
+        assertThat(ids.get(id1), is("one"));
+        assertThat(ids.get(id2), is("two"));
+        assertThat(ids.get(id3), is("three"));
     }
 
     @Test

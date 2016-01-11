@@ -5,8 +5,8 @@ package io.sipstack.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.netty.codec.sip.Transport;
 
 import java.util.Arrays;
 import java.util.List;

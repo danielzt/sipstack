@@ -1,6 +1,6 @@
 package io.sipstack.transport.impl;
 
-import io.sipstack.netty.codec.sip.Transport;
+import io.pkts.packet.sip.Transport;
 
 /**
  * All tests are defined in {@link PingTest} but if you run this class

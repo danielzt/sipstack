@@ -3,13 +3,15 @@
  */
 package io.sipstack.net;
 
-import io.netty.channel.Channel;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.netty.codec.sip.Transport;
+import io.sipstack.net.netty.NettyNetworkInterface;
+import io.sipstack.netty.codec.sip.Connection;
 
 import java.net.InetSocketAddress;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
 import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
 
@@ -19,74 +21,54 @@ import static io.pkts.packet.sip.impl.PreConditions.assertNotNull;
  * 
  * @author jonas@jonasborjesson.com
  */
-public final class ListeningPoint {
+public interface ListeningPoint {
 
+    int getLocalPort();
 
-    private final SipURI listenAddress;
-    private final Optional<SipURI> vipAddress;
-    private final Transport transport;
-    private final InetSocketAddress localAddress;
-    private final int localPort;
+    InetSocketAddress getLocalAddress();
 
-    private final AtomicReference<Channel> channel = new AtomicReference<>();
+    String getLocalIp();
+
+    Transport getTransport();
+
+    SipURI getListenAddress();
+
+    Optional<SipURI> getVipAddress();
 
     /**
-     * 
+     * Bring this {@link ListeningPoint} up, as in have it start
+     * listening on its desired ip and port.
+     *
+     * @return a future, which when successfully completed
+     * indicates that we manage to listen to the given address
      */
-    private ListeningPoint(final Transport transport, final SipURI listenAddress, final SipURI vipAddress) {
-        this.listenAddress = listenAddress;
-        this.vipAddress = Optional.ofNullable(vipAddress);
-        this.transport = transport;
-        this.localPort = NettyNetworkInterface.getPort(listenAddress.getPort(), transport);
-        this.localAddress = new InetSocketAddress(listenAddress.getHost().toString(), this.localPort);
-    }
+    CompletableFuture<Void> up();
 
-    public static ListeningPoint create(final Transport transport, final SipURI listen, final SipURI vipAddress) {
-        assertNotNull(transport);
-        assertNotNull(listen);
-        return new ListeningPoint(transport, listen, vipAddress);
-    }
+    /**
+     * Bring this {@link ListeningPoint} down, as in have it stop
+     * listening on its desired ip and port.
+     *
+     * @return a future, which when successfully completed
+     * indicates that we manage to shut down the port that we
+     * previously were listening on.
+     */
+    CompletableFuture<Void> down();
 
-    public int getLocalPort() {
-        return localPort;
-    }
+    /**
+     * Connect to the remote address.
+     *
+     * @param remoteAddress
+     * @return
+     */
+    CompletableFuture<Connection> connect(final InetSocketAddress remoteAddress);
 
-    public InetSocketAddress getLocalAddress() {
-        return this.localAddress;
-    }
-
-    public String getLocalIp() {
-        return this.localAddress.getHostString();
-    }
-
-    public Transport getTransport() {
-        return this.transport;
-    }
-
-    public SipURI getListenAddress() {
-        return this.listenAddress;
-    }
-
-    public Optional<SipURI> getVipAddress() {
-        return this.vipAddress;
-    }
-
-    // not nice but...
-    public void setChannel(final Channel channel) {
-        this.channel.set(channel);
-    }
-
-    public Channel getChannel() {
-        return this.channel.get();
-    }
-
-    @Override
-    public String toString() {
+    // because you can't override toString
+    default String toStringRepresentation() {
         final StringBuilder sb = new StringBuilder();
-        sb.append(this.listenAddress.toString());
+        sb.append(getListenAddress().toString());
 
-        if (this.vipAddress != null) {
-            sb.append(" as ").append(this.vipAddress.toString());
+        if (getVipAddress().isPresent()) {
+            sb.append(" as ").append(getVipAddress().toString());
         }
         return sb.toString();
     }

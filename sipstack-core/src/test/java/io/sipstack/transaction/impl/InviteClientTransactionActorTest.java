@@ -2,10 +2,10 @@ package io.sipstack.transaction.impl;
 
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.header.CallIdHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.SipTimer;
-import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.transaction.ClientTransaction;
 import io.sipstack.transaction.Transaction;
 import io.sipstack.transaction.event.SipTransactionEvent;

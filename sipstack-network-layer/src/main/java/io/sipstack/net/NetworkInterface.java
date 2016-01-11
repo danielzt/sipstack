@@ -1,9 +1,12 @@
 package io.sipstack.net;
 
 import io.netty.channel.ChannelFuture;
-import io.sipstack.netty.codec.sip.Transport;
+import io.pkts.packet.sip.Transport;
+import io.sipstack.netty.codec.sip.Connection;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 
 /**
  * @author jonas@jonasborjesson.com
@@ -19,10 +22,12 @@ public interface NetworkInterface {
 
     /**
      * Bring this interface up, as in start listening to its dedicated listening points.
+     * @return a future that when completed guarantees
+     * that all listening points were successfully setup.
      */
-    void up();
+    CompletableFuture<Void> up();
 
-    void down();
+    CompletableFuture<Void> down();
 
     /**
      * Use this {@link NetworkInterface} to connect to a remote address using the supplied
@@ -33,12 +38,13 @@ public interface NetworkInterface {
      *
      * @param remoteAddress
      * @param transport
-     * @return a {@link ChannelFuture} that, once completed, will contain the {@link Channel} that
+     * @return a {@link Future} that, once completed, will contain the {@link } that
      *         is connected to the remote address.
      * @throws IllegalTransportException in case the {@link NetworkInterface} isn't configured with
      *         the specified {@link Transport}
      */
-    ChannelFuture connect(final InetSocketAddress remoteAddress, final Transport transport);
+    CompletableFuture<Connection> connect(Transport transport, InetSocketAddress remoteAddress)
+            throws IllegalTransportException;
 
     ListeningPoint getListeningPoint(Transport transport);
 }

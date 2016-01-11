@@ -5,6 +5,7 @@ package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
 import io.pkts.buffer.Buffer;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 
 import java.net.InetSocketAddress;
@@ -70,6 +71,8 @@ public interface Connection {
      * @return
      */
     String getLocalIpAddress();
+
+    InetSocketAddress getLocalAddress();
 
     Buffer getLocalIpAddressAsBuffer();
 

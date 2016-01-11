@@ -1,10 +1,10 @@
 package io.sipstack.transport.impl;
 
+import io.pkts.packet.sip.Transport;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipTimer;
-import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.transport.Flow;
 import org.hamcrest.CoreMatchers;

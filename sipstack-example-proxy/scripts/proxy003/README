@@ -1,0 +1,27 @@
+This directory contains the necesssary SIPp scripts to run the sipstack.io 
+Simple Proxy 003 example. The difference between exmple 003 and the earlier
+ones is that 003 is able to accept and send across both udp and tcp and is
+triggered on the transport parameter in the request-uri. Hence, there are
+two UAC scenario files, one for UDP and one for TCP, and when used, it will
+make the Simple Proxy to choose that transport for the "proxied" request.
+
+Run like so:
+
+Start the two UAS:s, one that listens to UDP and one on TCP. Both 
+listens to port 5080 on localhost but can of course be changed.
+
+./uas.sh
+./uas_tcp.sh
+
+Then start the SIPp UAC instances:
+./uac.sh
+./uac_udp.sh
+./uac_tcp.sh
+
+Where the first one will listen to UDP and ask the proxied hop to
+the UAS to be over UDP.
+
+The next two ones will both listen to TCP, hence, they will use
+TCP to talk to the Simple Proxy 003 sample app but then ask
+to have the leg from Simple Proxy to the UAS to be over
+UDP and TCP respectively.

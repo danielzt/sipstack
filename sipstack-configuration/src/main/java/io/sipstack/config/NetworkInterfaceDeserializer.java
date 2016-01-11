@@ -12,8 +12,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
-import io.sipstack.netty.codec.sip.Transport;
 
 import java.io.IOException;
 import java.util.ArrayList;

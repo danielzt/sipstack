@@ -2,13 +2,13 @@ package io.sipstack.transport.impl;
 
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.config.SipOptionsPingConfiguration;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.SipTimer;
-import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.netty.codec.sip.event.SipRequestIOEvent;
 import io.sipstack.netty.codec.sip.event.SipResponseIOEvent;

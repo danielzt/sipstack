@@ -3,10 +3,10 @@ package io.sipstack;
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.netty.codec.sip.Connection;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.Transport;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -124,6 +124,11 @@ public class MockConnection implements Connection {
     @Override
     public String getLocalIpAddress() {
         return id.getLocalIpAddress();
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+        throw new RuntimeException("not implemented yet");
     }
 
     @Override

@@ -25,7 +25,7 @@ import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.NetworkInterfaceDeserializer;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.event.Event;
-import io.sipstack.net.NettyNetworkLayer;
+import io.sipstack.net.netty.NettyNetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.event.impl.SipMessageIOEventImpl;

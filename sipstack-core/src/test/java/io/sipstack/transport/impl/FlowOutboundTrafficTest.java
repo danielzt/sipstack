@@ -2,6 +2,7 @@ package io.sipstack.transport.impl;
 
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.header.CallIdHeader;
 import io.pkts.packet.sip.header.ContactHeader;
@@ -9,7 +10,6 @@ import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.config.SipConfiguration;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.netty.codec.sip.Connection;
-import io.sipstack.netty.codec.sip.Transport;
 import io.sipstack.netty.codec.sip.event.SipRequestBuilderIOEvent;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.event.FlowEvent;

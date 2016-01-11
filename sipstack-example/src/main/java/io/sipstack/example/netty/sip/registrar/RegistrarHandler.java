@@ -188,7 +188,7 @@ public final class RegistrarHandler extends SimpleChannelInboundHandler<SipMessa
      */
     private SipURI getAOR(final SipRequest request) {
         final SipURI sipURI = (SipURI) request.getToHeader().getAddress().getURI();
-        return SipURI.withUser(sipURI.getUser()).withHost(sipURI.getHost()).build();
+        return SipURI.withUser(sipURI.getUser().orElse(null)).withHost(sipURI.getHost()).build();
     }
 
 }

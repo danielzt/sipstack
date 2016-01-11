@@ -3,27 +3,19 @@
  */
 package io.sipstack.netty.codec.sip;
 
-import gov.nist.javax.sip.address.SipUri;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import io.pkts.buffer.Buffer;
-import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.address.SipURI;
-import io.pkts.packet.sip.impl.SipInitialLine;
 import io.pkts.packet.sip.impl.SipMessageStreamBuilder;
-import io.pkts.packet.sip.impl.SipMessageStreamBuilder.Configuration;
 import io.pkts.packet.sip.impl.SipMessageStreamBuilder.DefaultConfiguration;
 import io.sipstack.netty.codec.sip.event.*;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.Charset;
 import java.util.List;
-import java.util.function.BiConsumer;
+import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
@@ -51,7 +43,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     private final Clock clock;
 
-    private final SipURI vipAddress;
+    private final Optional<SipURI> vipAddress;
 
     /**
      * Contains the raw framed message.
@@ -72,7 +64,7 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     public SipMessageStreamDecoder(final Clock clock, final SipURI vipAddress) {
         this.clock = clock;
-        this.vipAddress = vipAddress;
+        this.vipAddress = Optional.ofNullable(vipAddress);
         final DefaultConfiguration config = new DefaultConfiguration();
         config.setMaxAllowedHeadersSize(2048);
         config.setMaxAllowedContentLength(1024);
@@ -86,7 +78,9 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     @Override
     public void channelRegistered(final ChannelHandlerContext ctx) throws Exception {
-        ctx.fireUserEventTriggered(create(ctx, ConnectionOpenedIOEvent::create));
+        if (ctx.channel().localAddress() != null) {
+            ctx.fireUserEventTriggered(create(ctx, ConnectionOpenedIOEvent::create));
+        }
     }
 
     /**
@@ -94,7 +88,9 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
-        ctx.fireUserEventTriggered(create(ctx, ConnectionClosedIOEvent::create));
+        if (ctx.channel().localAddress() != null) {
+            ctx.fireUserEventTriggered(create(ctx, ConnectionClosedIOEvent::create));
+        }
     }
 
     /**
@@ -102,7 +98,10 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelActive(final ChannelHandlerContext ctx) throws Exception {
-        ctx.fireUserEventTriggered(create(ctx, ConnectionActiveIOEvent::create));
+        if (ctx.channel().localAddress() != null) {
+            final ConnectionIOEvent event = create(ctx, ConnectionActiveIOEvent::create);
+            ctx.fireUserEventTriggered(event);
+        }
     }
 
     /**
@@ -110,7 +109,10 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
      */
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
-        ctx.fireUserEventTriggered(create(ctx, ConnectionInactiveIOEvent::create));
+        if (ctx.channel().localAddress() != null) {
+            final ConnectionIOEvent event = create(ctx, ConnectionInactiveIOEvent::create);
+            ctx.fireUserEventTriggered(event);
+        }
     }
 
     /**
@@ -123,8 +125,6 @@ public class SipMessageStreamDecoder extends ByteToMessageDecoder {
 
     @Override
     public void channelReadComplete(final ChannelHandlerContext ctx) throws Exception {
-        // System.err.println("Done reading in the UDP decoder");
-        // ctx.flush();
     }
 
     private ConnectionIOEvent create(final ChannelHandlerContext ctx, final BiFunction<Connection, Long, ConnectionIOEvent> f) {

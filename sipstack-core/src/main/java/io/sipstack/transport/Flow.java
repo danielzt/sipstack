@@ -1,7 +1,7 @@
 package io.sipstack.transport;
 
+import io.pkts.packet.sip.Transport;
 import io.sipstack.netty.codec.sip.ConnectionId;
-import io.sipstack.netty.codec.sip.Transport;
 
 import java.util.Optional;
 import java.util.function.Consumer;

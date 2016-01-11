@@ -6,7 +6,7 @@ import static io.pkts.packet.sip.impl.PreConditions.ensureNotEmpty;
 import static io.pkts.packet.sip.impl.PreConditions.ensureNotNull;
 
 /**
- * The execution environment for an io.sipstack.application.application.
+ * The execution environment for an application.
  * 
  * @author jonas@jonasborjesson.com
  */

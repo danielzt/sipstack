@@ -10,6 +10,7 @@ import io.netty.util.AttributeKey;
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.impl.SipParser;
 
@@ -35,11 +36,14 @@ public abstract class AbstractConnection implements Connection {
      * { this.ctx = ctx; this.channel = null; this.remote = remote; }
      */
 
-    protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote, final SipURI vipAddress) {
+    protected AbstractConnection(final Transport transport,
+                                 final Channel channel,
+                                 final InetSocketAddress remote,
+                                 final Optional<SipURI> vipAddress) {
         this.id = ConnectionId.create(transport, (InetSocketAddress)channel.localAddress(), remote);
         this.channel = channel;
         this.remote = remote;
-        this.vipAddress = Optional.ofNullable(vipAddress);
+        this.vipAddress = vipAddress == null ? Optional.empty() : vipAddress;
     }
 
     protected AbstractConnection(final Transport transport, final Channel channel, final InetSocketAddress remote) {
@@ -92,6 +96,11 @@ public abstract class AbstractConnection implements Connection {
         final SocketAddress local = this.channel.localAddress();
         final InetAddress address = ((InetSocketAddress) local).getAddress();
         return address.getAddress();
+    }
+
+    @Override
+    public final InetSocketAddress getLocalAddress() {
+        return (InetSocketAddress)this.channel.localAddress();
     }
 
     @Override

@@ -1,9 +1,11 @@
 package io.sipstack.netty.codec.sip;
 
 import io.netty.channel.Channel;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 
 /**
  * Encapsulates a
@@ -12,12 +14,12 @@ import java.net.InetSocketAddress;
  */
 public final class UdpConnection extends AbstractConnection {
 
-    public UdpConnection(final Channel channel, final InetSocketAddress remoteAddress, final SipURI vipAddress) {
+    public UdpConnection(final Channel channel, final InetSocketAddress remoteAddress, final Optional<SipURI> vipAddress) {
         super(Transport.udp, channel, remoteAddress, vipAddress);
     }
 
     public UdpConnection(final Channel channel, final InetSocketAddress remoteAddress) {
-        super(Transport.udp, channel, remoteAddress, null);
+        super(Transport.udp, channel, remoteAddress, Optional.empty());
     }
 
     @Override

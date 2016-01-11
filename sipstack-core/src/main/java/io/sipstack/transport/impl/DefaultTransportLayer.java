@@ -5,6 +5,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.impl.PreConditions;
 import io.sipstack.actor.GenericSingleContext;
 import io.sipstack.actor.InternalScheduler;
@@ -32,6 +33,7 @@ import io.sipstack.transport.event.SipBuilderFlowEvent;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Optional;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 /**
@@ -379,14 +381,23 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
             } else if (connectionId.isReliableTransport()) {
                 // TODO: connect directly via the ListeningPoint instead.
                 // TODO: actually need to store the future...
-                final ChannelFuture future = network.connect(remoteAddress, transportToUse);
+                final Future<Connection> f = network.connect(transportToUse, remoteAddress);
+                if (true) {
+                    throw new RuntimeException("TODO: need to address the network connections");
+                }
+
+                final ChannelFuture future = null;
                 final FlowFutureImpl flowFutureImpl = new FlowFutureImpl(flowStorage, future, onSuccess, onFailure, onCancelled);
                 future.addListener(flowFutureImpl);
                 flowFuture = flowFutureImpl;
             } else {
                 // for unreliable transports, we will simply create a connection as is without
                 // actually "connecting".
-                final Connection connection = new UdpConnection(lp.getChannel(), remoteAddress, lp.getVipAddress().orElse(null));
+                if (true) {
+                    throw new RuntimeException("TODO: need to use the futures correcly...");
+                }
+                // final Connection connection = new UdpConnection(lp.getChannel(), remoteAddress, lp.getVipAddress().orElse(null));
+                final Connection connection = null;
                 final FlowActor newActor = flowStorage.ensureFlow(connection);
 
                 flowFuture = new SuccessfulFlowFuture();

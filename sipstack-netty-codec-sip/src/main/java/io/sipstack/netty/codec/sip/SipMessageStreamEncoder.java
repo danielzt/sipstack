@@ -20,11 +20,10 @@ public class SipMessageStreamEncoder extends MessageToByteEncoder<IOEvent> {
             // Note: you don't want to do msgBuffer.getArray() since that will create
             // a copy and we are trying to avoid that. However, accessing the raw array
             // also means that you have to pay attention to which portion of that data
-            // is actually visitble to the buffer.
+            // is actually visible to the buffer.
             final Buffer msgBuffer = msg.toSipMessageIOEvent().message().toBuffer();
             final byte[] rawData = msgBuffer.getRawArray();
             out.writeBytes(rawData, msgBuffer.getLowerBoundary() + msgBuffer.getReaderIndex(), msgBuffer.getReadableBytes());
-            // ctx.flush();
         }
     }
 }

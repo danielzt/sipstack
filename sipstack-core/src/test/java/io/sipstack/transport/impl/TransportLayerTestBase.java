@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandler;
 import io.pkts.packet.sip.SipMessage;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 import io.sipstack.ControllableClock;
 import io.sipstack.MockChannelHandlerContext;
@@ -23,9 +24,10 @@ import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 
 import java.net.InetSocketAddress;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 
-import static io.sipstack.netty.codec.sip.Transport.*;
+import static io.pkts.packet.sip.Transport.tcp;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -154,9 +156,9 @@ public class TransportLayerTestBase extends SipStackTestBase {
     public Connection createConnection(final Transport transport, final MockChannel channel, final SipURI vipAddress) {
         switch (transport) {
             case udp:
-                return new UdpConnection(channel, (InetSocketAddress)channel.remoteAddress(), vipAddress);
+                return new UdpConnection(channel, (InetSocketAddress)channel.remoteAddress(), Optional.ofNullable(vipAddress));
             case tcp:
-                return new TcpConnection(channel, (InetSocketAddress)channel.remoteAddress(), vipAddress);
+                return new TcpConnection(channel, (InetSocketAddress)channel.remoteAddress(), Optional.ofNullable(vipAddress));
             case tls:
             case sctp:
             case ws:

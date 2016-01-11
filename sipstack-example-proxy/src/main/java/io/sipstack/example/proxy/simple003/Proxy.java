@@ -1,4 +1,4 @@
-package io.sipstack.example.proxy.simple002;
+package io.sipstack.example.proxy.simple003;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -11,15 +11,17 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.pkts.buffer.Buffer;
+import io.netty.channel.socket.nio.NioSocketChannel;
 import io.pkts.buffer.Buffers;
 import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.pkts.packet.sip.SipResponse;
+import io.pkts.packet.sip.Transport;
 import io.pkts.packet.sip.address.SipURI;
 import io.pkts.packet.sip.header.RouteHeader;
 import io.pkts.packet.sip.header.ViaHeader;
 import io.sipstack.netty.codec.sip.*;
+import io.sipstack.netty.codec.sip.event.ConnectionIOEvent;
 import io.sipstack.netty.codec.sip.event.IOEvent;
 import io.sipstack.netty.codec.sip.event.SipMessageIOEvent;
 
@@ -27,13 +29,19 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 /**
- * Same as Proxy example 002 but now we are actually paying attention
- * to what transport should be used for the proxy leg. In example 002
- * we simply just always assumed UDP but this example no longer makes
- * that assumption.
+ * This is a very simple proxy example written on top of the raw
+ * netty + pkts.io support as exposed through sipstack.io.
+ *
+ * The main difference between this proxy example and the proxy 001
+ * example is that we are now also listening to TCP and as such, we
+ * actually have to pay attention to which protocol we are supposed
+ * to use when we proxy to the next destination.
  *
  * @author jonas@jonasborjesson.com
  */
@@ -42,9 +50,14 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
 
     private final SimpleProxyConfiguration config;
 
+    private Bootstrap tcpBootstrap;
+
     private Channel udpChannel;
 
-    public Proxy(final SimpleProxyConfiguration config) {
+    private final InetSocketAddress localAddress;
+
+    public Proxy(final InetSocketAddress localAddress, final SimpleProxyConfiguration config) {
+        this.localAddress = localAddress;
         this.config = config;
         System.out.println("Starting " + config.getName());
     }
@@ -52,6 +65,7 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
     /**
      * This is ugly, and a catch 22, but we need to know the channel so
      * that we can create outbound connections in order to send
+     *
      * messages there.
      *
      * @param udpChannel
@@ -60,36 +74,23 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
         this.udpChannel = udpChannel;
     }
 
-    /**
-     * Create a new connection, which we technically do not
-     * need to do since in this example we are assuming UDP
-     * and as such, there is no "connection" per se, plus at
-     * least for responses, it would have been enough to re-use
-     * the same channel object as we already registered with
-     * in {@link Proxy#setUdpChannel(Channel)} but in the next
-     * few examples you will understand why.
-     *
-     * @param ip
-     * @param port
-     * @return
-     */
-    public Connection connect(final Buffer ip, final int port) {
-        final InetSocketAddress remoteAddress = new InetSocketAddress(ip.toString(), port);
-        return new UdpConnection(udpChannel, remoteAddress);
+    public void setTcpStack(final Bootstrap stack) {
+        this.tcpBootstrap = stack;
     }
 
     /**
      * We want to re-use the connection objects as much as possible so
      * therefore we will be storing the connections over which we
-     * receive messages.
+     * receive messages and the key will be the remote IP:port from
+     * which the connection originated.
      */
-    private final Map<ConnectionId, Connection> connections = new ConcurrentHashMap<>();
+    private final Map<ConnectionEndpointId, Connection> connections = new ConcurrentHashMap<>();
 
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final SipMessageIOEvent event) throws Exception {
         final Connection connection = event.connection();
         if (connection.isTCP()) {
-            connections.put(connection.id(), connection);
+            connections.put(connection.id().getRemoteConnectionEndpointId(), connection);
         }
 
         final SipMessage msg = event.message();
@@ -104,16 +105,23 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
             // actually pointed to us but this is a simple example so we'll continue
             // to live in happy land...
             final ConnectionId connectionId = ConnectionId.decode(msg.getViaHeader().getParameter("connection"));
-            final Connection outboundConnection = connections.get(connectionId);
             final SipResponse response = msg.toResponse().copy().withPoppedVia().build();
-            outboundConnection.send(IOEvent.create(outboundConnection, response));
+            final Consumer<Connection> onSuccess = c -> {
+                final ConnectionEndpointId cid = c.id().getRemoteConnectionEndpointId();
+                if (c.isTCP()) {
+                    connections.put(cid, c);
+                }
+                c.send(IOEvent.create(c, response));
+            };
+            connect(connectionId, onSuccess);
         }
     }
 
     /**
-     * Whenever we proxy a request we must also add a Via-header, which essentially says that the
-     * request went "via this network address using this protocol". The {@link ViaHeader}s are used
-     * for responses to find their way back the exact same path as the request took.
+     * The difference between Proxy example 001 and 002 is that we
+     * now will also pay attention to the protocol for the "proxied leg".
+     * Previously we just assumed UDP but we will now actually look
+     * at the target and and check the protocol we should be using.
      *
      * @param destination
      * @param connection the connection over which we received the sip message.
@@ -122,12 +130,12 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
      * @param msg
      */
     private void proxyTo(final SipURI destination, final Connection connection, final SipRequest msg) {
-        final Connection outboundConnection = connect(destination.getHost(), destination.getPort());
 
         // Create a new Via-header that points back to us
+        final Transport transport = destination.getTransportParam().orElse(Transport.udp);
         final ViaHeader via = ViaHeader.withHost(config.getListenAddress())
                 .withPort(config.getListenPort())
-                .withTransportUDP()
+                .withTransport(transport)
                 .withBranch()
                 .withRPortFlag()
                 // We want to re-use the same connection as the message came in over so
@@ -152,15 +160,27 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
                 .onMaxForwardsHeader(max -> max.decrement())
                 .build();
 
-        // Because the raw network support provided by sipstack.io expects
-        // IOEvents we will have to wrap the actual SIP message in one
-        // of those events before sending it off. Now, as we build on
-        // this example eventually this will go away since we will be
-        // adding more higher level support to this proxy example.
-        // But, again, this is an example of how to use the most low-level
-        // support from sipstack.io to get a SIP Proxy going so it is
-        // what it is...
-        outboundConnection.send(IOEvent.create(outboundConnection, proxyMsg));
+        final String remoteHost = destination.getHost().toString();
+        final int remotePort = destination.getPort();
+
+        final InetSocketAddress remoteAddress = new InetSocketAddress(remoteHost, remotePort);
+        final ConnectionId id = ConnectionId.create(transport, localAddress, remoteAddress);
+        final Connection outboundConnection = connections.get(id.getRemoteConnectionEndpointId());
+
+        if (outboundConnection != null) {
+            outboundConnection.send(IOEvent.create(outboundConnection, proxyMsg));
+        } else {
+            // we don't have a connection available to us so we have to create one.
+            final Consumer<Connection> onSuccess = c -> {
+                final ConnectionEndpointId cid = c.id().getRemoteConnectionEndpointId();
+                if (c.isTCP()) {
+                    connections.put(cid, c);
+                }
+                c.send(IOEvent.create(c, proxyMsg));
+            };
+
+            connect(transport, remoteAddress, onSuccess);
+        }
     }
 
     /**
@@ -194,6 +214,89 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
         return request.getRequestUri().toSipURI();
     }
 
+    @Override
+    public void userEventTriggered(final ChannelHandlerContext ctx, final Object evt) throws Exception {
+        try {
+            final IOEvent event = (IOEvent) evt;
+            if (event.isConnectionIOEvent()) {
+                processConnectionEvent(event.toConnectionIOEvent());
+            }
+        } catch (final ClassCastException e) {
+            // guess this is not an IOEvent, which is the only thing we handle
+            // so just forward it...
+            ctx.fireUserEventTriggered(evt);
+        }
+    }
+
+    /**
+     * Whenever we get a new connection we will add that to our internal storage
+     * of known connections. Whenever we get a disconnect, we will remove it.
+     *
+     * @param event
+     */
+    private void processConnectionEvent(final ConnectionIOEvent event) {
+        final Connection connection = event.connection();
+        if (event.isConnectionInactiveIOEvent()) {
+            connections.remove(connection.id().getRemoteConnectionEndpointId());
+        } else if (event.isConnectionActiveIOEvent()) {
+            connections.put(connection.id().getRemoteConnectionEndpointId(), connection);
+        }
+    }
+
+    /**
+     *
+     * @param ip
+     * @param port
+     * @return
+     */
+    public Future<Connection> connect(final Transport transport, final InetSocketAddress remoteAddress, final Consumer<Connection> consumer) {
+        final CompletableFuture<Connection> f =
+                transport.isTCP() ? connectTCP(remoteAddress) : connectUDP(remoteAddress);
+        f.thenAccept(consumer);
+        return f;
+    }
+
+    /**
+     * Get a connection based on the {@link ConnectionId}.
+     *
+     * @param id
+     * @param consumer
+     * @return
+     */
+    public Future<Connection> connect(final ConnectionId id, final Consumer<Connection> consumer) {
+        final Connection connection = connections.get(id.getRemoteConnectionEndpointId());
+        if (connection != null) {
+            final CompletableFuture<Connection> f = CompletableFuture.completedFuture(connection);
+            f.thenAccept(consumer);
+            return f;
+        }
+
+        return connect(id.getProtocol(), id.getRemoteAddress(), consumer);
+    }
+
+    private CompletableFuture<Connection> connectUDP(final InetSocketAddress remoteAddress) {
+        return CompletableFuture.completedFuture(new UdpConnection(udpChannel, remoteAddress));
+    }
+
+    private CompletableFuture<Connection> connectTCP(final InetSocketAddress remoteAddress) {
+        final CompletableFuture<Connection> f = new CompletableFuture<>();
+        final ChannelFuture channelFuture = tcpBootstrap.connect(remoteAddress);
+        channelFuture.addListener(new ChannelFutureListener() {
+            @Override
+            public void operationComplete(final ChannelFuture future) throws Exception {
+                if (future.isSuccess()) {
+                    final Channel channel = channelFuture.channel();
+                    final Connection c = new TcpConnection(channel, remoteAddress);
+                    f.complete(c);
+                } else {
+                    f.completeExceptionally(future.cause());
+                }
+            }
+        });
+
+        return f;
+    }
+
     /**
      * Very basic helper method for loading a yaml file and with the help of jackson, de-serialize it
      * to a configuration object.
@@ -208,6 +311,7 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
         return mapper.readValue(stream, SimpleProxyConfiguration.class);
     }
 
+
     public static void main(final String ... args) throws Exception {
 
         // just to keep things simple. Normally you want to use a CLI framework
@@ -217,9 +321,10 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
 
         final SimpleProxyConfiguration config = loadConfiguration(args[0]);
 
-        final Proxy proxy = new Proxy(config);
+        final InetSocketAddress socketAddress = new InetSocketAddress(config.getListenAddress(), config.getListenPort());
+        final Proxy proxy = new Proxy(socketAddress, config);
 
-        // Create the UDP listening point
+        // Create the UDP client and server stack
         final EventLoopGroup udpGroup = new NioEventLoopGroup();
         final Bootstrap b = new Bootstrap();
         b.group(udpGroup)
@@ -234,7 +339,7 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
                     }
                 });
 
-        // Create the TCP listening point
+        // Create the TCP server stack
         final ServerBootstrap serverBootstrap = new ServerBootstrap();
         final EventLoopGroup bossGroup = new NioEventLoopGroup();
         final EventLoopGroup workerGroup = new NioEventLoopGroup();
@@ -255,9 +360,25 @@ public class Proxy extends SimpleChannelInboundHandler<SipMessageIOEvent> {
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.TCP_NODELAY, true);
 
-        final InetSocketAddress socketAddress = new InetSocketAddress(config.getListenAddress(), config.getListenPort());
+        // Create the TCP client stack
+        final Bootstrap tcpBootstrap = new Bootstrap();
+        tcpBootstrap.group(workerGroup)
+                .channel(NioSocketChannel.class)
+                .option(ChannelOption.SO_KEEPALIVE, true)
+                .option(ChannelOption.TCP_NODELAY, true)
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(final SocketChannel ch) throws Exception {
+                        final ChannelPipeline pipeline = ch.pipeline();
+                        pipeline.addLast("decoder", new SipMessageStreamDecoder());
+                        pipeline.addLast("encoder", new SipMessageStreamEncoder());
+                        pipeline.addLast("handler", proxy);
+                    }
+                });
+
         final Channel udpChannel = b.bind(socketAddress).sync().channel();
-        final Channel tcpChannel = serverBootstrap.bind(socketAddress).sync().channel();
+        serverBootstrap.bind(socketAddress).sync().channel();
+        proxy.setTcpStack(tcpBootstrap);
         proxy.setUdpChannel(udpChannel);
         udpChannel.closeFuture().await();
     }

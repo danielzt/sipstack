@@ -5,8 +5,11 @@ package io.sipstack.netty.codec.sip;
 
 import io.pkts.buffer.Buffer;
 import io.pkts.buffer.Buffers;
-import io.pkts.packet.sip.impl.PreConditions;
+import io.pkts.packet.sip.Transport;
+import sun.net.util.IPAddressUtil;
 
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 
@@ -25,15 +28,23 @@ public interface ConnectionId {
 
     String getLocalIpAddress();
 
+    InetSocketAddress getLocalAddress();
+
     int getRemotePort();
 
     byte[] getRawRemoteIpAddress();
 
     String getRemoteIpAddress();
 
+    InetSocketAddress getRemoteAddress();
+
     Transport getProtocol();
 
     Buffer encode();
+
+    ConnectionEndpointId getLocalConnectionEndpointId();
+
+    ConnectionEndpointId getRemoteConnectionEndpointId();
 
     String encodeAsString();
 
@@ -65,6 +76,21 @@ public interface ConnectionId {
         return getProtocol() == Transport.wss;
     }
 
+    /**
+     * Helper method to convert an IPv4 address represented as a byte-array
+     * into a human readable String.
+     *
+     * @param ip
+     * @return
+     */
+    static String convertToStringIP(final byte[] ip) {
+        final short a = (short) (ip[0] & 0xFF);
+        final short b = (short) (ip[1] & 0xFF);
+        final short c = (short) (ip[2] & 0xFF);
+        final short d = (short) (ip[3] & 0xFF);
+        return a + "." + b + "." + c + "." + d;
+    }
+
     static ConnectionId create(final Transport transport, final InetSocketAddress local, final InetSocketAddress remote) {
         ensureNotNull(transport);
         ensureNotNull(local);
@@ -74,7 +100,7 @@ public interface ConnectionId {
         final byte[] rawRemote = remote.getAddress().getAddress();
         final int localPort = local.getPort();
         final int remotePort = remote.getPort();
-        return new IPv4ConnectionId(transport, rawLocal, localPort, rawRemote, remotePort);
+        return new IPv4ConnectionId(transport, local, rawLocal, localPort, remote, rawRemote, remotePort);
     }
 
     static ConnectionId decode(final Buffer encoded) {
@@ -123,16 +149,38 @@ public interface ConnectionId {
                 protocol = Transport.sctp;
                 break;
         }
-        return new IPv4ConnectionId(protocol, localIp, localPort, remoteIp, remotePort);
+        final String localIpAsString = convertToStringIP(localIp);
+        final String remoteIpAsString = convertToStringIP(remoteIp);
+
+        // TODO: see if creating hese InetSocketAddresses all the time is expensive.
+        // We don't want to resolve them all the time but rather be in full control
+        // of that ourselves.
+        //
+        // This attempt to create an unresolved unfortunately doens't work straight off
+        // because we attempt to access the address to get the raw bytes and that blows
+        // up because they were never created. We could probably avoid this by actually
+        // calculating the byte[] array ourselves. There is a helper class
+        // IPAddressUtil.textToNumericFormatV4() that the InetSocketAddress is using too.
+        // Just step debug through it and you'll see...
+        // final InetSocketAddress localAddress = InetSocketAddress.createUnresolved(localIpAsString, localPort);
+        // final InetSocketAddress remoteAddress = InetSocketAddress.createUnresolved(remoteIpAsString, remotePort);
+
+        final InetSocketAddress localAddress = new InetSocketAddress(localIpAsString, localPort);
+        final InetSocketAddress remoteAddress = new InetSocketAddress(remoteIpAsString, remotePort);
+
+        return new IPv4ConnectionId(protocol, localAddress, localIpAsString, localIp, localPort, remoteAddress, remoteIpAsString, remoteIp, remotePort);
     }
 
     class IPv4ConnectionId implements ConnectionId {
 
         private final Transport protocol;
-        private final int localPort;
-        private final int remotePort;
-        private final byte[] remoteIp;
+        private final InetSocketAddress localAddress;
         private final byte[] localIp;
+        private final int localPort;
+
+        private final InetSocketAddress remoteAddress;
+        private final byte[] remoteIp;
+        private final int remotePort;
 
         /**
          * The encoded version of this connection id. 
@@ -145,24 +193,70 @@ public interface ConnectionId {
         private final int hashCode;
         private final String humanReadableString;
 
-        private IPv4ConnectionId(final Transport protocol, final byte[] localIp, final int localPort,
-                final byte[] remoteIp, final int remotePort) {
+        private IPv4ConnectionId(final Transport protocol,
+                                 final byte[] localIp,
+                                 final int localPort,
+                                 final byte[] remoteIp,
+                                 final int remotePort) {
+            this(protocol,
+                    InetSocketAddress.createUnresolved(convertToStringIP(localIp), localPort),
+                    convertToStringIP(localIp),
+                    localIp,
+                    localPort,
+                    InetSocketAddress.createUnresolved(convertToStringIP(remoteIp), remotePort),
+                    convertToStringIP(remoteIp),
+                    remoteIp,
+                    remotePort);
+        }
+
+        private IPv4ConnectionId(final Transport protocol,
+                                 final  InetSocketAddress localAddress,
+                                 final byte[] localIp,
+                                 final int localPort,
+                                 final InetSocketAddress remoteAddress,
+                                 final byte[] remoteIp,
+                                 final int remotePort) {
+            this(protocol,
+                    localAddress,
+                    convertToStringIP(localIp),
+                    localIp,
+                    localPort,
+                    remoteAddress,
+                    convertToStringIP(remoteIp),
+                    remoteIp,
+                    remotePort);
+        }
+
+        private IPv4ConnectionId(final Transport protocol,
+                                 final  InetSocketAddress localAddress,
+                                 final String localIpAsString,
+                                 final byte[] localIp,
+                                 final int localPort,
+                                 final InetSocketAddress remoteAddress,
+                                 final String remoteIpAsString,
+                                 final byte[] remoteIp,
+                                 final int remotePort) {
+            this.localAddress = localAddress;
             this.localIp = localIp;
             this.localPort = localPort;
+
+            this.remoteAddress = remoteAddress;
             this.remoteIp = remoteIp;
             this.remotePort = remotePort;
+
             this.protocol = protocol;
 
             this.hashCode = calculateHashCode();
             this.encodedAsString = encodeConnection();
             this.encodedAsBuffer = Buffers.wrap(encodedAsString);
-            final StringBuilder sb = new StringBuilder(convertToStringIP(localIp));
+            final StringBuilder sb = new StringBuilder(localIpAsString);
             sb.append(":").append(localPort);
             sb.append(":").append(protocol);
-            sb.append(":").append(convertToStringIP(remoteIp));
+            sb.append(":").append(remoteIpAsString);
             sb.append(":").append(remotePort);
             this.humanReadableString = sb.toString();
         }
+
 
         @Override
         public int hashCode() {
@@ -224,6 +318,16 @@ public interface ConnectionId {
         @Override
         public Buffer encode() {
             return this.encodedAsBuffer;
+        }
+
+        @Override
+        public ConnectionEndpointId getRemoteConnectionEndpointId() {
+            return ConnectionEndpointId.create(protocol, remoteAddress, remoteIp, remotePort);
+        }
+
+        @Override
+        public ConnectionEndpointId getLocalConnectionEndpointId() {
+            return ConnectionEndpointId.create(protocol, localAddress, localIp, localPort);
         }
 
         private String encodeConnection() {
@@ -296,6 +400,11 @@ public interface ConnectionId {
         }
 
         @Override
+        public InetSocketAddress getLocalAddress() {
+            return this.getLocalAddress();
+        }
+
+        @Override
         public int getRemotePort() {
             return this.remotePort;
         }
@@ -311,17 +420,16 @@ public interface ConnectionId {
         }
 
         @Override
+        public InetSocketAddress getRemoteAddress() {
+            return this.remoteAddress;
+        }
+
+        @Override
         public Transport getProtocol() {
             return this.protocol;
         }
 
-        private String convertToStringIP(final byte[] ip) {
-            final short a = (short) (ip[0] & 0xFF);
-            final short b = (short) (ip[1] & 0xFF);
-            final short c = (short) (ip[2] & 0xFF);
-            final short d = (short) (ip[3] & 0xFF);
-            return a + "." + b + "." + c + "." + d;
-        }
     }
+
 
 }

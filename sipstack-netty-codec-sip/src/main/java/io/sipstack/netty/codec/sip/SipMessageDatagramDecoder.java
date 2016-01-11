@@ -14,6 +14,7 @@ import io.sipstack.netty.codec.sip.event.IOEvent;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The {@link SipMessageDatagramDecoder} will frame an incoming UDP packet into
@@ -28,7 +29,7 @@ import java.util.List;
 public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<DatagramPacket> {
 
     private final Clock clock;
-    private final SipURI vipAddress;
+    private final Optional<SipURI> vipAddress;
 
     public SipMessageDatagramDecoder() {
         this(new SystemClock(), null);
@@ -41,7 +42,7 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
      */
     public SipMessageDatagramDecoder(final Clock clock, final SipURI vipAddress) {
         this.clock = clock;
-        this.vipAddress = vipAddress;
+        this.vipAddress = Optional.ofNullable(vipAddress);
     }
 
     @Override
@@ -50,7 +51,6 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
         // TODO: address, if not then it is a listening socket and we
         // TODO: don't care about those (or a un-connected UDP)
         System.err.println("UDP Decoder: Channel registered: " + ctx.channel());
-        final Channel channel = ctx.channel();
     }
     /**
      * From ChannelInboundHandler
@@ -59,7 +59,6 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
     public void channelUnregistered(final ChannelHandlerContext ctx) throws Exception {
         // TODO: the FlowActor should transition to the CLOSED state.
         System.err.println("UDP Decoder: Channel un-registered " + ctx.channel());
-        final Channel channel = ctx.channel();
     }
     /**
      * From ChannelInboundHandler
@@ -68,7 +67,6 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
     public void channelActive(final ChannelHandlerContext ctx) throws Exception {
         // TODO: Send an event to the FlowActor
         System.err.println("UDP Decoder: Channel active " + ctx.channel());
-        final Channel channel = ctx.channel();
     }
 
     /**
@@ -79,7 +77,6 @@ public final class SipMessageDatagramDecoder extends MessageToMessageDecoder<Dat
         // TODO: this would be the closing event
         // TODO:
         System.err.println("UDP Decoder: Channel in-active " + ctx.channel());
-        final Channel channel = ctx.channel();
     }
 
     /**

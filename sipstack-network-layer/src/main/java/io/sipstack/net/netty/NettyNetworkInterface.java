@@ -114,7 +114,7 @@ public final class NettyNetworkInterface implements NetworkInterface, ChannelFut
 
     @Override
     public ListeningPoint getListeningPoint(final Transport transport) {
-        return listeningPointsByTransport[Transport.udp.ordinal()];
+        return listeningPointsByTransport[transport.ordinal()];
     }
 
     /**

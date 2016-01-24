@@ -19,6 +19,7 @@ import io.sipstack.transport.impl.FlowFutureImpl;
 import io.sipstack.transport.impl.FlowStorage;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -92,6 +93,11 @@ public class MockTransportLayer implements TransportLayer {
         return new MockFlowBuilder(ctx, handler, host, clock);
     }
 
+    @Override
+    public Flow.Builder createFlow(InetSocketAddress remoteHost) throws IllegalArgumentException {
+        throw new RuntimeException("Have to implement this again...");
+    }
+
     /**
      * TODO: This is stupid - this is a complete copy-paste from the real ones that
      * current exists within the {@link MockTransportLayer} but those should
@@ -134,6 +140,11 @@ public class MockTransportLayer implements TransportLayer {
         }
 
         @Override
+        public Flow.Builder withNetworkInterface(final String interfaceName) {
+            return this;
+        }
+
+        @Override
         public Flow.Builder onSuccess(final Consumer<Flow> consumer) {
             this.onSuccess = consumer;
             return this;
@@ -152,7 +163,7 @@ public class MockTransportLayer implements TransportLayer {
         }
 
         @Override
-        public FlowFuture connect() throws IllegalArgumentException {
+        public CompletableFuture<Flow> connect() throws IllegalArgumentException {
             final int port = this.port == -1 ? defaultPort() : this.port;
 
             final InetSocketAddress remoteAddress = new InetSocketAddress(host, port);
@@ -173,8 +184,8 @@ public class MockTransportLayer implements TransportLayer {
             // it is a completed future already.
             mockFuture.addListener(flowFuture);
 
-
-            return flowFuture;
+            throw new RuntimeException("Have to fix this again");
+            // return flowFuture;
         }
 
         /**

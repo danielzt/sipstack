@@ -22,10 +22,6 @@ public interface Connection {
 
     ConnectionId id();
 
-    void storeObject(Object o);
-
-    Optional<Object> fetchObject();
-
     /**
      * A connection may optionally have a VIP address, which for the
      * actual connection itself doesn't matter but there are cases

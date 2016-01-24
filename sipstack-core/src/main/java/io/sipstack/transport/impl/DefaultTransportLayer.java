@@ -33,8 +33,12 @@ import io.sipstack.transport.event.SipBuilderFlowEvent;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * The {@link DefaultTransportLayer} is responsible for maintaining {@link Flow}s, which represents
@@ -164,7 +168,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
         if (event.isConnectionOpenedIOEvent() || event.isConnectionBoundIOEvent()) {
             actor = flowStorage.ensureFlow(connection);
         } else {
-            actor = flowStorage.get(FlowId.create(connection.id()));
+            actor = flowStorage.get(connection.id());
         }
 
         if (actor != null) {
@@ -220,7 +224,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
                 });
 
                 if (actor.isTerminated()) {
-                    flowStorage.remove(actor.id());
+                    flowStorage.remove(actor.flow().id());
                     actor.stop();
                     actor.postStop();
                     final FlowTerminatedEvent terminatedEvent = FlowTerminatedEvent.create(actor.flow());
@@ -248,7 +252,6 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
      */
     @Override
     public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) throws Exception {
-        System.err.println("connecting to " + remoteAddress + " from local " + localAddress);
         ctx.connect(remoteAddress, localAddress, promise);
     }
 
@@ -269,7 +272,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
         try {
             final FlowEvent event = (FlowEvent)msg;
             final Flow flow = event.flow();
-            final FlowActor actor = flowStorage.get(FlowId.create(flow.id().get()));
+            final FlowActor actor = flowStorage.get(flow.id());
             if (actor != null) {
 
                 if (event.isSipFlowEvent()) {
@@ -290,14 +293,20 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
 
     @Override
     public Flow.Builder createFlow(final String host) {
-        PreConditions.ensureNotEmpty("You must specify the host to connect to", host);
+        PreConditions.ensureNotEmpty(host, "You must specify the host to connect to");
         return new FlowBuilder(host);
+    }
+
+    @Override
+    public Flow.Builder createFlow(final InetSocketAddress remoteAddress) {
+        PreConditions.ensureNotNull(remoteAddress, "You must specify the host to connect to");
+        return new FlowBuilder(remoteAddress);
     }
 
     @Override
     public void onTimeout(final SipTimerEvent timer) {
         try {
-            final FlowId id = (FlowId) timer.key();
+            final ConnectionId id = (ConnectionId) timer.key();
             final FlowActor actor = flowStorage.get(id);
             if (actor != null) {
                 final IOEvent event = io.sipstack.netty.codec.sip.event.SipTimerEvent.create(timer.timer());
@@ -313,16 +322,28 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
         private Consumer<Flow> onSuccess;
         private Consumer<Flow> onFailure;
         private Consumer<Flow> onCancelled;
-        private String host;
+        private final String host;
+        private final InetSocketAddress remoteAddress;
+        private String networkInterfaceName;
         private int port;
         private Transport transport;
 
         private FlowBuilder(final String host) {
             this.host = host;
+            this.remoteAddress = null;
+        }
+
+        private FlowBuilder(final InetSocketAddress remoteAddress) {
+            this.remoteAddress = remoteAddress;
+            this.host = null;
         }
 
         @Override
         public Flow.Builder withPort(final int port) {
+            if (this.remoteAddress != null) {
+                throw new IllegalArgumentException("You cannot specify port when you already "
+                        + "have specified the remote address");
+            }
             this.port = port;
             return this;
         }
@@ -330,6 +351,12 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
         @Override
         public Flow.Builder withTransport(final Transport transport) {
             this.transport = transport;
+            return this;
+        }
+
+        @Override
+        public Flow.Builder withNetworkInterface(final String interfaceName) {
+            this.networkInterfaceName = interfaceName;
             return this;
         }
 
@@ -352,57 +379,66 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
         }
 
         @Override
-        public FlowFuture connect() throws IllegalArgumentException {
+        public CompletableFuture<Flow> connect() throws IllegalArgumentException {
             final int port = this.port == -1 ? defaultPort() : this.port;
 
-            // TODO: need to ensure that the host is an actual IP-address
+            // TODO: need to ensure that the host is an actual IP-address and if not
+            // then we should resolve it or perhaps we should force the user to actually
+            // resolve it first so flows only connect to IP addresses?
             final Transport transportToUse = transport == null ? Transport.udp : transport;
-            final InetSocketAddress remoteAddress = new InetSocketAddress(host, port);
-            final Optional<ListeningPoint> lpToUse = network.getListeningPoint(transportToUse);
+            final InetSocketAddress remoteAddress = this.remoteAddress != null ?
+                    this.remoteAddress :
+                    new InetSocketAddress(host, port);
 
-            // if we cannot find an appropriate ListeningPoint then we are dead. Return
-            // a failed future.
-            if (!lpToUse.isPresent()) {
-                // TODO: create a failed FlowFuture and complete it right away. For now, exception...
-                // TODO: or should we re-throw exception? I think we should stick with one thing so lets
-                // go for a failed future.
-                throw new RuntimeException("Guess we don't support the transport or something. Create failed FlowFuture here instead");
-            }
+            // TODO: allow to choose the network interface to use as well.
+            final ListeningPoint lp = network.getListeningPoint(transportToUse).orElseThrow(() ->
+                    new RuntimeException("Guess we don't support the transport or something. "
+                            + "Create failed FlowFuture here instead"));
 
-            final ListeningPoint lp = lpToUse.get();
             final ConnectionId connectionId =
                     ConnectionId.create(transportToUse, lp.getLocalAddress(), remoteAddress);
-            final FlowId flowId = FlowId.create(connectionId);
-            final FlowActor actor = flowStorage.get(flowId);
-            FlowFuture flowFuture = null;
+
+            // This is the key of the remote endpoint. We will use it to
+            // lookup the flow because if this is e.g. TCP then if we were
+            // to use our local address then we won't find a Flow since every time
+            // we connect over TCP we will get a different local port and as such,
+            // it will never ever match lp.getLocalAddress().
+            final ConnectionEndpointId endpointId = ConnectionEndpointId.create(transportToUse, remoteAddress);
+            final FlowActor actor = flowStorage.get(endpointId);
             if (actor != null) {
-                flowFuture = new SuccessfulFlowFuture();
+                final CompletableFuture<Flow> future = CompletableFuture.completedFuture(actor.flow());
                 invokeCallbackDirectly(actor.flow(), onSuccess);
-            } else if (connectionId.isReliableTransport()) {
-                // TODO: connect directly via the ListeningPoint instead.
-                // TODO: actually need to store the future...
-                final Future<Connection> f = network.connect(transportToUse, remoteAddress);
-                if (true) {
-                    throw new RuntimeException("TODO: need to address the network connections");
-                }
-
-                final ChannelFuture future = null;
-                final FlowFutureImpl flowFutureImpl = new FlowFutureImpl(flowStorage, future, onSuccess, onFailure, onCancelled);
-                future.addListener(flowFutureImpl);
-                flowFuture = flowFutureImpl;
-            } else {
-                // for unreliable transports, we will simply create a connection as is without
-                // actually "connecting".
-                if (true) {
-                    throw new RuntimeException("TODO: need to use the futures correcly...");
-                }
-                // final Connection connection = new UdpConnection(lp.getChannel(), remoteAddress, lp.getVipAddress().orElse(null));
-                final Connection connection = null;
-                final FlowActor newActor = flowStorage.ensureFlow(connection);
-
-                flowFuture = new SuccessfulFlowFuture();
-                invokeCallbackDirectly(newActor.flow(), onSuccess);
+                return future;
             }
+
+            /**
+             * Function for converting
+             */
+            final BiFunction<Connection, Throwable, Flow> bfn = (c, t) -> {
+                if (t != null) {
+                    if (t instanceof CancellationException) {
+                        return new FailureFlow(connectionId, (CancellationException)t);
+                    }
+                    return new FailureFlow(connectionId, t);
+                }
+
+                final Flow flow = flowStorage.ensureFlow(c).flow();
+                return flow;
+            };
+
+            final Consumer<Flow> fn = f -> {
+                if (f.isValid() && onSuccess != null) {
+                    onSuccess.accept(f);
+                } else if (f.isCancelled() && onCancelled != null) {
+                    onCancelled.accept(f);
+                } else if (f.isFailed() && onFailure != null) {
+                    onFailure.accept(f);
+                }
+            };
+
+            final CompletableFuture<Connection> connectionFuture = lp.connect(remoteAddress);
+            final CompletableFuture<Flow> flowFuture = connectionFuture.handle(bfn);
+            flowFuture.thenAccept(fn);
             return flowFuture;
         }
 

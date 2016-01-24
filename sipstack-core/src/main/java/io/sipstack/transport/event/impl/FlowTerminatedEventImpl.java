@@ -36,12 +36,9 @@ public class FlowTerminatedEventImpl extends FlowEventImpl implements FlowTermin
 
         try {
             final FlowTerminatedEvent other = (FlowTerminatedEvent)obj;
-            final Optional<ConnectionId> id = flow().id();
-            final Optional<ConnectionId> idOther = other.flow().id();
-            if (id.isPresent() != idOther.isPresent()) {
-                return false;
-            }
-            return id.get().equals(idOther.get());
+            final ConnectionId id = flow().id();
+            final ConnectionId idOther = other.flow().id();
+            return id.equals(idOther);
         } catch (final ClassCastException e) {
             return false;
         }

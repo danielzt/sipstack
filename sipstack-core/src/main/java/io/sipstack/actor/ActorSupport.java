@@ -7,7 +7,9 @@ import java.util.function.Predicate;
 
 
 /**
- * Created by jonas on 3/27/15.
+ *
+ * @param <T>
+ * @param <S>
  */
 public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
 
@@ -59,7 +61,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     /**
-     * Always execute the function upton every event the actor receive.
+     * Always execute the function upon every event the actor receive.
      *
      * @param execute
      */
@@ -158,7 +160,7 @@ public abstract class ActorSupport<T, S extends Enum<S>> implements Actor {
     }
 
     protected void unhandled(final T event) {
-        logger().warn("Unhandled event \"{}\". Event will be dropped", event.getClass());
+        logger().warn("{} {} Unhandled event \"{}\". Event will be dropped", this.id, this.currentState, event.getClass());
     }
 
     protected void logWarn(final String msg, Object ... args) {

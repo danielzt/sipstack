@@ -1,0 +1,13 @@
+# This is the coniguration file for the simple proxy example
+
+name: Simple Proxy
+
+# The network interfaces.
+networkInterfaces:
+     - name: default
+       listen: 127.0.0.1:5060
+       transport: [udp, tcp]
+
+     # - name: eth0
+       # listen: 192.168.1.234:5060
+       # transport: [udp, tcp]

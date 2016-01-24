@@ -132,3 +132,19 @@ Changed so that we do not copy the memory again in the SipMessageStreamEncoder w
 512.0  512.0  128.0   0.0   53760.0  12362.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
 512.0  512.0  128.0   0.0   53760.0  13975.8   171008.0   27837.1   15488.0 15198.4 1920.0 1789.8   1992    1.435   0      0.000    1.435
 
+=== Jan 10 ====
+
+Tested against: 3336f19fa9a0ecc0e14afe55f38c7cd1a6cdbb50
+and against a unrelased pkts.io: c31cacf10d8c1608e91490202147313aeffbe0ea
+
+Pure UAS 5000 CPS was not an issue. Didn't really keep track of numbers but SIPp's numbers were perfect. Same for both UDP and TCP. Started to break down around 5500.
+
+For acting as a proxy (running proxy example 004) we could do 2000 CPS no problem (tcp & udp had the same results). 2500 CPS was somewhat ok but started to break down. 3000 CPS not a chance... I guess that is consistent with the pure UAS numbers since the UAS scenario is doing half the number of messages...
+
+Overall, pretty good.
+
+=== Jan 23 ===
+
+Running Proxy Example 005, which has Flow support.
+
+Pure UDP to UDP 1000 CPS was no issue. 1500 CPS started to become an issue and 2000 not a chance. Need to do some profiling to see why the big diff.

@@ -22,6 +22,7 @@ import io.sipstack.transport.FlowState;
 import io.sipstack.transport.event.FlowEvent;
 import org.hamcrest.CoreMatchers;
 import org.junit.Before;
+import org.junit.Test;
 
 import java.net.InetSocketAddress;
 import java.util.Optional;
@@ -83,32 +84,33 @@ public class TransportLayerTestBase extends SipStackTestBase {
 
     /**
      * Convenience method for making sure that a flow actually exists in the flow storage.
+     *
      * @param id
      */
-    public void assertFlowExists(final FlowId id) {
-        assertThat(defaultFlowStorage.get(id), not((FlowId)null));
+    public void assertFlowExists(final ConnectionId id) {
+        assertThat(defaultFlowStorage.get(id), not((ConnectionId) null));
     }
 
     public void assertFlowExists(final Connection connection) {
-        assertFlowExists(FlowId.create(connection.id()));
+        assertFlowExists(connection.id());
     }
 
-    public void assertFlowDoesNotExist(final FlowId id) {
-        assertThat(defaultFlowStorage.get(id), is((FlowId)null));
+    public void assertFlowDoesNotExist(final ConnectionId id) {
+        assertThat(defaultFlowStorage.get(id), is((ConnectionId) null));
     }
 
     public void assertFlowDoesNotExist(final Connection connection) {
-        assertFlowDoesNotExist(FlowId.create(connection.id()));
+        assertFlowDoesNotExist(connection.id());
     }
 
     /**
      * Convenience method for initiating a new flow based off an event, which is either a {@link SipMessage} or
      * if you pass in null (slightly awkward) then a {@link ConnectionOpenedIOEvent} will be passed in instead.
-     *
+     * <p/>
      * Also note that SIP messages will be passed through the netty pipeline through the
      * channelRead method but the various connection events is pushed through
      * the userEventTriggered.
-     *
+     * <p/>
      * Also note that a timer is scheduled for both events but with different values.
      * For the {@link ConnectionOpenedIOEvent} the timer is for ensuring that we get
      * something across the flow and if not, the flow will be killed off.
@@ -156,9 +158,9 @@ public class TransportLayerTestBase extends SipStackTestBase {
     public Connection createConnection(final Transport transport, final MockChannel channel, final SipURI vipAddress) {
         switch (transport) {
             case udp:
-                return new UdpConnection(channel, (InetSocketAddress)channel.remoteAddress(), Optional.ofNullable(vipAddress));
+                return new UdpConnection(channel, (InetSocketAddress) channel.remoteAddress(), Optional.ofNullable(vipAddress));
             case tcp:
-                return new TcpConnection(channel, (InetSocketAddress)channel.remoteAddress(), Optional.ofNullable(vipAddress));
+                return new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), Optional.ofNullable(vipAddress));
             case tls:
             case sctp:
             case ws:
@@ -179,6 +181,22 @@ public class TransportLayerTestBase extends SipStackTestBase {
      */
     public Connection initiateNewFlow(final MockChannel channel) throws Exception {
         return initiateNewFlow(channel, null);
+    }
+
+    @Test
+    public void testFlowLocalRemoteParams() {
+        final InetSocketAddress remoteAddress = new InetSocketAddress(defaultRemoteIPAddress, defaultRemotePort);
+        final MockChannel channel = createNewChannel(remoteAddress);
+        final Connection c = new TcpConnection(channel, (InetSocketAddress) channel.remoteAddress(), Optional.empty());
+        final Flow flow = new DefaultFlow(c, FlowState.INIT);
+        assertThat(flow.getTransport(), is(Transport.tcp));
+        assertThat(flow.getLocalIpAddress(), is("192.168.0.100"));
+        assertThat(flow.getLocalPort(), is(6789));
+        assertThat(flow.getRemoteIpAddress(), is("62.63.64.65"));
+        assertThat(flow.getRemotePort(), is(7080));
+
+        assertThat(flow.getLocalAddress(), is(new InetSocketAddress(defaultLocalIPAddress, defaultLocalPort)));
+        assertThat(flow.getRemoteAddress(), is(remoteAddress));
     }
 
     /**
@@ -212,13 +230,36 @@ public class TransportLayerTestBase extends SipStackTestBase {
         return new UdpConnection(channel, remoteAddress);
     }
 
+    public Connection createUdpConnection(final InetSocketAddress localAddress, final InetSocketAddress remoteAddress) {
+        final Channel channel = createNewChannel(localAddress, remoteAddress);
+        return new UdpConnection(channel, remoteAddress);
+    }
+
+    public Connection createUdpConnection(final InetSocketAddress remoteAddress) {
+        final Channel channel = createNewChannel(remoteAddress);
+        return new UdpConnection(channel, remoteAddress);
+    }
+
     public Connection createTcpConnection(final Channel channel, final InetSocketAddress remoteAddress) {
+        return new TcpConnection(channel, remoteAddress);
+    }
+
+    public Connection createTcpConnection(final InetSocketAddress remoteAddress) {
+        final Channel channel = createNewChannel(remoteAddress);
+        return new TcpConnection(channel, remoteAddress);
+    }
+
+    public Connection createTcpConnection(final InetSocketAddress localAddress, final InetSocketAddress remoteAddress) {
+        final Channel channel = createNewChannel(localAddress, remoteAddress);
         return new TcpConnection(channel, remoteAddress);
     }
 
     public MockChannel createNewChannel(final InetSocketAddress remoteAddress) {
         final InetSocketAddress localAddress = new InetSocketAddress(defaultLocalIPAddress, defaultLocalPort);
+        return createNewChannel(localAddress, remoteAddress);
+    }
 
+    public MockChannel createNewChannel(final InetSocketAddress localAddress, final InetSocketAddress remoteAddress) {
         // TODO: want to mock up the channel so that it
         // returns the correct values as well.
 

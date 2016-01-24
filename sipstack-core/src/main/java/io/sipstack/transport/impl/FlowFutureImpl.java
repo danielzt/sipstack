@@ -9,6 +9,7 @@ import io.sipstack.transport.Flow;
 import io.sipstack.transport.FlowFuture;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 
 /**
@@ -62,11 +63,11 @@ public class FlowFutureImpl implements FlowFuture, GenericFutureListener<Channel
             final FlowActor actor = flowStorage.ensureFlow(connection);
             onSuccess.accept(actor.flow());
         } else if (future.isCancelled() && onCancel != null) {
-            onCancel.accept(new CancelledFlow());
+            onCancel.accept(new CancelledFlow(null, new CancellationException("Cancelled")));
         } else if (future.cause() != null && onFailure != null) {
             System.err.println("What, it failed, why???");
             future.cause().printStackTrace();
-            onFailure.accept(new FailureFlow(future.cause()));
+            onFailure.accept(new FailureFlow(null, future.cause()));
         }
     }
 

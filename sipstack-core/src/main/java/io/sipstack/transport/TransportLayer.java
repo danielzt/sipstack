@@ -2,6 +2,8 @@ package io.sipstack.transport;
 
 import io.pkts.packet.sip.SipMessage;
 
+import java.net.InetSocketAddress;
+
 /**
  * @author jonas@jonasborjesson.com
  */
@@ -37,6 +39,8 @@ public interface TransportLayer {
      * @throws IllegalArgumentException
      */
     Flow.Builder createFlow(String host) throws IllegalArgumentException;
+
+    Flow.Builder createFlow(InetSocketAddress remoteHost) throws IllegalArgumentException;
 
 
 }

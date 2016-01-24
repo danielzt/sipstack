@@ -54,14 +54,6 @@ public abstract class AbstractConnection implements Connection {
         return vipAddress;
     }
 
-    public final void storeObject(final Object o) {
-        this.channel.attr(key).set(o);
-    }
-
-    public final Optional<Object> fetchObject() {
-        return Optional.ofNullable(this.channel.attr(key).get());
-    }
-
     protected Channel channel() {
         return this.channel;
     }

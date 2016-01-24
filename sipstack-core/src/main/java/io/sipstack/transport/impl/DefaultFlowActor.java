@@ -153,7 +153,6 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
     // =====================
     // === Init State
     // =====================
-
     private void onInit(final IOEvent event) {
 
         // if we are not in active ping mode we need to schedule the max lifetime
@@ -279,6 +278,10 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
             onFlowLifeTimeTimerTimeout(event);
         } else if (event.isSipTimerTimeout2()) {
             onSipTimerTimeout2InActive(event);
+        } else if (event.isConnectionInactiveIOEvent()) {
+            become(FlowState.CLOSING, "Remote host closed connecction");
+        } else if (event.isConnectionActiveIOEvent()) {
+            // consume
         } else {
             unhandled(event);
         }
@@ -511,6 +514,26 @@ public class DefaultFlowActor extends ActorSupport<IOEvent, FlowState> implement
     @Override
     public Connection connection() {
         return connection;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        try {
+            final DefaultFlowActor that = (DefaultFlowActor) o;
+            return flowId.equals(that.flowId);
+        } catch (final ClassCastException | NullPointerException e) {
+            return false;
+        }
+
+    }
+
+    @Override
+    public int hashCode() {
+        return flowId.hashCode();
     }
 
     private SipURI getSipOptionsTarget() {

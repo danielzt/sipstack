@@ -92,16 +92,6 @@ public class MockConnection implements Connection {
     }
 
     @Override
-    public void storeObject(Object o) {
-
-    }
-
-    @Override
-    public Optional<Object> fetchObject() {
-        return null;
-    }
-
-    @Override
     public Optional<SipURI> getVipAddress() {
         return Optional.empty();
     }

@@ -104,7 +104,7 @@ public class DefaultTransportLayerTest extends TransportLayerTestBase {
         // so now there should have been a life-cycle event saying that
         // the flow is dead.
         final FlowTerminatedEvent terminated = defaultChannelCtx.findForwardedMessageByType(FlowTerminatedEvent.class);
-        assertThat(terminated.flow().id().get(), CoreMatchers.is(connection.id()));
+        assertThat(terminated.flow().id(), CoreMatchers.is(connection.id()));
 
         // and it should not be in the storage anymore
         assertFlowDoesNotExist(connection);

@@ -9,6 +9,14 @@ import io.sipstack.transport.FlowException;
  */
 public interface ClientTransaction extends Transaction {
 
+    default boolean isClientTransaction() {
+        return true;
+    }
+
+    default ClientTransaction toClientTransaction() {
+        return this;
+    }
+
     /**
      * A {@link ClientTransaction} is created by calling {@link TransactionLayer#newClientTransaction(SipRequest)}
      * which will create a new client transaction but will NOT actually send the associated request out.

@@ -12,6 +12,22 @@ public interface Transaction {
 
     TransactionState state();
 
+    default boolean isServerTransaction() {
+        return false;
+    }
+
+    default boolean isClientTransaction() {
+        return false;
+    }
+
+    default ServerTransaction toServerTransaction() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + ServerTransaction.class.getName());
+    }
+
+    default ClientTransaction toClientTransaction() {
+        throw new ClassCastException("Cannot cast " + getClass().getName() + " into a " + ClientTransaction.class.getName());
+    }
+
     /**
      * When the {@link Transaction} is terminated the supplied function
      * will be called with a reference to 'this'.

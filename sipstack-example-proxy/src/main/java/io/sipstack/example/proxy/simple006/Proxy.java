@@ -1,4 +1,4 @@
-package io.sipstack.example.proxy.simple005;
+package io.sipstack.example.proxy.simple006;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -18,15 +18,22 @@ import io.sipstack.actor.HashWheelScheduler;
 import io.sipstack.actor.InternalScheduler;
 import io.sipstack.config.NetworkInterfaceConfiguration;
 import io.sipstack.config.NetworkInterfaceDeserializer;
+import io.sipstack.config.TransactionLayerConfiguration;
 import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.net.NetworkLayer;
 import io.sipstack.net.netty.NettyNetworkLayer;
 import io.sipstack.netty.codec.sip.Clock;
-import io.sipstack.netty.codec.sip.ConnectionEndpointId;
 import io.sipstack.netty.codec.sip.ConnectionId;
 import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.netty.codec.sip.event.ConnectionIOEvent;
 import io.sipstack.netty.codec.sip.event.IOEvent;
+import io.sipstack.transaction.ClientTransaction;
+import io.sipstack.transaction.ServerTransaction;
+import io.sipstack.transaction.Transaction;
+import io.sipstack.transaction.TransactionLayer;
+import io.sipstack.transaction.event.SipTransactionEvent;
+import io.sipstack.transaction.event.TransactionEvent;
+import io.sipstack.transaction.impl.DefaultTransactionLayer;
 import io.sipstack.transport.Flow;
 import io.sipstack.transport.TransportLayer;
 import io.sipstack.transport.event.FlowEvent;
@@ -34,26 +41,20 @@ import io.sipstack.transport.impl.DefaultTransportLayer;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
- * in Proxy 004 we utilized the Network Layer to aid us in setting up
- * the netty network layer and also to help us create new connections.
- * However, we still had to maintain those connections ourselves and
- * we even didn't solve the issue of when to kill those Connections.
- *
- * In this example we add the Transport Layer, which is a very important
- * part of any network stack. It's primary purpose is to do connection
- * management and will free us of the burden to keep track of all the
- * active connections, when to kill those connections due to inactivity
- * etc.
+ * In Proxy 005 we added the Transport Layer so we didn't have to maintain
+ * the flows (connections) ourselves however, we still had to deal with
+ * re-transmission logic etc (even though we actually didn't implement it).
+ * In SIP, the Transaction Layer is responsible for dealing with re-transmits
+ * and that is what we will be adding into this example.
  *
  * @author jonas@jonasborjesson.com
  */
 @Sharable
-public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
+public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
 
     private final SimpleProxyConfiguration config;
 
@@ -61,19 +62,50 @@ public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
      * We will use the {@link TransportLayer} to create flows for us over
      * which can send out SIP messages.
      */
-    private TransportLayer transportLayer;
+    private TransactionLayer transactionLayer;
 
     public Proxy(final SimpleProxyConfiguration config) {
         this.config = config;
         System.out.println("Starting " + config.getName());
     }
 
-    public void setTransportLayer(final TransportLayer transport) {
-        this.transportLayer = transport;
+    public void setTransactionLayer(final TransactionLayer transactionLayer) {
+        this.transactionLayer = transactionLayer;
     }
 
+    /**
+     * @param ctx
+     * @param event
+     * @throws Exception
+     */
     @Override
-    protected void channelRead0(final ChannelHandlerContext ctx, final FlowEvent event) throws Exception {
+    protected void channelRead0(final ChannelHandlerContext ctx, final TransactionEvent event) throws Exception {
+        final Transaction transaction = event.transaction();
+
+        // We will only ever get a ServerTransaction passed up ONCE so when you see a server transaction
+        // you should setup it up the way you want. This is of course unlike a ClientTransaction since
+        // we may see many responses for that transaction we will get it passed up many times. Hence, a
+        // ClientTransaction should be configured when you create it (if you care)
+        if (transaction.isServerTransaction()) {
+            final ServerTransaction serverTransaction = transaction.toServerTransaction();
+        }
+
+        if (event.isSipTransactionEvent()) {
+            final SipTransactionEvent sipTransaction = event.toSipRequestTransactionEvent();
+            final SipMessage msg = sipTransaction.message();
+            final Flow flow = sipTransaction.transaction().flow();
+            if (msg.isRequest()) {
+                final SipURI next = getNextHop(msg.toRequest());
+                proxyTo(next, flow, msg.toRequest());
+            } else {
+                final SipResponse response = msg.toResponse().copy().withPoppedVia().build();
+                transaction.send(response);
+            }
+
+        } else if (event.isTransactionTerminatedEvent()) {
+            System.out.println("Transaction terminated");
+        }
+                /*
         final Flow flow = event.flow();
         if (event.isSipFlowEvent()) {
             final SipMessage msg = event.toSipFlowEvent().message();
@@ -95,14 +127,17 @@ public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
                 connect(connectionId, onSuccess);
             }
         }
+        */
     }
 
     /**
+     * Note, unlike in Proxy005 we no longer keep track of the flow we came in over
+     * since that is part of the Transaction we maintain.
      *
      * @param destination
      * @param flow the flow over which we received this sip message.
      *                   We need this connection to stamp the correct information
-     *                   in the Via-header that came in across
+     *                   in the Via-header that came in across.
      * @param msg
      */
     private void proxyTo(final SipURI destination, final Flow flow, final SipRequest msg) {
@@ -122,12 +157,6 @@ public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
                     .withTransport(otherFlow.getTransport())
                     .withBranch()
                     .withRPortFlag()
-                    // As with a connection, we want to use the same flow coming back again
-                    // TODO: the flow should return the connection id instead
-                    // because that is what we parse it to later on. It is only
-                    // confusing. Let's add another way to encrypt the id if we wish
-                    // to do so.
-                    .withParameter(Buffers.wrap("flow"), flow.id().encode())
                     .build();
 
             final SipRequest proxyMsg = msg.copy()
@@ -147,7 +176,9 @@ public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
                     })
                     .onMaxForwardsHeader(max -> max.decrement())
                     .build();
-            otherFlow.send(proxyMsg);
+            final ClientTransaction transaction = transactionLayer.newClientTransaction(otherFlow, proxyMsg);
+            // otherFlow.send(proxyMsg);
+            transaction.start();
         };
 
         connect(destination, onSuccess);
@@ -208,7 +239,7 @@ public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
         final Consumer<Flow> onCancelled = f -> System.err.println("Flow was cancelled: " + f);
         final Consumer<Flow> onFailure = f -> System.err.println("Flow failed: " + f.getFailureCause());
 
-        return transportLayer.createFlow(remoteHost)
+        return transactionLayer.createFlow(remoteHost)
                 .withPort(remotePort)
                 .withTransport(transport)
                 .onSuccess(onSuccess)
@@ -273,7 +304,7 @@ public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
      * @param event
      */
     private void processConnectionEvent(final ConnectionIOEvent event) {
-        System.err.println("Proxy005: received a connection event " + event);
+        System.err.println("Proxy006: received a connection event " + event);
         /*
         final Connection connection = event.connection();
         if (event.isConnectionInactiveIOEvent()) {
@@ -323,13 +354,17 @@ public class Proxy extends SimpleChannelInboundHandler<FlowEvent> {
         final DefaultTransportLayer transportLayer = new DefaultTransportLayer(transportConfig, clock, scheduler);
         builder.withHandler("transport-layer", transportLayer);
 
+        final TransactionLayerConfiguration tlConfig = config.getTransactionLayerConfiguration();
+        final DefaultTransactionLayer transactionLayer = new DefaultTransactionLayer(transportLayer, clock, scheduler, tlConfig);
+        builder.withHandler("transaction-layer", transactionLayer);
+
         // Add our own proxy last, which is very important. It cannot come
-        // before the above transport-layer.
+        // before the above layers.
         builder.withHandler("proxy", proxy);
 
         final NetworkLayer network = builder.build();
         transportLayer.useNetworkLayer(network);
-        proxy.setTransportLayer(transportLayer);
+        proxy.setTransactionLayer(transactionLayer);
 
         // bring all the configured listening points up...
         network.start();

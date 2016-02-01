@@ -145,6 +145,9 @@ Overall, pretty good.
 
 === Jan 23 ===
 
+Tested against: 523c6e5ca1d16eab6988aa8fcc138dfbfff5edb4
+and against a unrelased pkts.io: c31cacf10d8c1608e91490202147313aeffbe0ea
+
 Running Proxy Example 005, which has Flow support.
 
 Pure UDP to UDP 1000 CPS was no issue. 1500 CPS started to become an issue and 2000 not a chance. Need to do some profiling to see why the big diff.

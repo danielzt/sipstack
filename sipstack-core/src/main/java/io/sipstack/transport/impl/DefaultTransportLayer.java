@@ -82,7 +82,8 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
     public DefaultTransportLayer(final TransportLayerConfiguration config,
                                  final Clock clock,
                                  final InternalScheduler scheduler) {
-        this(config, clock, new DefaultFlowStorage(config, clock), scheduler);
+        this(config, clock, new MapBasedFlowStorage(config, clock), scheduler);
+        // this(config, clock, new DefaultFlowStorage(config, clock), scheduler);
     }
 
     public void useNetworkLayer(final NetworkLayer network) {
@@ -195,7 +196,8 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
     private void invokeActor(final boolean upstream, final ChannelHandlerContext channelCtx, final FlowActor actor, final IOEvent event) {
         try {
             synchronized (actor) {
-                final GenericSingleContext<IOEvent> ctx = new GenericSingleContext<IOEvent>(clock, channelCtx, scheduler, actor.id(), this);
+                final ConnectionId key = actor.flow().id();
+                final GenericSingleContext<IOEvent> ctx = new GenericSingleContext<IOEvent>(clock, channelCtx, scheduler, key, this);
                 actor.onReceive(ctx, event);
 
                 // always favor downstream
@@ -314,6 +316,7 @@ public class DefaultTransportLayer extends InboundOutboundHandlerAdapter impleme
             }
         } catch (final ClassCastException e) {
             // TODO: log error and move on?
+            e.printStackTrace();
         }
     }
 

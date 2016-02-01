@@ -196,8 +196,8 @@ public abstract class PingTest extends TransportLayerTestBase {
         final String expectedFrom = sipOptionsConfig.getFromUser();
         final String expectedTo = sipOptionsConfig.getToUser();
 
-        assertThat(actualFrom.getUser().toString(), is(expectedFrom));
-        assertThat(actualTo.getUser().toString(), is(expectedTo));
+        assertThat(actualFrom.getUser().get().toString(), is(expectedFrom));
+        assertThat(actualTo.getUser().get().toString(), is(expectedTo));
 
         return new Object[]{connection, options};
     }

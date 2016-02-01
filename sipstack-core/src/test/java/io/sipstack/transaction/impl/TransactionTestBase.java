@@ -3,9 +3,13 @@ package io.sipstack.transaction.impl;
 import io.sipstack.ControllableClock;
 import io.sipstack.SipStackTestBase;
 import io.sipstack.config.TransactionLayerConfiguration;
+import io.sipstack.config.TransportLayerConfiguration;
 import io.sipstack.netty.codec.sip.Clock;
 import io.sipstack.netty.codec.sip.SystemClock;
 import io.sipstack.transaction.TransactionLayer;
+import io.sipstack.transport.FlowState;
+import io.sipstack.transport.impl.FlowStorage;
+import io.sipstack.transport.impl.MapBasedFlowStorage;
 import org.junit.Before;
 
 /**
@@ -44,9 +48,11 @@ public class TransactionTestBase extends SipStackTestBase {
         myApplication = new MockTransactionUser();
 
         mockChannelContext = new MockChannelHandlerContext();
-        transports = new MockTransportLayer(mockChannelContext, clock);
+        final TransportLayerConfiguration transportConfig = new TransportLayerConfiguration();
+        final FlowStorage flowStorage = new MapBasedFlowStorage(transportConfig, clock);
+        transports = new MockTransportLayer(flowStorage, mockChannelContext, clock);
 
-        transactionLayer = new DefaultTransactionLayer(transports, new SystemClock(), defaultScheduler, config);
+        transactionLayer = new DefaultTransactionLayer(transports, clock, defaultScheduler, config);
 
         transports.setChannelOutboundHandler(transactionLayer);
     }

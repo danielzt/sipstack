@@ -107,48 +107,6 @@ public class SingleContext implements ActorContext<Event>, Scheduler {
         final SipTimerEvent event = SipTimerEvent.withTimer(timer).withKey(transactionId).withContext(ctx).build();
         return scheduler.schedule(transactionLayer, event, delay);
 
-        /*
-        return scheduler.schedule(new Runnable() {
-            @Override
-            public void run() {
-                transactionLayer.processSipTimerEvent(event);
-            }
-        }, delay);
-        */
-
-        // only temp until the scheduler is working again
-        // return new CancellableImpl(null);
-        // handlerCtx.executor().sc
-
-        // throw new RuntimeException("Guess we got to come up with a new interface");
-            // return scheduler.schedule(transactionLayer, handlerCtx, event, delay);
-
-        // using the executor service associated with the handler itself
-        // makes it better in that when the event is fired, it is being
-        // executed on the correct threadpool. Otherwise it may have to
-        // do a context switch.
-        /*
-        final ScheduledFuture<?> future = handlerCtx.executor().schedule(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    final TransactionId id = (TransactionId)event.key();
-                    // transactionLayer.userEventTriggered(handlerCtx, event);
-                } catch (final Throwable t) {
-                    try {
-                        // TODO:
-                        // transactionLayer.exceptionCaught(handlerCtx, t);
-                    } catch (Exception e) {
-                        // i f@#$ give up.
-                        e.printStackTrace();
-                    }
-                }
-                // handlerCtx.fireUserEventTriggered(event);
-            }
-        }, delay.toMillis(), TimeUnit.MILLISECONDS);
-
-        return new CancellableImpl(future);
-        */
     }
 
     private static class CancellableImpl implements Cancellable {

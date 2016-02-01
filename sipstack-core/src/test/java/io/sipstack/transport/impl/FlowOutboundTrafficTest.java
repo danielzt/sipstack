@@ -77,7 +77,7 @@ public abstract class FlowOutboundTrafficTest extends TransportLayerTestBase {
         final ContactHeader contactHeader = msg.getContactHeader();
         assertThat(contactHeader.getAddress().getURI().toSipURI().getHost().toString(), is(defaultLocalIPAddress));
         assertThat(contactHeader.getAddress().getURI().toSipURI().getPort(), is(defaultLocalPort));
-        assertThat(contactHeader.getAddress().getURI().toSipURI().getTransportParam(), is(transport.toBuffer()));
+        assertThat(contactHeader.getAddress().getURI().toSipURI().getTransportParam().get(), is(transport));
     }
 
     /**

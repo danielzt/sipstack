@@ -73,7 +73,8 @@ public class TransportLayerTestBase extends SipStackTestBase {
 
     public void reset(final TransportLayerConfiguration config) {
         defaultScheduler = new MockScheduler(new CountDownLatch(1));
-        defaultFlowStorage = new DefaultFlowStorage(config, defaultClock);
+        defaultFlowStorage = new MapBasedFlowStorage(config, defaultClock);
+        // defaultFlowStorage = new DefaultFlowStorage(config, defaultClock);
         transportLayer = createTransportLayer(config);
         defaultChannelCtx = new MockChannelHandlerContext(transportLayer);
     }

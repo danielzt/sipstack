@@ -35,6 +35,8 @@ import io.sipstack.transport.impl.InternalFlow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetSocketAddress;
+
 /**
  * @author jonas@jonasborjesson.com
  */
@@ -239,16 +241,6 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
             // time...
             synchronized (transaction) {
                 try {
-
-                    //
-                    // TODO: not sure we should do this anymore, which also means we don't need to
-                    // pass in the flow on the invokeTransaction
-                    //
-                    // the flow may change so keep it up to date
-                    // if (holder.flow != flow && flow != null) {
-                        // holder.flow = flow;
-                    // }
-
                     transaction.onReceive(ctx, event);
                 } catch (final Throwable t) {
                     // TODO: if the actor throws an exception we should
@@ -324,6 +316,11 @@ public class DefaultTransactionLayer extends InboundOutboundHandlerAdapter imple
     @Override
     public Flow.Builder createFlow(String host) throws IllegalArgumentException {
         return transportLayer.createFlow(host);
+    }
+
+    @Override
+    public Flow.Builder createFlow(final InetSocketAddress remoteAddress) throws IllegalArgumentException {
+        return transportLayer.createFlow(remoteAddress);
     }
 
     /**

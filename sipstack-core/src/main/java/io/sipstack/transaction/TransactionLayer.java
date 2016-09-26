@@ -5,6 +5,8 @@ import io.pkts.packet.sip.SipMessage;
 import io.pkts.packet.sip.SipRequest;
 import io.sipstack.transport.Flow;
 
+import java.net.InetSocketAddress;
+
 /**
  * Represents the SIP transaction layer through which one can send messages. Each message
  * will always be associated with a transaction (so there is no method to ask to create
@@ -40,6 +42,8 @@ public interface TransactionLayer {
     // Transaction send(SipMessage msg);
 
     Flow.Builder createFlow(String host) throws IllegalArgumentException;
+
+    Flow.Builder createFlow(InetSocketAddress remoteAddress);
 
     default Flow.Builder createFlow(final Buffer host) throws IllegalArgumentException {
         return createFlow(host.toString());

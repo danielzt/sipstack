@@ -81,35 +81,11 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
     @Override
     protected void channelRead0(final ChannelHandlerContext ctx, final TransactionEvent event) throws Exception {
         final Transaction transaction = event.transaction();
-
-        // We will only ever get a ServerTransaction passed up ONCE so when you see a server transaction
-        // you should setup it up the way you want. This is of course unlike a ClientTransaction since
-        // we may see many responses for that transaction we will get it passed up many times. Hence, a
-        // ClientTransaction should be configured when you create it (if you care)
-        if (transaction.isServerTransaction()) {
-            final ServerTransaction serverTransaction = transaction.toServerTransaction();
-        }
+        final Flow flow = transaction.flow();
 
         if (event.isSipTransactionEvent()) {
             final SipTransactionEvent sipTransaction = event.toSipRequestTransactionEvent();
             final SipMessage msg = sipTransaction.message();
-            final Flow flow = sipTransaction.transaction().flow();
-            if (msg.isRequest()) {
-                final SipURI next = getNextHop(msg.toRequest());
-                proxyTo(next, flow, msg.toRequest());
-            } else {
-                final SipResponse response = msg.toResponse().copy().withPoppedVia().build();
-                transaction.send(response);
-            }
-
-        } else if (event.isTransactionTerminatedEvent()) {
-            System.out.println("Transaction terminated");
-        }
-                /*
-        final Flow flow = event.flow();
-        if (event.isSipFlowEvent()) {
-            final SipMessage msg = event.toSipFlowEvent().message();
-
             if (msg.isRequest()) {
                 final SipURI next = getNextHop(msg.toRequest());
                 proxyTo(next, flow, msg.toRequest());
@@ -126,8 +102,9 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
                 };
                 connect(connectionId, onSuccess);
             }
+        } else if (event.isTransactionTerminatedEvent()) {
+            System.out.println("Transaction terminated");
         }
-        */
     }
 
     /**
@@ -157,6 +134,7 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
                     .withTransport(otherFlow.getTransport())
                     .withBranch()
                     .withRPortFlag()
+                    .withParameter(Buffers.wrap("flow"), flow.id().encode())
                     .build();
 
             final SipRequest proxyMsg = msg.copy()
@@ -176,9 +154,7 @@ public class Proxy extends SimpleChannelInboundHandler<TransactionEvent> {
                     })
                     .onMaxForwardsHeader(max -> max.decrement())
                     .build();
-            final ClientTransaction transaction = transactionLayer.newClientTransaction(otherFlow, proxyMsg);
-            // otherFlow.send(proxyMsg);
-            transaction.start();
+            otherFlow.send(proxyMsg);
         };
 
         connect(destination, onSuccess);

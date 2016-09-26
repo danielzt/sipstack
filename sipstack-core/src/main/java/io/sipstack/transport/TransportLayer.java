@@ -5,6 +5,9 @@ import io.pkts.packet.sip.SipMessage;
 import java.net.InetSocketAddress;
 
 /**
+ * The {@link TransportLayer} is responsible for managing {@link Flow}s, which essentially are
+ * bi-directional stream of data between two endpoints.
+ *
  * @author jonas@jonasborjesson.com
  */
 public interface TransportLayer {

@@ -4,6 +4,7 @@
 function join { local IFS="$1"; shift; echo "$*"; }
 
 # top -p `ps -edalf | grep [s]ipstack.yaml | awk '{print $4}'`,$(join , `pidof sipp`)
-top -p `ps -edalf | grep [P]roxy | awk '{print $4}'`,$(join , `pidof sipp`)
+# top -p `ps -edalf | grep [P]roxy | awk '{print $4}'`,$(join , `pidof sipp`)
+top -p `ps -edalf | grep [s]imple-proxy | awk '{print $4}'`,$(join , `pidof sipp`)
 # top -p `ps -edalf | grep [U]AS | awk '{print $4}'`,$(join , `pidof sipp`)
 # top -p `ps -edalf | grep [P]roxy | awk '{print $4}'`,$(join , `pidof sipp`)
